@@ -159,3 +159,19 @@ def test_dual_field_tensor():
     assert sp.expand(wedge(F, hodge(F, eta))[vol] - (Bx**2 + By**2 + Bz**2 - Ex**2 - Ey**2 - Ez**2)) == 0
     assert sp.expand(wedge(F, F)[vol] + 2 * (Ex * Bx + Ey * By + Ez * Bz)) == 0
     assert sp.expand(inner(F, F, eta) - (Bx**2 + By**2 + Bz**2 - Ex**2 - Ey**2 - Ez**2)) == 0
+
+
+# --- Эрмитово произведение: антилинейно по первому аргументу ------------------
+
+def test_hermitian_product_realification():
+    x1, y1, x2, y2, c = sp.symbols("x1 y1 x2 y2 c", real=True)
+    u, v = x1 + sp.I * y1, x2 + sp.I * y2
+
+    def h(a, b):
+        return sp.expand(sp.conjugate(a) * b)
+
+    assert sp.expand(h(u, (1 + sp.I) * v) - (1 + sp.I) * h(u, v)) == 0        # линейно по второму
+    assert sp.expand(h((1 + sp.I) * u, v) - (1 - sp.I) * h(u, v)) == 0        # антилинейно по первому
+    assert sp.expand(sp.re(h(u, v)) - (x1 * x2 + y1 * y2)) == 0                # Re = евклидова метрика
+    assert sp.expand(sp.im(h(u, v)) - (x1 * y2 - y1 * x2)) == 0                # Im = (dx∧dy)(u, v)
+    assert sp.expand(sp.im(h(u, sp.I * v)) - sp.re(h(u, v))) == 0              # g(u, v) = Im⟨u|Jv⟩

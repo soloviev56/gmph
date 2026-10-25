@@ -65,6 +65,19 @@ subtitle: "Обозначения и соглашения о знаках, ед�
   У Ландау и Лифшица скобка определена с противоположным знаком:
   $[f, g] = -\{f, g\}$, поэтому там $\dot f = \partial_t f + [H, f]$.
 
+## Комплексные пространства
+
+- Эрмитово скалярное произведение антилинейно по **первому** аргументу и
+  линейно по второму, как принято в физике:
+  $\langle u | c\,v\rangle = c\,\langle u | v\rangle$,
+  $\langle c\,u | v\rangle = \bar c\,\langle u | v\rangle$; в ортонормированном
+  базисе $\langle u | v\rangle = \sum_k \bar u^k v^k$.
+- Сопряжённый оператор: $\langle u | A v\rangle = \langle A^\dagger u | v\rangle$.
+- Овеществление: при $z^k = x^k + i y^k$ вещественная часть
+  $\operatorname{Re}\langle u|v\rangle$ — евклидова метрика $g$ на $\R^{2n}$, мнимая часть
+  $\operatorname{Im}\langle u|v\rangle = \sum_k \dd x^k\wedge\dd y^k\,(u, v)$, умножение на $i$ —
+  оператор $J$; при этом $g(u, v) = \operatorname{Im}\langle u | J v\rangle$.
+
 ## Группы Ли
 
 - Генераторы матричной группы Ли в геометрических главах вещественные:
