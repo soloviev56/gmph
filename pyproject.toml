@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gmph"
+version = "0.1.0"
+description = "Вычислительное ядро пособия «Геометрические методы в физике»"
+requires-python = ">=3.12"
+dependencies = ["sympy>=1.14", "numpy", "scipy"]
+license = { text = "MIT" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,15 @@
+---
+title: "Карта тем"
+execute:
+  freeze: false
+  echo: false
+---
+
+Стрелка ведёт от темы к темам, которые на неё опираются. Узлы графа
+кликабельны. Карта строится автоматически из заголовков статей.
+
+```{python}
+#| output: asis
+# _generated/map.md пишет scripts/topics.py перед каждой сборкой
+print(open("_generated/map.md", encoding="utf-8").read())
+```

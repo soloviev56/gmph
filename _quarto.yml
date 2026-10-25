@@ -1,0 +1,51 @@
+project:
+  type: website
+  pre-render: scripts/topics.py
+  render:
+    - "*.qmd"
+    - "math/**/*.qmd"
+    - "physics/**/*.qmd"
+  resources:
+    - "_generated/topics.json"
+
+lang: ru
+
+website:
+  title: "Геометрические методы в физике"
+  search: true
+  page-navigation: true
+  page-footer:
+    center: >-
+      Текст — <a href="https://creativecommons.org/licenses/by-sa/4.0/deed.ru">CC BY-SA 4.0</a>,
+      код — MIT
+  sidebar:
+    style: docked
+    contents:
+      - index.qmd
+      - conventions.qmd
+      - map.qmd
+      - section: "Математический аппарат"
+        contents: "math/**/*.qmd"
+      - section: "Физика"
+        contents: "physics/**/*.qmd"
+
+filters:
+  # pre-ast: блок должен появиться до того, как Quarto обработает врезки (callout)
+  - path: filters/topics.lua
+    at: pre-ast
+
+format:
+  html:
+    theme:
+      light: cosmo
+      dark: darkly
+    toc: true
+    number-sections: false
+    html-math-method: mathjax
+    include-before-body: _macros.html
+    code-tools: true
+    code-fold: false
+
+execute:
+  freeze: auto
+  warning: false
