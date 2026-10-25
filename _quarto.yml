@@ -12,6 +12,9 @@ lang: ru
 
 website:
   title: "Геометрические методы в физике"
+  site-url: https://soloviev56.github.io/gmph/
+  repo-url: https://github.com/soloviev56/gmph
+  repo-actions: [edit, issue]
   search: true
   page-navigation: true
   page-footer:
