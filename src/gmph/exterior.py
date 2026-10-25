@@ -1,0 +1,120 @@
+"""Внешняя алгебра в компонентах: формы, внешнее произведение, оператор Ходжа.
+
+Форма хранится как словарь {возрастающий набор индексов: коэффициент};
+индексы нумеруются с 1. Например, 3 e¹∧e³ − e²∧e³ — это
+``{(1, 3): 3, (2, 3): -1}``, а 0-форма (число) c — ``{(): c}``.
+Коэффициенты при упорядоченных индексах совпадают с компонентами
+ω_{i₁…i_k} в соглашении ω = (1/k!) ω_{i₁…i_k} e^{i₁}∧…∧e^{i_k}.
+"""
+
+from itertools import combinations
+
+import sympy as sp
+
+
+def sort_with_sign(indices):
+    """Упорядочить индексы; вернуть (знак перестановки, набор) или (0, None) при повторе."""
+    idx, sign = list(indices), 1
+    if len(set(idx)) < len(idx):
+        return 0, None
+    for i in range(len(idx)):
+        for j in range(len(idx) - 1 - i):
+            if idx[j] > idx[j + 1]:
+                idx[j], idx[j + 1] = idx[j + 1], idx[j]
+                sign = -sign
+    return sign, tuple(idx)
+
+
+def _clean(form):
+    return {K: c for K, c in ((K, sp.simplify(c)) for K, c in form.items()) if c != 0}
+
+
+def add(*forms):
+    """Сумма форм."""
+    result = {}
+    for form in forms:
+        for I, c in form.items():
+            result[I] = result.get(I, 0) + c
+    return _clean(result)
+
+
+def scale(c, form):
+    """Произведение формы на число."""
+    return _clean({I: c * x for I, x in form.items()})
+
+
+def wedge(*forms):
+    """Внешнее произведение форм."""
+    result = {(): 1}
+    for b in forms:
+        product = {}
+        for I, x in result.items():
+            for J, y in b.items():
+                sign, K = sort_with_sign(I + J)
+                if sign:
+                    product[K] = product.get(K, 0) + sign * x * y
+        result = _clean(product)
+    return result
+
+
+def value(form, *vectors):
+    """Значение k-формы на k векторах: e^I(v_1, …, v_k) = det[v_j^{i_m}]."""
+    total = 0
+    for I, c in form.items():
+        minor = sp.Matrix(len(I), len(I), lambda m, j: vectors[j][I[m] - 1])
+        total += c * minor.det()
+    return sp.simplify(total)
+
+
+def raise_indices(form, g):
+    """Контравариантные компоненты α^I = Σ_K det(g⁻¹[I, K]) α_K (I, K возрастающие)."""
+    g_inv = sp.Matrix(g).inv()
+    n = g_inv.rows
+    result = {}
+    for K, c in form.items():
+        for I in combinations(range(1, n + 1), len(K)):
+            minor = g_inv.extract([i - 1 for i in I], [k - 1 for k in K]) if K else sp.Matrix([[1]])
+            result[I] = result.get(I, 0) + minor.det() * c
+    return _clean(result)
+
+
+def inner(alpha, beta, g):
+    """Скалярное произведение k-форм, порождённое метрикой: ⟨α, β⟩ = Σ_I α^I β_I."""
+    up = raise_indices(alpha, g)
+    return sp.simplify(sum((up.get(I, 0) * c for I, c in beta.items()), sp.S(0)))
+
+
+def volume(g):
+    """Форма объёма √|det g| e¹∧…∧eⁿ."""
+    g = sp.Matrix(g)
+    return {tuple(range(1, g.rows + 1)): sp.sqrt(sp.Abs(g.det()))}
+
+
+def hodge(form, g):
+    """Оператор Ходжа: α∧⋆β = ⟨α, β⟩ vol.
+
+    В компонентах (⋆α)_J = √|det g| Σ_I α^I ε_{IJ}, где J — дополнение I,
+    а ε_{IJ} — знак перестановки (I, J) набора (1, …, n).
+    """
+    g = sp.Matrix(g)
+    n = g.rows
+    root = sp.sqrt(sp.Abs(g.det()))
+    result = {}
+    for I, c in raise_indices(form, g).items():
+        J = tuple(i for i in range(1, n + 1) if i not in I)
+        sign, _ = sort_with_sign(I + J)
+        result[J] = result.get(J, 0) + sign * root * c
+    return _clean(result)
+
+
+def show(form, names=None):
+    """Запись формы строкой: names — обозначения базисных 1-форм (по умолчанию e¹, e², …)."""
+    if not form:
+        return "0"
+    sup = str.maketrans("0123456789", "⁰¹²³⁴⁵⁶⁷⁸⁹")
+    name = (lambda i: names[i - 1]) if names else (lambda i: "e" + str(i).translate(sup))
+    terms = []
+    for I, c in sorted(form.items(), key=lambda item: (len(item[0]), item[0])):
+        basis = "∧".join(name(i) for i in I)
+        terms.append(f"({c})" + (f"·{basis}" if basis else ""))
+    return " + ".join(terms)

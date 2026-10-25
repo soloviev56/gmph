@@ -127,3 +127,35 @@ def test_nonabelian_curvature_and_gauge():
     A_new = [U * A[m] * U.inv() + sp.I * sp.diff(U, UV[m]) * U.inv() for m in range(2)]
     for m in range(2):
         assert sp.simplify(Dm(m, U * chi, A_new) - U * Dm(m, chi, A)) == sp.zeros(2, 1)
+
+
+# --- Оператор Ходжа: α∧⋆β = ⟨α, β⟩ vol ---------------------------------------
+
+def test_hodge_signs():
+    from gmph.exterior import hodge, scale
+
+    assert hodge({(1,): 1}, sp.eye(3)) == {(2, 3): 1}            # ⋆dx = dy∧dz
+    assert hodge({(1, 2): 1}, sp.eye(3)) == {(3,): 1}            # ⋆dx∧dy = dz
+    eta = sp.diag(1, -1, -1, -1)
+    two_form = {(1, 2): 1}                                       # dx⁰∧dx¹
+    assert hodge(hodge(two_form, eta), eta) == scale(-1, two_form)
+
+
+def test_dual_field_tensor():
+    from gmph.exterior import hodge, inner, wedge
+
+    eta = sp.diag(1, -1, -1, -1)
+    Ex, Ey, Ez, Bx, By, Bz = sp.symbols("E_x E_y E_z B_x B_y B_z", real=True)
+
+    def field(E, B):
+        # F_{0i} = E^i, F_{12} = −B_z, F_{13} = B_y, F_{23} = −B_x; индексы 1…4 ↔ x⁰…x³
+        return {(1, 2): E[0], (1, 3): E[1], (1, 4): E[2],
+                (2, 3): -B[2], (2, 4): B[1], (3, 4): -B[0]}
+
+    E, B = (Ex, Ey, Ez), (Bx, By, Bz)
+    F = field(E, B)
+    assert hodge(F, eta) == field([-b for b in B], E)
+    vol = (1, 2, 3, 4)
+    assert sp.expand(wedge(F, hodge(F, eta))[vol] - (Bx**2 + By**2 + Bz**2 - Ex**2 - Ey**2 - Ez**2)) == 0
+    assert sp.expand(wedge(F, F)[vol] + 2 * (Ex * Bx + Ey * By + Ez * Bz)) == 0
+    assert sp.expand(inner(F, F, eta) - (Bx**2 + By**2 + Bz**2 - Ex**2 - Ey**2 - Ez**2)) == 0

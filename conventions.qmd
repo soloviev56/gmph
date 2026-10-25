@@ -43,6 +43,14 @@ subtitle: "Обозначения и соглашения о знаках, ед�
   пересчитываются.
 - Ориентация $\R^3$ правая; форма объёма в карте с метрикой $g$:
   $\mathrm{vol} = \sqrt{|\det g|}\;\dd x^1\wedge\dots\wedge \dd x^n$.
+  В пространстве-времени положительно ориентирован базис $(\partial_0, \partial_1, \partial_2, \partial_3)$,
+  $\mathrm{vol} = \dd x^0\wedge\dd x^1\wedge\dd x^2\wedge\dd x^3$.
+- Оператор Ходжа определяется равенством
+  $\alpha\wedge\hodge\beta = \langle\alpha, \beta\rangle\,\mathrm{vol}$, где
+  $\langle\alpha, \beta\rangle = \frac{1}{k!}\,\alpha^{i_1\dots i_k}\beta_{i_1\dots i_k}$
+  (индексы подняты метрикой). Тогда $\hodge\hodge = (-1)^{k(n-k)}\operatorname{sign}\det g$
+  на $k$-формах; в $\R^3$: $\hodge\dd x = \dd y\wedge\dd z$ (и циклически),
+  $\hodge(\dd x\wedge\dd y) = \dd z$; в пространстве Минковского $\hodge\hodge = -1$ на 2-формах.
 
 ## Гамильтонова механика
 
@@ -77,6 +85,10 @@ subtitle: "Обозначения и соглашения о знаках, ед�
   $F^{0i} = -E^i$, $F^{12} = -B_z$ (и циклически), а 2-форма поля
   $F = \frac12 F_{\mu\nu}\,\dd x^\mu\wedge \dd x^\nu = \dd A$, где
   $A = A_\mu \dd x^\mu$.
+  Дуальная форма $\hodge F$ получается из $F$ заменой $\mathbf E \to -\mathbf B$,
+  $\mathbf B \to \mathbf E$; инварианты поля
+  $F\wedge\hodge F = (\mathbf B^2 - \mathbf E^2)\,\mathrm{vol}$,
+  $F\wedge F = -2\,(\mathbf E\cdot\mathbf B)\,\mathrm{vol}$.
 - 4-ток $j^\mu = (c\rho, \mathbf{j})$; уравнения Максвелла
   $\partial_\lambda F_{\mu\nu} + \partial_\mu F_{\nu\lambda} + \partial_\nu F_{\lambda\mu} = 0$
   (то есть $\dd F = 0$) и $\partial_\nu F^{\mu\nu} = -\frac{4\pi}{c}\, j^\mu$.
