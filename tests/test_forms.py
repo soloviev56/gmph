@@ -1,7 +1,7 @@
 import sympy as sp
-from sympy.diffgeom import Differential, WedgeProduct
+from sympy.diffgeom import Differential, TensorProduct, WedgeProduct
 
-from gmph.forms import chart, components, pair, plane_polar, to_symbols
+from gmph.forms import chart, components, matrix, pair, plane_polar, to_symbols
 
 
 def test_dual_basis():
@@ -49,3 +49,12 @@ def test_area_form_in_polar_coordinates():
     dx, dy = cart.forms
     e_r, e_phi = polar.vectors
     assert pair(WedgeProduct(dx, dy), e_r, e_phi) == polar.symbols[0]
+
+
+def test_euclidean_metric_in_polar_coordinates():
+    cart, polar = plane_polar()
+    dx, dy = cart.forms
+    r = polar.symbols[0]
+    g = TensorProduct(dx, dx) + TensorProduct(dy, dy)
+    assert matrix(g, polar) == sp.diag(1, r**2)
+    assert matrix(g, cart) == sp.eye(2)

@@ -87,6 +87,12 @@ def components(form, chart_):
     return [pair(form, e, chart=chart_) for e in chart_.vectors]
 
 
+def matrix(tensor, chart_):
+    """Матрица компонент T_ij = T(∂_i, ∂_j) ковариантного 2-тензора в данной карте."""
+    e = chart_.vectors
+    return sp.Matrix(len(e), len(e), lambda i, j: pair(tensor, e[i], e[j], chart=chart_))
+
+
 def _chart_of(vectors):
     systems = {f._coord_sys for v in vectors for f in v.atoms(BaseVectorField)}
     if len(systems) != 1:
