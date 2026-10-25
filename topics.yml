@@ -1,0 +1,891 @@
+# Карта тем пособия — единый источник правды о составе, уровнях и связях.
+#
+# Раздел (section) соответствует каталогу, где лежат его статьи:
+# статья темы `foo` раздела `math/forms` — это math/forms/foo.qmd
+# (с полем `topic: foo` в заголовке).
+#
+# Поля темы:
+#   id       — уникальный идентификатор (латиница, дефисы);
+#   title    — название;
+#   level    — курс, начиная с которого тему можно читать (1–4);
+#   requires — темы, которые нужно знать заранее (только прямые зависимости;
+#              уровень каждой из них не выше уровня самой темы);
+#   about    — что входит в тему.
+#
+# Предполагается знание стандартных университетских курсов первых семестров:
+# математический анализ, линейная алгебра, обыкновенные дифференциальные
+# уравнения, общая физика.
+
+sections:
+
+# ============================ Математический аппарат ============================
+
+- id: math/algebra
+  title: Тензорная и внешняя алгебра
+  topics:
+  - id: tensors
+    title: Тензоры и тензорное произведение
+    level: 1
+    requires: [covectors]
+    about: Полилинейные функции; тензоры типа (p, q); закон преобразования компонент; свёртка.
+  - id: metric
+    title: "Метрика: подъём и опускание индексов"
+    level: 1
+    requires: [tensors]
+    about: Скалярное произведение как тензор; изоморфизмы ♭ и ♯; ортонормированные и косоугольные базисы; псевдоевклидова метрика.
+  - id: exterior-algebra
+    title: Внешняя алгебра
+    level: 1
+    requires: [tensors]
+    about: Антисимметричные тензоры; внешнее произведение; ориентированные площади и объёмы; определитель как форма объёма.
+  - id: orientation
+    title: Ориентация и форма объёма
+    level: 1
+    requires: [exterior-algebra, metric]
+    about: Ориентация векторного пространства; каноническая форма объёма √|g| dx¹∧…∧dxⁿ.
+  - id: hodge-algebraic
+    title: Оператор Ходжа в линейной алгебре
+    level: 1
+    requires: [orientation]
+    about: Дуальность k- и (n−k)-векторов; векторное произведение как ⋆(a∧b); ⋆⋆ и знаки в евклидовом и псевдоевклидовом случаях.
+  - id: complex-spaces
+    title: Комплексные векторные пространства
+    level: 1
+    requires: [metric]
+    about: Эрмитово скалярное произведение; сопряжённый оператор; унитарные и эрмитовы операторы; бра и кеты.
+  - id: spectral-finite
+    title: Спектральная теорема в конечной размерности
+    level: 1
+    requires: [complex-spaces]
+    about: Собственные векторы; диагонализация симметричных и эрмитовых матриц; одновременная диагонализация коммутирующих операторов.
+
+- id: math/forms
+  title: Дифференциальные формы
+  topics:
+  - id: covectors
+    title: Ковекторы и 1-формы
+    level: 1
+    requires: []
+    about: Вектор и ковектор; дуальный базис; законы преобразования компонент; дифференциал функции; почему df — не grad f.
+  - id: manifolds
+    title: Гладкие многообразия
+    level: 2
+    requires: [covectors]
+    about: Карты и атласы; функции перехода; примеры из физики — сфера, тор, SO(3), фазовое пространство.
+  - id: tangent-vectors
+    title: Касательные векторы и векторные поля
+    level: 2
+    requires: [manifolds]
+    about: Вектор как производная по направлению; касательное пространство; векторные поля.
+  - id: flows
+    title: Потоки векторных полей
+    level: 2
+    requires: [tangent-vectors]
+    about: Интегральные кривые и ОДУ; поток как однопараметрическая группа; коммутатор векторных полей.
+  - id: differential-forms
+    title: Дифференциальные k-формы
+    level: 2
+    requires: [exterior-algebra, tangent-vectors]
+    about: Поля внешних форм на многообразии; компоненты и базис; значение формы на векторах.
+  - id: exterior-derivative
+    title: Внешний дифференциал
+    level: 2
+    requires: [differential-forms]
+    about: Аксиоматика d; d² = 0 как симметрия смешанных производных; правило Лейбница.
+  - id: hodge-star
+    title: Оператор Ходжа на многообразии
+    level: 2
+    requires: [differential-forms, hodge-algebraic]
+    about: ⋆ в криволинейных координатах и в пространстве Минковского; вычисление в SymPy.
+  - id: vector-calculus-forms
+    title: Векторный анализ на языке форм
+    level: 2
+    requires: [exterior-derivative, hodge-star]
+    about: grad, rot, div через d, ⋆, ♭, ♯; тождества rot grad = 0 и div rot = 0; формулы в криволинейных координатах без запоминания коэффициентов Ламе.
+  - id: pullback
+    title: Отображения многообразий и перенос форм
+    level: 2
+    requires: [differential-forms]
+    about: Перенос форм назад (pullback) и векторов вперёд; замена переменных как pullback; d коммутирует с pullback.
+  - id: integration
+    title: Интегрирование форм
+    level: 2
+    requires: [pullback, orientation]
+    about: Интеграл k-формы по k-мерной поверхности; якобиан как следствие внешней алгебры; ориентированные и неориентированные интегралы.
+  - id: stokes
+    title: Обобщённая теорема Стокса
+    level: 2
+    requires: [integration, exterior-derivative]
+    about: ∫∂Ω ω = ∫Ω dω; формулы Ньютона–Лейбница, Грина, Стокса и Гаусса–Остроградского как частные случаи; двойственность ∂² = 0 и d² = 0.
+  - id: closed-exact
+    title: Замкнутые и точные формы
+    level: 2
+    requires: [exterior-derivative]
+    about: Лемма Пуанкаре; существование потенциала; контрпример dφ на плоскости без начала координат.
+  - id: interior-lie
+    title: Внутреннее произведение и производная Ли
+    level: 2
+    requires: [flows, exterior-derivative]
+    about: ι_X; производная Ли тензоров; формула Картана L_X = dι_X + ι_X d.
+  - id: codifferential
+    title: Кодифференциал и оператор Лапласа–де Рама
+    level: 3
+    requires: [hodge-star, exterior-derivative]
+    about: δ = ±⋆d⋆; Δ = dδ + δd; лапласиан и даламбертиан на формах.
+  - id: de-rham
+    title: Когомологии де Рама
+    level: 3
+    requires: [closed-exact, stokes]
+    about: Замкнутые формы по модулю точных; топология области и существование потенциалов; связь с эффектом Ааронова–Бома.
+  - id: frobenius
+    title: Распределения и теорема Фробениуса
+    level: 3
+    requires: [interior-lie]
+    about: Интегрируемость полей плоскостей; голономные и неголономные связи.
+
+- id: math/lie
+  title: Группы Ли и симметрии
+  topics:
+  - id: groups-basics
+    title: Группы и симметрии
+    level: 1
+    requires: []
+    about: Группа, подгруппа, гомоморфизм, факторгруппа; группы симметрии фигур, кристаллов и уравнений.
+  - id: representations-finite
+    title: Представления конечных групп
+    level: 2
+    requires: [groups-basics, spectral-finite]
+    about: Неприводимые представления; характеры; лемма Шура; группа перестановок.
+  - id: matrix-lie-groups
+    title: Матричные группы Ли
+    level: 2
+    requires: [groups-basics, manifolds]
+    about: O(n), SO(n), U(n), SU(n), SL(n), SE(3); группа как многообразие.
+  - id: lie-algebras
+    title: Алгебры Ли
+    level: 2
+    requires: [matrix-lie-groups]
+    about: Касательное пространство в единице; генераторы; коммутатор и структурные константы; экспоненциальное отображение.
+  - id: so3-su2
+    title: Вращения — SO(3) и SU(2)
+    level: 2
+    requires: [lie-algebras]
+    about: Параметризации вращений; кватернионы; двулистное накрытие SU(2) → SO(3); топология SO(3).
+  - id: lorentz-group
+    title: Группа Лоренца и группа Пуанкаре
+    level: 2
+    requires: [lie-algebras, minkowski]
+    about: Повороты и бусты; компоненты связности; алгебра Ли; SL(2, C) как накрытие.
+  - id: group-actions
+    title: Действия групп на многообразиях
+    level: 2
+    requires: [lie-algebras, flows]
+    about: Орбиты и стабилизаторы; фундаментальные векторные поля; инвариантные функции.
+  - id: invariant-operators
+    title: Инвариантные дифференциальные операторы
+    level: 2
+    requires: [group-actions]
+    about: Коммутация оператора с генераторами; инвариантность лапласиана и даламбертиана; размножение решений симметриями.
+  - id: lie-symmetries-ode
+    title: Симметрии дифференциальных уравнений
+    level: 3
+    requires: [group-actions]
+    about: Метод Ли; понижение порядка; автомодельные решения.
+  - id: killing
+    title: Изометрии и векторы Киллинга
+    level: 3
+    requires: [group-actions, interior-lie, metric]
+    about: Уравнение Киллинга L_ξ g = 0; максимально симметричные пространства; 10 полей Киллинга пространства Минковского.
+  - id: lie-representations
+    title: Представления групп и алгебр Ли
+    level: 3
+    requires: [lie-algebras, representations-finite]
+    about: Представления и их генераторы; неприводимость; присоединённое представление; операторы Казимира.
+  - id: su2-reps
+    title: Представления SU(2)
+    level: 3
+    requires: [lie-representations, so3-su2]
+    about: Неприводимые представления со спином j; повышающий и понижающий операторы; сложение моментов и коэффициенты Клебша–Гордана.
+  - id: spherical-harmonics
+    title: Сферические функции
+    level: 3
+    requires: [su2-reps, invariant-operators]
+    about: Сферические гармоники как базис представлений SO(3); лапласиан на сфере.
+  - id: wigner-eckart
+    title: Тензорные операторы и теорема Вигнера–Эккарта
+    level: 4
+    requires: [su2-reps]
+    about: Неприводимые тензорные операторы; правила отбора.
+  - id: su3
+    title: Группа SU(3)
+    level: 4
+    requires: [lie-representations]
+    about: Алгебра su(3); веса и корни; мультиплеты кварковой модели.
+  - id: clifford-spinors
+    title: Алгебры Клиффорда и спиноры
+    level: 4
+    requires: [lorentz-group, lie-representations]
+    about: Алгебра Клиффорда; гамма-матрицы; спинорное представление группы Лоренца.
+
+- id: math/symplectic
+  title: Симплектическая и контактная геометрия
+  topics:
+  - id: symplectic-linear
+    title: Симплектическое векторное пространство
+    level: 2
+    requires: [exterior-algebra]
+    about: Невырожденная кососимметричная форма; канонический базис; симплектические матрицы.
+  - id: symplectic-manifolds
+    title: Симплектические многообразия
+    level: 2
+    requires: [symplectic-linear, differential-forms]
+    about: Замкнутая невырожденная 2-форма; кокасательное расслоение и форма Лиувилля; теорема Дарбу.
+  - id: hamiltonian-fields
+    title: Гамильтоновы векторные поля
+    level: 2
+    requires: [symplectic-manifolds, interior-lie]
+    about: ι_X ω = −dH; сохранение ω и фазового объёма (теорема Лиувилля); движение вдоль линий уровня H.
+  - id: poisson-brackets
+    title: Скобка Пуассона
+    level: 2
+    requires: [hamiltonian-fields, lie-algebras]
+    about: Скобка через симплектическую форму; тождество Якоби; алгебра Ли наблюдаемых; интегралы движения.
+  - id: canonical-transformations
+    title: Канонические преобразования
+    level: 3
+    requires: [poisson-brackets, closed-exact]
+    about: Симплектоморфизмы; производящие функции; гамильтоновы потоки как канонические преобразования.
+  - id: action-angle
+    title: Интегрируемые системы и переменные действие–угол
+    level: 3
+    requires: [poisson-brackets, flows]
+    about: Теорема Лиувилля–Арнольда; инвариантные торы; переменные действие–угол.
+  - id: momentum-map
+    title: Отображение момента и симплектическая редукция
+    level: 4
+    requires: [poisson-brackets, group-actions]
+    about: Сохраняющиеся величины симметричной системы как отображение момента; понижение размерности.
+  - id: contact-geometry
+    title: Контактная геометрия
+    level: 4
+    requires: [differential-forms, frobenius]
+    about: Контактная форма; контактные гамильтоновы поля; лежандровы подмногообразия.
+
+- id: math/riemann
+  title: Связности и риманова геометрия
+  topics:
+  - id: covariant-derivative
+    title: Ковариантная производная
+    level: 3
+    requires: [tangent-vectors, tensors]
+    about: Аффинная связность; символы связности; ковариантная производная тензоров.
+  - id: parallel-transport
+    title: Параллельный перенос и геодезические
+    level: 3
+    requires: [covariant-derivative, flows]
+    about: Перенос вектора вдоль кривой; геодезические как «прямые»; зависимость переноса от пути.
+  - id: levi-civita
+    title: Связность Леви-Чивиты
+    level: 3
+    requires: [covariant-derivative, metric]
+    about: Метрическая связность без кручения; символы Кристоффеля; геодезические как экстремали длины.
+  - id: curvature-riemann
+    title: Тензор кривизны
+    level: 3
+    requires: [levi-civita, parallel-transport]
+    about: Тензор Римана как некоммутативность ковариантных производных; тензор Риччи и скалярная кривизна; вычисление в SymPy.
+  - id: bianchi
+    title: Тождества Бианки
+    level: 3
+    requires: [curvature-riemann]
+    about: Алгебраическое и дифференциальное тождества; тензор Эйнштейна с нулевой дивергенцией.
+  - id: geodesic-deviation
+    title: Девиация геодезических
+    level: 3
+    requires: [curvature-riemann]
+    about: Относительное ускорение соседних геодезических; приливные силы.
+  - id: tetrads-cartan
+    title: Тетрады и структурные уравнения Картана
+    level: 4
+    requires: [curvature-riemann, exterior-derivative]
+    about: Ортонормированные реперы; формы связности и кривизны; быстрые вычисления кривизны.
+
+- id: math/bundles
+  title: Расслоения и калибровочная геометрия
+  topics:
+  - id: vector-bundles
+    title: Векторные расслоения
+    level: 3
+    requires: [manifolds, tangent-vectors]
+    about: База, слой, проекция; локальная тривиализация; сечения; касательное расслоение и лента Мёбиуса.
+  - id: bundle-connections
+    title: Связность в векторном расслоении
+    level: 3
+    requires: [vector-bundles, covariant-derivative]
+    about: Ковариантная производная сечений; форма связности; смена тривиализации.
+  - id: bundle-curvature
+    title: Кривизна связности и голономия
+    level: 3
+    requires: [bundle-connections, stokes]
+    about: Кривизна как 2-форма; голономия по малому контуру; плоские связности.
+  - id: principal-bundles
+    title: Главные и ассоциированные расслоения
+    level: 4
+    requires: [vector-bundles, matrix-lie-groups]
+    about: Слой — группа Ли; ассоциированные расслоения; поля материи как сечения.
+  - id: gauge-transformations
+    title: Калибровочные преобразования
+    level: 4
+    requires: [principal-bundles, bundle-connections]
+    about: Калибровка как смена тривиализации; закон преобразования связности и кривизны.
+  - id: chern-classes
+    title: Характеристические классы
+    level: 4
+    requires: [bundle-curvature, de-rham]
+    about: Первый класс Черна; число Черна как интеграл кривизны; квантование топологического заряда.
+
+- id: math/analysis
+  title: Анализ и уравнения математической физики
+  topics:
+  - id: calculus-of-variations
+    title: Вариационное исчисление
+    level: 2
+    requires: []
+    about: Функционалы; уравнения Эйлера–Лагранжа; условия на границе; задачи с ограничениями.
+  - id: complex-analysis
+    title: Комплексный анализ для физика
+    level: 2
+    requires: []
+    about: Аналитические функции; вычеты; контурные интегралы; дисперсионные соотношения.
+  - id: fourier
+    title: Ряды и преобразование Фурье
+    level: 2
+    requires: []
+    about: Ряды Фурье; преобразование Фурье; свёртка; теорема Парсеваля.
+  - id: distributions
+    title: Обобщённые функции
+    level: 2
+    requires: [fourier]
+    about: δ-функция; производные обобщённых функций; фундаментальные решения.
+  - id: pde-classification
+    title: Уравнения математической физики
+    level: 2
+    requires: []
+    about: Эллиптические, параболические и гиперболические уравнения; характеристики; постановка краевых задач.
+  - id: separation-variables
+    title: Разделение переменных
+    level: 2
+    requires: [pde-classification, spectral-finite]
+    about: Задача Штурма–Лиувилля; ортогональные системы функций; разделение переменных и симметрия.
+  - id: special-functions
+    title: Специальные функции
+    level: 2
+    requires: [separation-variables]
+    about: Полиномы Лежандра, Эрмита, Лагерра; функции Бесселя; вычисление в SymPy.
+  - id: green-functions
+    title: Функции Грина
+    level: 3
+    requires: [distributions, pde-classification, complex-analysis]
+    about: Функции Грина уравнений Пуассона, теплопроводности и волнового; запаздывающая функция Грина.
+  - id: hilbert-spaces
+    title: Гильбертовы пространства
+    level: 3
+    requires: [complex-spaces, fourier]
+    about: Полнота; ортонормированные базисы; L²; пространства функций в квантовой механике.
+  - id: operators-spectrum
+    title: Операторы и спектр
+    level: 3
+    requires: [hilbert-spaces]
+    about: Неограниченные операторы; самосопряжённость; дискретный и непрерывный спектр; спектральная теорема.
+  - id: probability
+    title: Теория вероятностей для физика
+    level: 2
+    requires: []
+    about: Распределения и моменты; характеристическая функция; закон больших чисел; центральная предельная теорема.
+
+- id: math/numerics
+  title: Вычислительные методы
+  topics:
+  - id: sympy-intro
+    title: Символьные вычисления в SymPy
+    level: 1
+    requires: []
+    about: Символы, упрощение, дифференцирование, матрицы; как проверять выкладки на компьютере.
+  - id: ode-numerics
+    title: Численное решение ОДУ
+    level: 1
+    requires: []
+    about: Порядок и устойчивость метода; методы Рунге–Кутты; адаптивный шаг; SciPy solve_ivp.
+  - id: spectral-methods
+    title: Спектральные методы и БПФ
+    level: 2
+    requires: [fourier]
+    about: Дискретное преобразование Фурье; спектральное дифференцирование; алиасинг.
+  - id: symplectic-integrators
+    title: Симплектические интеграторы
+    level: 2
+    requires: [ode-numerics, hamiltonian-fields]
+    about: Схема Верле и leapfrog; почему RK4 «дрейфует» по энергии; модифицированный гамильтониан; системы с трением.
+  - id: splitting-methods
+    title: Методы расщепления
+    level: 3
+    requires: [symplectic-integrators, spectral-methods]
+    about: Расщепление Ли–Троттера и Странга; split-operator для уравнения Шрёдингера.
+  - id: monte-carlo
+    title: Методы Монте-Карло
+    level: 3
+    requires: [probability]
+    about: Интегрирование Монте-Карло; цепи Маркова; алгоритм Метрополиса.
+  - id: dec-yee
+    title: Дискретное внешнее исчисление и схема Йи
+    level: 3
+    requires: [stokes, ode-numerics]
+    about: Формы на сетке; d как матрица инцидентности; точное d² = 0; схема Йи для уравнений Максвелла.
+  - id: feec
+    title: Конечные элементы внешнего исчисления
+    level: 4
+    requires: [dec-yee, de-rham]
+    about: Комплекс де Рама на сетке; элементы Лагранжа, Неделека и Равьяра–Тома; паразитные моды узловых элементов.
+
+# =================================== Физика ===================================
+
+- id: physics/mechanics
+  title: Классическая механика
+  topics:
+  - id: newton-mechanics
+    title: Механика Ньютона
+    level: 1
+    requires: []
+    about: Законы Ньютона; импульс, момент импульса и энергия; законы сохранения.
+  - id: configuration-space
+    title: Конфигурационное пространство и связи
+    level: 2
+    requires: [newton-mechanics, manifolds]
+    about: Обобщённые координаты; конфигурационное пространство как многообразие — маятники, тор, SO(3).
+  - id: least-action
+    title: Принцип наименьшего действия
+    level: 2
+    requires: [calculus-of-variations, configuration-space]
+    about: Действие; вывод законов Ньютона из вариационного принципа; лагранжиан свободной частицы.
+  - id: lagrange-equations
+    title: Уравнения Лагранжа
+    level: 2
+    requires: [least-action, tangent-vectors]
+    about: Лагранжиан как функция на касательном расслоении; уравнения движения; автоматический вывод в SymPy.
+  - id: noether
+    title: Теорема Нётер
+    level: 2
+    requires: [lagrange-equations, group-actions]
+    about: Симметрия лагранжиана и сохраняющаяся величина; энергия, импульс, момент; поиск интегралов движения в SymPy.
+  - id: noninertial
+    title: Неинерциальные системы отсчёта
+    level: 2
+    requires: [lagrange-equations]
+    about: Вращающаяся система отсчёта; силы инерции; маятник Фуко.
+  - id: small-oscillations
+    title: Малые колебания
+    level: 2
+    requires: [lagrange-equations, spectral-finite]
+    about: Линеаризация около равновесия; нормальные моды; связанные осцилляторы.
+  - id: kepler
+    title: Задача Кеплера
+    level: 2
+    requires: [noether, poisson-brackets]
+    about: Задача двух тел; вектор Лапласа–Рунге–Ленца; скрытая симметрия SO(4).
+  - id: legendre-hamilton
+    title: Уравнения Гамильтона
+    level: 2
+    requires: [lagrange-equations, hamiltonian-fields]
+    about: Преобразование Лежандра; переход от TM к T*M; канонические уравнения как гамильтоново поле.
+  - id: numerical-mechanics
+    title: Численное моделирование механических систем
+    level: 2
+    requires: [symplectic-integrators, legendre-hamilton]
+    about: Маятник, задача Кеплера, многие тела; сохранение энергии и фазового объёма на больших временах.
+  - id: rigid-body
+    title: Твёрдое тело
+    level: 3
+    requires: [lagrange-equations, so3-su2]
+    about: SO(3) как конфигурационное пространство; тензор инерции; уравнения Эйлера; волчок.
+  - id: nonholonomic
+    title: Неголономные системы
+    level: 3
+    requires: [lagrange-equations, frobenius]
+    about: Неинтегрируемые связи; катящийся диск; уравнения с множителями.
+  - id: hamilton-jacobi
+    title: Уравнение Гамильтона–Якоби
+    level: 3
+    requires: [canonical-transformations, legendre-hamilton]
+    about: Действие как функция координат; разделение переменных; связь с геометрической оптикой и квазиклассикой.
+  - id: adiabatic-invariants
+    title: Адиабатические инварианты
+    level: 3
+    requires: [action-angle, legendre-hamilton]
+    about: Медленное изменение параметров; сохранение действия; примеры.
+  - id: perturbation-chaos
+    title: Теория возмущений и хаос
+    level: 4
+    requires: [action-angle]
+    about: Резонансы; теорема КАМ; отображения Пуанкаре; детерминированный хаос.
+
+- id: physics/relativity
+  title: Специальная теория относительности
+  topics:
+  - id: minkowski
+    title: Пространство Минковского
+    level: 1
+    requires: [metric]
+    about: Интервал; 4-векторы; световой конус; собственное время.
+  - id: lorentz-transformations
+    title: Преобразования Лоренца
+    level: 1
+    requires: [minkowski]
+    about: Бусты; сложение скоростей; сокращение длины и замедление времени как геометрия.
+  - id: relativistic-particle
+    title: Релятивистская частица
+    level: 2
+    requires: [lorentz-transformations, least-action]
+    about: Действие свободной частицы; 4-импульс; энергия и масса; распады и столкновения.
+
+- id: physics/fields
+  title: Классическая теория поля
+  topics:
+  - id: field-lagrangian
+    title: Лагранжев формализм для полей
+    level: 3
+    requires: [least-action, minkowski]
+    about: Плотность лагранжиана; уравнения Эйлера–Лагранжа для полей; действие как интеграл 4-формы.
+  - id: field-noether
+    title: Теорема Нётер для полей
+    level: 3
+    requires: [field-lagrangian, noether]
+    about: Сохраняющиеся токи; тензор энергии–импульса; сохранение заряда.
+  - id: klein-gordon
+    title: Скалярное поле
+    level: 3
+    requires: [field-lagrangian, invariant-operators]
+    about: Уравнение Клейна–Гордона; плоские волны; комплексное поле и U(1).
+
+- id: physics/electrodynamics
+  title: Электродинамика
+  topics:
+  - id: electrostatics
+    title: Электростатика
+    level: 2
+    requires: [vector-calculus-forms, stokes]
+    about: Напряжённость как 1-форма, индукция как 2-форма; теорема Гаусса; потенциал; уравнение Пуассона.
+  - id: magnetostatics
+    title: Магнитостатика
+    level: 2
+    requires: [electrostatics, closed-exact]
+    about: Закон Био–Савара; векторный потенциал; отсутствие магнитных зарядов как замкнутость 2-формы.
+  - id: maxwell-forms
+    title: Уравнения Максвелла на языке форм
+    level: 3
+    requires: [magnetostatics, minkowski, hodge-star]
+    about: F = dA, dF = 0, d⋆F = (4π/c)⋆j; сохранение заряда из d² = 0; расщепление на время и пространство.
+  - id: gauge-invariance-em
+    title: Калибровочная инвариантность в электродинамике
+    level: 3
+    requires: [maxwell-forms, closed-exact]
+    about: 4-потенциал; калибровки Лоренца и Кулона; потенциал как связность.
+  - id: em-action
+    title: Действие для поля и заряда
+    level: 3
+    requires: [gauge-invariance-em, relativistic-particle, field-lagrangian]
+    about: Действие Максвелла; взаимодействие с зарядом; сила Лоренца.
+  - id: em-energy-momentum
+    title: Энергия и импульс электромагнитного поля
+    level: 3
+    requires: [em-action, field-noether]
+    about: Тензор энергии–импульса; вектор Пойнтинга; давление излучения.
+  - id: em-waves
+    title: Электромагнитные волны
+    level: 3
+    requires: [maxwell-forms, fourier]
+    about: Волновое уравнение; поляризация; волноводы и резонаторы.
+  - id: radiation
+    title: Излучение
+    level: 3
+    requires: [em-waves, green-functions]
+    about: Запаздывающие потенциалы; потенциалы Лиенара–Вихерта; дипольное излучение.
+  - id: em-media
+    title: Электромагнитное поле в среде
+    level: 3
+    requires: [maxwell-forms]
+    about: Материальные уравнения как оператор Ходжа среды; анизотропные среды; граничные условия.
+  - id: em-numerics
+    title: Численная электродинамика
+    level: 3
+    requires: [maxwell-forms, dec-yee]
+    about: Моделирование уравнений Максвелла схемой Йи; сохранение заряда на сетке.
+  - id: dirac-monopole
+    title: Монополь Дирака
+    level: 4
+    requires: [gauge-invariance-em, chern-classes]
+    about: Невозможность глобального потенциала; струна Дирака; квантование заряда.
+
+- id: physics/quantum
+  title: Квантовая механика
+  topics:
+  - id: qm-postulates
+    title: Постулаты квантовой механики
+    level: 3
+    requires: [hilbert-spaces, operators-spectrum]
+    about: Состояния и наблюдаемые; измерение; эволюция; картины Шрёдингера и Гейзенберга.
+  - id: uncertainty
+    title: Соотношения неопределённостей
+    level: 3
+    requires: [qm-postulates]
+    about: Коммутаторы и неравенство Робертсона; переход от скобок Пуассона к коммутаторам.
+  - id: schrodinger-1d
+    title: Одномерные задачи
+    level: 3
+    requires: [qm-postulates]
+    about: Потенциальные ямы и барьеры; туннелирование; дискретный и непрерывный спектр.
+  - id: qm-numerics
+    title: Численное решение уравнения Шрёдингера
+    level: 3
+    requires: [schrodinger-1d, splitting-methods]
+    about: Стационарные состояния диагонализацией; эволюция волновых пакетов split-operator; сохранение нормы.
+  - id: quantum-oscillator
+    title: Квантовый гармонический осциллятор
+    level: 3
+    requires: [schrodinger-1d]
+    about: Операторы рождения и уничтожения; спектр; функции Эрмита.
+  - id: symmetries-qm
+    title: Симметрии в квантовой механике
+    level: 3
+    requires: [qm-postulates, lie-representations]
+    about: Теорема Вигнера; унитарные представления; вырождение уровней и симметрия.
+  - id: angular-momentum-qm
+    title: Момент импульса
+    level: 3
+    requires: [su2-reps, qm-postulates]
+    about: Момент импульса как генератор вращений; спектр; сложение моментов.
+  - id: spin
+    title: Спин
+    level: 3
+    requires: [angular-momentum-qm]
+    about: Спин 1/2 и спиноры; матрицы Паули; уравнение Паули; прецессия.
+  - id: hydrogen
+    title: Атом водорода
+    level: 3
+    requires: [angular-momentum-qm, spherical-harmonics, kepler]
+    about: Разделение переменных; спектр; случайное вырождение и скрытая симметрия SO(4).
+  - id: perturbation-qm
+    title: Теория возмущений
+    level: 3
+    requires: [qm-postulates]
+    about: Стационарная и нестационарная теория возмущений; золотое правило Ферми.
+  - id: wkb
+    title: Квазиклассическое приближение
+    level: 3
+    requires: [schrodinger-1d, action-angle]
+    about: Метод ВКБ; правило квантования Бора–Зоммерфельда как квантование действия.
+  - id: identical-particles
+    title: Тождественные частицы
+    level: 3
+    requires: [qm-postulates, representations-finite]
+    about: Бозоны и фермионы как представления группы перестановок; принцип Паули.
+  - id: qm-em-field
+    title: Заряд в электромагнитном поле
+    level: 3
+    requires: [qm-postulates, gauge-invariance-em]
+    about: Минимальная связь; калибровочная инвариантность уравнения Шрёдингера; уровни Ландау.
+  - id: aharonov-bohm
+    title: Эффект Ааронова–Бома
+    level: 3
+    requires: [qm-em-field, de-rham]
+    about: Фаза от потенциала при нулевом поле; голономия exp(i∮A) как наблюдаемая.
+  - id: density-matrix
+    title: Матрица плотности
+    level: 4
+    requires: [qm-postulates]
+    about: Смешанные состояния; редуцированная матрица плотности; запутанность.
+  - id: coherent-states
+    title: Когерентные состояния
+    level: 4
+    requires: [quantum-oscillator]
+    about: Состояния минимальной неопределённости; классический предел.
+  - id: berry-phase
+    title: Фаза Берри
+    level: 4
+    requires: [qm-postulates, bundle-curvature]
+    about: Адиабатическая теорема; связность и кривизна Берри; спин в поворачивающемся поле; монополь в пространстве параметров.
+  - id: scattering
+    title: Теория рассеяния
+    level: 4
+    requires: [schrodinger-1d, green-functions, spherical-harmonics]
+    about: Амплитуда рассеяния; борновское приближение; парциальные волны.
+  - id: path-integral
+    title: Интеграл по траекториям
+    level: 4
+    requires: [least-action, qm-postulates]
+    about: Пропагатор как сумма по путям; классический предел; гауссовы интегралы.
+  - id: second-quantization
+    title: Вторичное квантование
+    level: 4
+    requires: [identical-particles, quantum-oscillator]
+    about: Пространство Фока; операторы рождения и уничтожения для бозонов и фермионов.
+  - id: dirac-equation
+    title: Уравнение Дирака
+    level: 4
+    requires: [clifford-spinors, spin, klein-gordon]
+    about: Релятивистское уравнение для спина 1/2; спинорная ковариантность; нерелятивистский предел.
+
+- id: physics/statistical
+  title: Термодинамика и статистическая физика
+  topics:
+  - id: thermodynamics-forms
+    title: Начала термодинамики на языке форм
+    level: 2
+    requires: [closed-exact]
+    about: Работа и теплота как незамкнутые 1-формы; 1/T как интегрирующий множитель; энтропия как функция состояния.
+  - id: thermodynamic-potentials
+    title: Термодинамические потенциалы
+    level: 2
+    requires: [thermodynamics-forms]
+    about: Преобразование Лежандра; соотношения Максвелла как d² = 0; условия устойчивости.
+  - id: gibbs-ensembles
+    title: Ансамбли Гиббса
+    level: 3
+    requires: [hamiltonian-fields, probability]
+    about: Мера Лиувилля; микроканоническое распределение; эргодичность.
+  - id: entropy
+    title: Энтропия
+    level: 3
+    requires: [gibbs-ensembles]
+    about: Энтропии Больцмана, Гиббса и Шеннона; второе начало в статистической физике.
+  - id: canonical-ensemble
+    title: Каноническое и большое каноническое распределения
+    level: 3
+    requires: [gibbs-ensembles, thermodynamic-potentials]
+    about: Статистическая сумма; связь со свободной энергией; флуктуации энергии и числа частиц.
+  - id: quantum-gases
+    title: Квантовые газы
+    level: 4
+    requires: [canonical-ensemble, identical-particles, density-matrix]
+    about: Распределения Бозе–Эйнштейна и Ферми–Дирака; вырожденный ферми-газ; бозе-конденсация; излучение чёрного тела.
+  - id: phase-transitions
+    title: Фазовые переходы
+    level: 4
+    requires: [canonical-ensemble, monte-carlo]
+    about: Модель Изинга; теория среднего поля; критические показатели; моделирование методом Метрополиса.
+  - id: fluctuations-brownian
+    title: Флуктуации и броуновское движение
+    level: 4
+    requires: [canonical-ensemble, probability]
+    about: Уравнение Ланжевена; уравнение Фоккера–Планка; флуктуационно-диссипационная теорема.
+  - id: boltzmann-equation
+    title: Кинетическое уравнение Больцмана
+    level: 4
+    requires: [gibbs-ensembles]
+    about: Функция распределения; интеграл столкновений; H-теорема.
+  - id: thermodynamics-contact
+    title: Термодинамика и контактная геометрия
+    level: 4
+    requires: [contact-geometry, thermodynamic-potentials]
+    about: Пространство термодинамических состояний как контактное многообразие; равновесные состояния как лежандровы подмногообразия.
+
+- id: physics/continuum
+  title: Механика сплошных сред
+  topics:
+  - id: continuum-kinematics
+    title: Кинематика сплошной среды
+    level: 3
+    requires: [flows, interior-lie, tensors]
+    about: Описание Лагранжа и Эйлера; тензор деформаций; производная Ли по потоку среды; несжимаемость.
+  - id: stress
+    title: Тензор напряжений
+    level: 3
+    requires: [continuum-kinematics, integration]
+    about: Силы на площадках; напряжение как векторнозначная 2-форма; уравнения равновесия.
+  - id: elasticity
+    title: Теория упругости
+    level: 3
+    requires: [stress, metric]
+    about: Закон Гука; изотропная среда; упругие волны.
+  - id: ideal-fluid
+    title: Идеальная жидкость
+    level: 3
+    requires: [stress]
+    about: Уравнение Эйлера; уравнение Бернулли; потенциальные течения.
+  - id: vorticity
+    title: Завихренность
+    level: 3
+    requires: [ideal-fluid, stokes, interior-lie]
+    about: Завихренность как 2-форма; теоремы Кельвина и Гельмгольца через производную Ли.
+  - id: viscous-fluid
+    title: Вязкая жидкость
+    level: 3
+    requires: [ideal-fluid]
+    about: Уравнение Навье–Стокса; течение Пуазейля; число Рейнольдса.
+  - id: sound-shocks
+    title: Звук и ударные волны
+    level: 4
+    requires: [ideal-fluid]
+    about: Линеаризация; характеристики; условия Ренкина–Гюгонио.
+  - id: elasticity-numerics
+    title: Численные методы теории упругости
+    level: 4
+    requires: [elasticity, feec]
+    about: Смешанные конечные элементы; объёмное запирание; сохранение импульса на сетке.
+
+- id: physics/gravitation
+  title: Общая теория относительности
+  topics:
+  - id: equivalence-principle
+    title: Принцип эквивалентности
+    level: 3
+    requires: [minkowski, levi-civita]
+    about: Локально инерциальные системы; гравитация как кривизна; метрика как гравитационный потенциал.
+  - id: geodesic-motion
+    title: Движение в гравитационном поле
+    level: 3
+    requires: [equivalence-principle, parallel-transport]
+    about: Мировые линии как геодезические; ньютоновский предел; гравитационное красное смещение.
+  - id: einstein-equations
+    title: Уравнения Эйнштейна
+    level: 4
+    requires: [curvature-riemann, bianchi, field-noether]
+    about: Действие Гильберта–Эйнштейна; тензор энергии–импульса материи; ньютоновский предел.
+  - id: schwarzschild
+    title: Решение Шварцшильда
+    level: 4
+    requires: [einstein-equations, geodesic-motion]
+    about: Сферически симметричное решение; прецессия перигелия; отклонение света; задержка сигнала.
+  - id: black-holes
+    title: Чёрные дыры
+    level: 4
+    requires: [schwarzschild, killing]
+    about: Горизонт; координаты Крускала; метрика Керра.
+  - id: gravitational-waves
+    title: Гравитационные волны
+    level: 4
+    requires: [einstein-equations, geodesic-deviation]
+    about: Линеаризованная гравитация; поляризации; действие волны на пробные массы.
+  - id: cosmology
+    title: Космология
+    level: 4
+    requires: [einstein-equations, killing]
+    about: Однородность и изотропия; метрика Фридмана–Леметра–Робертсона–Уокера; уравнения Фридмана.
+
+- id: physics/gauge
+  title: Калибровочные поля
+  topics:
+  - id: gauge-principle
+    title: Калибровочный принцип
+    level: 4
+    requires: [gauge-transformations, gauge-invariance-em, field-noether]
+    about: От глобальной симметрии к локальной; ковариантная производная; что принцип даёт и чего не даёт.
+  - id: yang-mills
+    title: Поля Янга–Миллса
+    level: 4
+    requires: [gauge-principle, bundle-curvature]
+    about: Неабелева кривизна; самодействие полей; уравнения Янга–Миллса; вычисление в SymPy.
+  - id: spontaneous-breaking
+    title: Спонтанное нарушение симметрии
+    level: 4
+    requires: [yang-mills, klein-gordon]
+    about: Вырожденный вакуум; голдстоуновские бозоны; механизм Хиггса.

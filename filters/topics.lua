@@ -22,7 +22,14 @@ local function links(ids)
     if i > 1 then
       table.insert(items, pandoc.Str(", "))
     end
-    table.insert(items, pandoc.Link(t.title, t.href))
+    if t.href then
+      table.insert(items, pandoc.Link(t.title, t.href))
+    else
+      -- тема есть в topics.yml, но статья ещё не написана
+      table.insert(items, pandoc.Str(t.title))
+      table.insert(items, pandoc.Space())
+      table.insert(items, pandoc.Emph("(в работе)"))
+    end
   end
   return items
 end
