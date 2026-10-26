@@ -1,0 +1,7 @@
+[Unit]
+Description=Пособие GMPh: ежедневная порция работы Claude
+
+[Service]
+Type=oneshot
+ExecStart=%h/work/claude_prjs/GMPh/scripts/daily/run.sh
+TimeoutStartSec=infinity
