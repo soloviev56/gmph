@@ -1,0 +1,299 @@
+---
+title: "Малые колебания"
+topic: small-oscillations
+order: 7
+description: "Линеаризация около положения равновесия; устойчивость; нормальные моды как одновременная диагонализация двух квадратичных форм; двойной маятник — моды и проверка нелинейным расчётом; биения; цепочка масс и закон дисперсии"
+---
+
+Почти любая механическая система вблизи устойчивого положения равновесия
+ведёт себя как набор независимых гармонических осцилляторов. Колебания
+молекулы, звук в кристалле, качания моста, электрические контуры —
+все они в первом приближении описываются одной и той же линейной теорией.
+Её геометрическое содержание мы уже видели в статье [о спектральной
+теореме](/math/algebra/spectral-finite.qmd): две квадратичные формы —
+кинетическая и потенциальная энергии — одновременно приводятся к сумме
+квадратов. Здесь мы выведем эти формы из лагранжиана, проверим
+приближение нелинейным расчётом и разберём два типичных явления: биения и
+распространение волн по цепочке.
+
+Нужны [уравнения Лагранжа](/physics/mechanics/lagrange-equations.qmd) и
+[спектральная теорема в конечной размерности](/math/algebra/spectral-finite.qmd).
+
+## Линеаризация
+
+Пусть натуральная система $L = \tfrac12 M_{ij}(q)\dot q^i\dot q^j - U(q)$ имеет
+положение равновесия $q_0$: $\partial U/\partial q^i(q_0) = 0$. Положим $q = q_0 + x$ и
+оставим в лагранжиане квадратичные по малым $x, \dot x$ члены:
+$$
+L_2 = \frac12\,M_{ij}\,\dot x^i\dot x^j - \frac12\,K_{ij}\,x^ix^j, \qquad
+M_{ij} = M_{ij}(q_0), \quad K_{ij} = \frac{\partial^2 U}{\partial q^i\partial q^j}(q_0).
+$$
+Зависимость $M$ от $q$ даёт поправки уже третьего порядка, поэтому матрица
+масс берётся в точке равновесия. Уравнения движения линейны:
+$M\ddot x + Kx = 0$.
+
+::: {#def-normal-mode}
+**Нормальная мода** — решение вида $x(t) = a\cos(\omega t + \alpha)$ с
+постоянным вектором $a$. Подстановка даёт **обобщённую задачу на
+собственные значения**
+$$
+K a = \omega^2 M a, \qquad \det(K - \omega^2 M) = 0 .
+$$
+:::
+
+$M$ положительно определена — это метрика на конфигурационном
+пространстве (статья [о конфигурационном пространстве](/physics/mechanics/configuration-space.qmd)).
+Матрица $M^{-1}K$ самосопряжена относительно этой метрики. Поэтому все
+$\omega^2$ вещественны, а собственные векторы $a_{(1)}, \dots, a_{(n)}$ можно выбрать
+**$M$-ортонормированными**: $a_{(k)}^{\mathsf T}Ma_{(l)} = \delta_{kl}$. В координатах мод
+$x = \sum_k Q_k\,a_{(k)}$
+$$
+L_2 = \sum_k\frac12\bigl(\dot Q_k^2 - \omega_k^2Q_k^2\bigr),
+$$
+система распадается на $n$ независимых осцилляторов. $Q_k$ называются
+**нормальными координатами**.
+
+**Устойчивость.** Если $K$ положительно определена (равновесие — минимум $U$),
+все $\omega_k^2 > 0$ и движение — суперпозиция колебаний. Если у $K$ есть
+отрицательное собственное значение, соответствующая «частота» мнимая и
+решение растёт экспоненциально: равновесие неустойчиво. Нулевые $\omega_k^2$
+отвечают направлениям безразличного равновесия, обычно симметриям
+(сдвиг всей молекулы как целого).
+
+## Двойной маятник
+
+Возьмём двойной маятник из статьи [об уравнениях
+Лагранжа](/physics/mechanics/lagrange-equations.qmd) с равными массами и длинами.
+Функция `mass_matrix` модуля `gmph.mechanics` извлекает $M_{ij} = \partial^2 L/\partial\dot q^i\partial\dot q^j$,
+а $K$ — гессиан потенциальной энергии. Обе берутся в нижнем положении
+$\varphi_1 = \varphi_2 = 0$:
+
+```{python}
+import sympy as sp
+from gmph.mechanics import mass_matrix
+
+t = sp.Symbol("t", real=True)
+m, l, g = sp.symbols("m l g", positive=True)
+phi1, phi2 = sp.Function("varphi_1")(t), sp.Function("varphi_2")(t)
+coords = [phi1, phi2]
+
+r1 = sp.Matrix([l * sp.sin(phi1), -l * sp.cos(phi1)])
+r2 = r1 + sp.Matrix([l * sp.sin(phi2), -l * sp.cos(phi2)])
+T = m / 2 * (r1.diff(t).dot(r1.diff(t)) + r2.diff(t).dot(r2.diff(t)))
+U = m * g * (r1[1] + r2[1])
+L = T - U
+
+equilibrium = {phi1: 0, phi2: 0}
+M = mass_matrix(L, coords, t).subs(equilibrium)
+K = sp.hessian(U, coords).subs(equilibrium)
+print("M =", M.tolist())
+print("K =", K.tolist())
+
+w2 = sp.Symbol("omega^2")
+for root in sp.solve((K - w2 * M).det(), w2):
+    mode = (K - root * M).nullspace()[0]
+    print(f"ω² = {sp.simplify(root)},  мода (φ₁, φ₂) ∝ {list(sp.simplify(mode / mode[0]))}")
+```
+
+$$
+\omega_\mp^2 = (2 \mp \sqrt2)\,\frac gl, \qquad a_\mp = (1,\ \pm\sqrt2).
+$$
+В медленной моде ($\omega_-\approx 0{,}765\sqrt{g/l}$) стержни отклоняются в одну
+сторону, нижний сильнее; в быстрой ($\omega_+ \approx 1{,}848\sqrt{g/l}$) — в
+противоположные стороны.
+
+Проверим линейную теорию на полной нелинейной системе. Проинтегрируем
+уравнения движения при малых начальных углах и найдём частоты
+колебаний по спектру Фурье угла $\varphi_1(t)$:
+
+```{python}
+import numpy as np
+from scipy.integrate import solve_ivp
+from gmph.mechanics import first_order_system
+
+params = {m: 1, l: 1, g: 9.81}
+rhs = first_order_system(L, coords, t, params)
+
+t_end, n = 400.0, 2**15
+t_eval = np.linspace(0, t_end, n, endpoint=False)
+sol = solve_ivp(rhs, (0, t_end), [0.02, -0.01, 0, 0], t_eval=t_eval, rtol=1e-10, atol=1e-12)
+
+spectrum = np.abs(np.fft.rfft(sol.y[0] * np.hanning(n)))
+omegas = 2 * np.pi * np.fft.rfftfreq(n, d=t_end / n)
+peaks = [i for i in range(1, len(spectrum) - 1)
+         if spectrum[i] > spectrum[i - 1] and spectrum[i] > spectrum[i + 1] and spectrum[i] > 0.05 * spectrum.max()]
+
+omega_theory = np.sqrt((2 - np.sqrt(2)) * 9.81), np.sqrt((2 + np.sqrt(2)) * 9.81)
+print("пики спектра, рад/с:", np.round(omegas[peaks], 3))
+print("линейная теория:    ", np.round(omega_theory, 3))
+print(f"разрешение по частоте: {2 * np.pi / t_end:.3f} рад/с")
+```
+
+```{python}
+#| label: fig-double-pendulum-spectrum
+#| fig-cap: "Спектр угла φ₁(t) двойного маятника (m = l = 1, g = 9,81) при малых начальных углах φ₁ = 0,02, φ₂ = −0,01, полученный нелинейным расчётом. Пунктир — частоты нормальных мод линейной теории."
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots(figsize=(7, 3.2))
+ax.semilogy(omegas, spectrum, color="tab:blue", lw=1)
+for w in omega_theory:
+    ax.axvline(w, color="tab:red", ls="--", lw=1)
+ax.set(xlim=(0, 10), ylim=(spectrum.max() * 1e-6, spectrum.max() * 3), xlabel="ω, рад/с", ylabel="|спектр|")
+ax.grid(alpha=0.2)
+```
+
+Пики совпадают с частотами мод в пределах разрешения $2\pi/t_{\text{end}}$.
+Начальные условия выбраны произвольно, поэтому в движении участвуют обе
+моды, и амплитуды пиков различны. Слабые пики, в $10^{4}$–$10^{5}$ раз ниже
+главных, — комбинационные частоты $\omega_+ - 2\omega_- \approx 0{,}99$,
+$3\omega_- \approx 7{,}19$ и $2\omega_+ - \omega_- \approx 9{,}18$ рад/с: их порождают
+кубические по амплитуде нелинейные члены, отброшенные в линейной теории.
+
+## Биения
+
+Два одинаковых маятника, связанных слабой пружиной жёсткости $k$ между
+грузами, — классический пример. В единицах $m = l = g = 1$
+$M = 1$, $K = \begin{pmatrix} 1 + k & -k\\ -k & 1 + k\end{pmatrix}$; моды — синфазная
+$(1, 1)$ с $\omega_1 = 1$ (пружина не растягивается) и противофазная $(1, -1)$ с
+$\omega_2 = \sqrt{1 + 2k}$. Отклоним первый маятник, оставив второй на месте:
+$x = \tfrac12 a(1, 1)\cos\omega_1t + \tfrac12 a(1, -1)\cos\omega_2t$, то есть
+$$
+x_1 = a\cos\frac{\omega_2 - \omega_1}{2}t\,\cos\frac{\omega_1 + \omega_2}{2}t, \qquad
+x_2 = a\sin\frac{\omega_2 - \omega_1}{2}t\,\sin\frac{\omega_1 + \omega_2}{2}t .
+$$
+
+```{python}
+k = sp.Symbol("k", positive=True)
+K_pair = sp.Matrix([[1 + k, -k], [-k, 1 + k]])
+for root in sp.solve((K_pair - w2 * sp.eye(2)).det(), w2):
+    print(f"ω² = {root},  мода {list((K_pair - root * sp.eye(2)).nullspace()[0])}")
+
+tt, a = sp.symbols("t a", real=True)
+w1_, w2_ = 1, sp.sqrt(1 + 2 * k)
+x1 = a / 2 * (sp.cos(w1_ * tt) + sp.cos(w2_ * tt))
+print("x₁ = произведение косинусов:",
+      sp.simplify(x1 - a * sp.cos((w2_ - w1_) / 2 * tt) * sp.cos((w1_ + w2_) / 2 * tt)) == 0)
+```
+
+```{python}
+#| label: fig-beats
+#| fig-cap: "Биения связанных маятников (k = 0,05, m = l = g = 1): энергия полностью перетекает от первого маятника ко второму и обратно с периодом 2π/(ω₂ − ω₁) ≈ 129."
+k_val = 0.05
+w1n, w2n = 1.0, np.sqrt(1 + 2 * k_val)
+tb = np.linspace(0, 260, 4000)
+fig, axes = plt.subplots(2, 1, figsize=(8, 3.8), sharex=True)
+for ax, xs, name in [(axes[0], 0.5 * (np.cos(w1n * tb) + np.cos(w2n * tb)), "x₁"),
+                     (axes[1], 0.5 * (np.cos(w1n * tb) - np.cos(w2n * tb)), "x₂")]:
+    ax.plot(tb, xs, color="tab:blue", lw=0.8)
+    ax.set_ylabel(name)
+    ax.grid(alpha=0.2)
+axes[1].set_xlabel("t")
+fig.tight_layout()
+print(f"период перекачки энергии 2π/(ω₂ − ω₁) = {2 * np.pi / (w2n - w1n):.1f}")
+```
+
+При слабой связи частоты мод близки, и энергия медленно перекачивается
+между маятниками. Тот же механизм в квантовой механике описывает
+осцилляции нейтрино и туннелирование в двухъямном потенциале: «маятники» —
+состояния, а моды — стационарные состояния с близкими энергиями.
+
+## Цепочка масс: от мод к волнам
+
+$N$ одинаковых грузов массы $m$ соединены пружинами жёсткости $\kappa$ и
+закреплены на концах. Смещения $x_1, \dots, x_N$ вдоль цепочки;
+$U = \frac\kappa2\sum_{j=0}^{N}(x_{j+1} - x_j)^2$ с $x_0 = x_{N+1} = 0$. Матрица
+$K$ трёхдиагональна, и её собственные векторы — синусоиды. Проверим
+аналитический ответ
+$$
+\omega_s = 2\sqrt{\frac{\kappa}{m}}\,\sin\frac{s\pi}{2(N + 1)}, \qquad
+a_{(s)j} = \sin\frac{s j\pi}{N + 1}, \qquad s = 1, \dots, N,
+$$
+для $N = 12$ численно:
+
+```{python}
+N = 12
+K_chain = 2 * np.eye(N) - np.eye(N, k=1) - np.eye(N, k=-1)      # κ = m = 1
+omega_num = np.sqrt(np.linalg.eigvalsh(K_chain))
+s = np.arange(1, N + 1)
+omega_formula = 2 * np.sin(s * np.pi / (2 * (N + 1)))
+mode3 = np.sin(3 * np.arange(1, N + 1) * np.pi / (N + 1))
+
+print("частоты совпадают с формулой:", np.allclose(omega_num, omega_formula))
+print("синусоида s = 3 — собственный вектор:", np.allclose(K_chain @ mode3, omega_formula[2]**2 * mode3))
+```
+
+```{python}
+#| label: fig-chain
+#| fig-cap: "Цепочка из N = 12 масс (κ = m = 1). Слева: смещения в модах s = 1, 3 и 12. Справа: частоты мод в зависимости от волнового числа q = sπ/(N + 1) и закон дисперсии ω = 2 sin(q/2); пунктир — ω = q, линейный закон непрерывной струны."
+j = np.arange(0, N + 2)
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9.5, 3.6))
+for s_val, color in [(1, "tab:blue"), (3, "tab:green"), (12, "tab:red")]:
+    shape = np.sin(s_val * j * np.pi / (N + 1))
+    ax1.plot(j, shape, "-o", color=color, ms=3, lw=1, label=f"s = {s_val}")
+ax1.set(xlabel="номер груза j", ylabel="смещение", ylim=(-1.15, 1.5))
+ax1.legend(fontsize=8, ncol=3, loc="upper center")
+q_dense = np.linspace(0, np.pi, 200)
+ax2.plot(q_dense, 2 * np.sin(q_dense / 2), color="gray", lw=1, label="ω = 2 sin(q/2)")
+ax2.plot(q_dense, q_dense, "--", color="gray", lw=1, label="ω = q")
+ax2.plot(s * np.pi / (N + 1), omega_num, "o", color="tab:blue", label="моды")
+ax2.set(xlabel="q", ylabel="ω", ylim=(0, 2.3))
+ax2.legend(fontsize=8, loc="upper left")
+for ax in (ax1, ax2):
+    ax.grid(alpha=0.2)
+fig.tight_layout()
+```
+
+Мода с номером $s$ — стоячая волна с волновым числом $q = s\pi/(N + 1)$ (на один
+период решётки). Для длинных волн $q \ll 1$ частота пропорциональна $q$, как у
+непрерывной струны, а звуковые волны распространяются со скоростью
+$\sqrt{\kappa/m}$ (в единицах периода решётки). Для коротких волн
+дисперсия нелинейна, и частота не может превысить $2\sqrt{\kappa/m}$:
+дискретная среда не передаёт колебания быстрее этого предела. Это
+простейшая модель **фононов** — колебаний кристаллической решётки; при
+$N \to \infty$ получается волновое уравнение и теория поля.
+
+## Итоги
+
+- Вблизи равновесия $L \approx \tfrac12 M_{ij}\dot x^i\dot x^j - \tfrac12 K_{ij}x^ix^j$, где
+  $M$ — матрица масс в точке равновесия, $K$ — гессиан потенциала.
+- Нормальные моды: $Ka = \omega^2Ma$; моды $M$-ортогональны, в нормальных
+  координатах система — набор независимых осцилляторов.
+- Равновесие устойчиво, если $K$ положительно определена; отрицательное
+  собственное значение даёт экспоненциальный рост, нулевое — симметрию.
+- Двойной маятник: $\omega^2 = (2 \mp \sqrt2)g/l$; нелинейный расчёт при малых
+  амплитудах воспроизводит эти частоты.
+- Слабая связь двух осцилляторов даёт биения; цепочка масс — стоячие волны
+  с законом дисперсии $\omega = 2\sqrt{\kappa/m}\,\sin(q/2)$.
+
+## Упражнения
+
+1. Найдите частоты двух одинаковых маятников (масса $m$, длина $l$),
+   связанных пружиной жёсткости $k$ между грузами. Каков период биений?
+2. Линейная молекула CO₂: атомы O (масса $m$) — C (масса $M$) — O, связанные
+   пружинами жёсткости $k$. Найдите частоты продольных колебаний и их
+   отношение для $m = 16$, $M = 12$.
+3. Бусинка на кольце, вращающемся с угловой скоростью $\Omega$ (упражнение 1 к
+   статье об уравнениях Лагранжа). Найдите частоты малых колебаний около
+   нижней точки и около бокового равновесия при $\Omega^2 > g/R$.
+4. Проверьте, что моды двойного маятника $(1, \pm\sqrt2)$ ортогональны в
+   метрике $M$, но не в евклидовом смысле.
+5. Проверьте формулу частот цепочки для $N = 2$ напрямую.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $\omega_1 = \sqrt{g/l}$ (синфазная мода), $\omega_2 = \sqrt{g/l + 2k/m}$
+   (противофазная); период перекачки энергии $2\pi/(\omega_2 - \omega_1)$.
+2. $\omega = 0$ (сдвиг молекулы), $\omega = \sqrt{k/m}$ (атомы O движутся
+   навстречу, C покоится), $\omega = \sqrt{\tfrac km\bigl(1 + \tfrac{2m}{M}\bigr)}$
+   (O в одну сторону, C в другую). Отношение
+   $\sqrt{1 + 32/12} = \sqrt{11/3} \approx 1{,}915$ (у реальной молекулы
+   $2349/1333 \approx 1{,}76$: модель пружинок грубая).
+3. Около $\theta = 0$: $\omega^2 = g/R - \Omega^2$ — нижняя точка теряет
+   устойчивость при $\Omega^2 > g/R$. Около $\cos\theta_0 = g/(R\Omega^2)$:
+   $\omega^2 = \Omega^2\sin^2\theta_0 = \Omega^2 - g^2/(R^2\Omega^2)$.
+4. $M = ml^2\begin{pmatrix}2 & 1\\ 1 & 1\end{pmatrix}$:
+   $(1, \sqrt2)\,M\,(1, -\sqrt2)^{\mathsf T} = ml^2(2 - \sqrt2 + \sqrt2 - 2) = 0$, а
+   обычное скалярное произведение $1 - 2 = -1 \ne 0$.
+5. $K = \kappa\begin{pmatrix}2 & -1\\ -1 & 2\end{pmatrix}$, $\omega^2 = \kappa/m$ и
+   $3\kappa/m$; формула даёт $2\sin(\pi/6) = 1$ и $2\sin(\pi/3) = \sqrt3$.
+:::
