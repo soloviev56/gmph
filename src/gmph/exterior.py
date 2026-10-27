@@ -78,6 +78,25 @@ def pullback(form, old_coords, images, new_coords):
     return add(*[scale(sp.sympify(c).subs(subs), wedge(*[dx[i - 1] for i in I])) for I, c in form.items()])
 
 
+def poincare_potential(form, coords):
+    """Гомотопический оператор Пуанкаре для звёздной области с центром в нуле.
+
+    Kω(x) = ∫₀¹ t^{k−1} (ι_x ω)(tx) dt, где ι_x — подстановка радиус-вектора
+    x^i ∂_i в первый аргумент. Для любой формы ω = dKω + Kdω; поэтому при
+    dω = 0 форма Kω — потенциал: d(Kω) = ω.
+    """
+    t = sp.Dummy("t")
+    stretch = {x: t * x for x in coords}
+    result = {}
+    for I, c in form.items():
+        k = len(I)
+        coeff = sp.integrate(t ** (k - 1) * sp.sympify(c).subs(stretch, simultaneous=True), (t, 0, 1))
+        for m, i in enumerate(I):
+            J = I[:m] + I[m + 1:]
+            result[J] = result.get(J, 0) + (-1) ** m * coords[i - 1] * coeff
+    return _clean(result)
+
+
 def value(form, *vectors):
     """Значение k-формы на k векторах: e^I(v_1, …, v_k) = det[v_j^{i_m}]."""
     total = 0

@@ -95,3 +95,20 @@ def test_pullback_polar_and_commutes_with_d():
     lhs = pullback(d(alpha, (x, y)), (x, y), images, (r, phi))
     rhs = d(pullback(alpha, (x, y), images, (r, phi)), (r, phi))
     assert add(lhs, scale(-1, rhs)) == {}
+
+
+def test_poincare_potential():
+    from gmph.exterior import d, poincare_potential
+
+    xs = x, y, z = sp.symbols("x y z", real=True)
+    B = sp.symbols("B_x B_y B_z", real=True)
+    flux = {(2, 3): B[0], (1, 3): -B[1], (1, 2): B[2]}            # однородное поле
+    A = poincare_potential(flux, xs)
+    assert A == {(1,): (B[1] * z - B[2] * y) / 2, (2,): (B[2] * x - B[0] * z) / 2,
+                 (3,): (B[0] * y - B[1] * x) / 2}                  # A = ½ B × r
+    assert d(A, xs) == flux
+    # гомотопическая формула ω = dKω + Kdω для незамкнутой формы
+    omega = {(1,): x * y**2, (2,): z, (3,): x**3 * y}
+    total = add(d(poincare_potential(omega, xs), xs), poincare_potential(d(omega, xs), xs))
+    assert add(total, scale(-1, omega)) == {}
+    assert poincare_potential({(): 5}, xs) == {}
