@@ -67,3 +67,31 @@ def test_hodge_squared_signs():
 def test_show():
     assert show({(1, 2): -7}) == "(-7)·e¹∧e²"
     assert show(add({(1,): 1}, {(1,): -1})) == "0"
+
+
+def test_d_squared_and_leibniz():
+    from gmph.exterior import d
+
+    xs = sp.symbols("x1:5", real=True)
+    f = sp.Function("f")(*xs)
+    assert d(d({(): f}, xs), xs) == {}
+    alpha = {(1,): sp.Function("a")(*xs), (3,): sp.Function("b")(*xs)}
+    beta = {(2, 4): sp.Function("c")(*xs)}
+    assert d(d(alpha, xs), xs) == {}
+    # d(α∧β) = dα∧β − α∧dβ для 1-формы α
+    assert add(d(wedge(alpha, beta), xs), scale(-1, wedge(d(alpha, xs), beta)), wedge(alpha, d(beta, xs))) == {}
+    x, y = xs[:2]
+    assert d({(1,): -y, (2,): x}, xs) == {(1, 2): 2}
+
+
+def test_pullback_polar_and_commutes_with_d():
+    from gmph.exterior import d, pullback
+
+    x, y = sp.symbols("x y", real=True)
+    r, phi = sp.symbols("r phi", positive=True)
+    images = (r * sp.cos(phi), r * sp.sin(phi))
+    assert pullback({(1, 2): 1}, (x, y), images, (r, phi)) == {(1, 2): r}
+    alpha = {(1,): x**2 * y, (2,): sp.sin(x)}
+    lhs = pullback(d(alpha, (x, y)), (x, y), images, (r, phi))
+    rhs = d(pullback(alpha, (x, y), images, (r, phi)), (r, phi))
+    assert add(lhs, scale(-1, rhs)) == {}

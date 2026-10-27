@@ -57,6 +57,27 @@ def wedge(*forms):
     return result
 
 
+def d(form, coords):
+    """Внешний дифференциал: dω = Σ_I Σ_j ∂_j ω_I dx^j∧dx^I.
+
+    ``coords`` — координаты x¹, …, xⁿ (символы SymPy), от которых зависят
+    компоненты; базисная 1-форма dx^j имеет индекс j (с 1).
+    """
+    return add(*[wedge({(j,): sp.diff(c, x)}, {I: 1})
+                 for I, c in form.items() for j, x in enumerate(coords, 1)])
+
+
+def pullback(form, old_coords, images, new_coords):
+    """Перенос формы назад по отображению y ↦ x(y).
+
+    ``images`` — выражения x^i(y) через ``new_coords``; в компонентах x
+    заменяется на x(y), а dx^i — на Σ_j ∂x^i/∂y^j dy^j.
+    """
+    subs = dict(zip(old_coords, images))
+    dx = [{(j,): sp.diff(xi, y) for j, y in enumerate(new_coords, 1)} for xi in images]
+    return add(*[scale(sp.sympify(c).subs(subs), wedge(*[dx[i - 1] for i in I])) for I, c in form.items()])
+
+
 def value(form, *vectors):
     """Значение k-формы на k векторах: e^I(v_1, …, v_k) = det[v_j^{i_m}]."""
     total = 0

@@ -1,0 +1,338 @@
+---
+title: "Внешний дифференциал"
+topic: exterior-derivative
+order: 6
+description: "Внешний дифференциал d: аксиомы и формула в координатах; grad, rot, div как один оператор; d² = 0 как симметрия смешанных производных; правило Лейбница; инвариантная формула и циркуляция по малому параллелограмму; однородные уравнения Максвелла dF = 0"
+---
+
+В векторном анализе три разных оператора — градиент, ротор и дивергенция —
+и два тождества между ними: $\operatorname{rot}\operatorname{grad} f = 0$ и
+$\operatorname{div}\operatorname{rot}\mathbf A = 0$. На языке
+[дифференциальных форм](/math/forms/differential-forms.qmd) это один
+оператор $\dd$, который превращает $k$-формы в $(k+1)$-формы, и одно
+тождество $\dd^2 = 0$. Причём $\dd$, в отличие от grad, rot и div, не
+требует ни метрики, ни ориентации, ни даже размерности 3: он одинаково
+работает на фазовой плоскости, в пространстве-времени и на любом
+многообразии. В электродинамике четыре уравнения Максвелла
+распадаются на две пары, и первая пара целиком — это $\dd F = 0$.
+
+Нужны [дифференциальные k-формы](/math/forms/differential-forms.qmd).
+
+## Определение
+
+::: {#def-exterior-derivative}
+**Внешний дифференциал** — отображение $\dd$, переводящее $k$-формы в
+$(k+1)$-формы, со свойствами:
+
+1. на функциях $\dd f$ — обычный дифференциал, $\dd f(X) = X f$;
+2. $\dd$ линеен: $\dd(\alpha + \beta) = \dd\alpha + \dd\beta$;
+3. **правило Лейбница**: $\dd(\alpha\wedge\beta) = \dd\alpha\wedge\beta + (-1)^k\,\alpha\wedge\dd\beta$
+   для $k$-формы $\alpha$;
+4. $\dd(\dd\omega) = 0$ для любой формы $\omega$.
+:::
+
+Эти четыре свойства определяют $\dd$ однозначно. В карте форма —
+сумма слагаемых $\omega_I\,\dd x^{i_1}\wedge\dots\wedge\dd x^{i_k}$; по
+свойству 4 $\dd(\dd x^i) = 0$, и правило Лейбница даёт
+$$
+\dd\omega = \sum_I \dd\omega_I\wedge\dd x^{i_1}\wedge\dots\wedge\dd x^{i_k}
+= \sum_I\sum_j \pd{\omega_I}{x^j}\,\dd x^j\wedge\dd x^{i_1}\wedge\dots\wedge\dd x^{i_k}.
+$$
+Дифференцируются только компоненты, а базисные формы «пропускают» $\dd$
+через себя. Эта формула реализована в пакете `gmph.exterior` функцией
+`d(form, coords)`; формы, как и в [предыдущей
+статье](/math/forms/differential-forms.qmd), — словари {индексы: компонента}.
+
+## grad, rot, div — это d
+
+Возьмём в $\R^3$ функцию, 1-форму и 2-форму с произвольными компонентами и
+применим к ним $\dd$:
+
+```{python}
+import sympy as sp
+from gmph.exterior import add, d, scale, show, wedge
+
+x, y, z = sp.symbols("x y z", real=True)
+X = (x, y, z)
+names = ["dx", "dy", "dz"]
+
+f = sp.Function("f")(*X)
+A = [sp.Function(n)(*X) for n in ("A_x", "A_y", "A_z")]
+B = [sp.Function(n)(*X) for n in ("B_x", "B_y", "B_z")]
+
+one_form = {(1,): A[0], (2,): A[1], (3,): A[2]}                 # A_x dx + A_y dy + A_z dz
+two_form = {(2, 3): B[0], (1, 3): -B[1], (1, 2): B[2]}          # B_x dy∧dz + B_y dz∧dx + B_z dx∧dy
+
+print("d f =", show(d({(): f}, X), names))
+print("d(A·dr) =", show(d(one_form, X), names))
+print("d(B·dS) =", show(d(two_form, X), names))
+```
+
+Компоненты $\dd f$ — компоненты градиента. Компоненты $\dd(\mathbf A\cdot\dd\mathbf r)$
+при $\dd y\wedge\dd z$, $\dd z\wedge\dd x = -\dd x\wedge\dd z$, $\dd x\wedge\dd y$ —
+это $(\operatorname{rot}\mathbf A)_x$, $(\operatorname{rot}\mathbf A)_y$,
+$(\operatorname{rot}\mathbf A)_z$. Наконец, $\dd(\mathbf B\cdot\dd\mathbf S) = \operatorname{div}\mathbf B\;\dd x\wedge\dd y\wedge\dd z$.
+Сводка:
+$$
+\begin{array}{ccccccc}
+\text{0-формы} & \xrightarrow{\ \dd\ } & \text{1-формы} & \xrightarrow{\ \dd\ } & \text{2-формы} & \xrightarrow{\ \dd\ } & \text{3-формы}\\
+f & \mapsto & \operatorname{grad} f\cdot\dd\mathbf r & & & & \\
+& & \mathbf A\cdot\dd\mathbf r & \mapsto & \operatorname{rot}\mathbf A\cdot\dd\mathbf S & & \\
+& & & & \mathbf B\cdot\dd\mathbf S & \mapsto & \operatorname{div}\mathbf B\;\dd V
+\end{array}
+$$
+Отождествление векторов с 1- и 2-формами здесь неявно использует
+евклидову метрику и ориентацию $\R^3$; сам $\dd$ их не использует.
+Точный словарь с операторами $\flat$, $\sharp$ и $\hodge$ и формулы в
+криволинейных координатах — тема «Векторный анализ на языке форм».
+
+## d² = 0
+
+Почему $\dd\dd = 0$? Для функции
+$$
+\dd\dd f = \sum_{j, k}\frac{\partial^2 f}{\partial x^k\,\partial x^j}\,\dd x^k\wedge\dd x^j = 0,
+$$
+потому что вторые производные симметричны по $j, k$, а $\dd x^k\wedge\dd x^j$
+антисимметрично. Для форм старших степеней работает тот же механизм.
+Проверим для произвольных форм всех степеней в $\R^4$:
+
+```{python}
+from itertools import combinations
+
+xs = sp.symbols("x1:5", real=True)
+
+def generic_form(k, n=4):
+    """k-форма с произвольными функциями-компонентами."""
+    return {I: sp.Function("w" + "".join(map(str, I)))(*xs) for I in combinations(range(1, n + 1), k)}
+
+for k in range(4):
+    print(f"k = {k}: d(d ω) =", show(d(d(generic_form(k), xs), xs)))
+```
+
+В $\R^3$ тождество $\dd\dd = 0$ на функциях — это $\operatorname{rot}\operatorname{grad} = 0$, а на
+1-формах — $\operatorname{div}\operatorname{rot} = 0$.
+
+Обратное утверждение — всякая ли форма с $\dd\omega = 0$ есть $\dd$ от
+чего-нибудь — зависит от топологии области; это тема «Замкнутые и
+точные формы».
+
+## Правило Лейбница
+
+Знак $(-1)^k$ в правиле Лейбница появляется, когда $\dd$ «проходит» через
+$k$-форму $\alpha$, — как при перестановке $\dd x^j$ через $k$ базисных
+1-форм. Проверим правило для 1-формы и 2-формы в $\R^4$ и, для сравнения,
+неверный вариант со знаком «+»:
+
+```{python}
+alpha, beta = generic_form(1), generic_form(2)
+lhs = d(wedge(alpha, beta), xs)
+right = add(wedge(d(alpha, xs), beta), scale(-1, wedge(alpha, d(beta, xs))))
+wrong = add(wedge(d(alpha, xs), beta), wedge(alpha, d(beta, xs)))
+
+print("d(α∧β) = dα∧β − α∧dβ:", add(lhs, scale(-1, right)) == {})
+print("d(α∧β) = dα∧β + α∧dβ:", add(lhs, scale(-1, wrong)) == {})
+```
+
+В векторном анализе правило Лейбница — это семейство формул вроде
+$\operatorname{rot}(f\mathbf A) = f\operatorname{rot}\mathbf A + \operatorname{grad} f\times\mathbf A$
+и $\operatorname{div}(\mathbf a\times\mathbf b) = \mathbf b\cdot\operatorname{rot}\mathbf a - \mathbf a\cdot\operatorname{rot}\mathbf b$
+(упражнение 2), которые здесь не нужно запоминать по отдельности.
+
+## Независимость от координат
+
+Формула для $\dd$ записана в карте, но результат от карты не зависит:
+если перейти к другим координатам, а затем применить $\dd$, получится то
+же, что при обратном порядке действий. Проверим на плоскости: возьмём
+1-форму в декартовых координатах, выразим её и её $\dd$ в полярных.
+
+```{python}
+from gmph.exterior import pullback
+
+r, phi = sp.symbols("r phi", positive=True)
+polar = (r * sp.cos(phi), r * sp.sin(phi))
+
+omega = {(1,): x**2 * y, (2,): x * y**3}
+first_d = pullback(d(omega, (x, y)), (x, y), polar, (r, phi))
+first_change = d(pullback(omega, (x, y), polar, (r, phi)), (r, phi))
+
+print("dω в полярной карте:", show(first_d, ["dr", "dφ"]))
+print("совпадает с d от ω в полярной карте:", add(first_d, scale(-1, first_change)) == {})
+```
+
+Функция `pullback` выражает форму в новых координатах; её смысл и
+доказательство того, что $\dd$ коммутирует с заменами координат, — в
+статье «Отображения многообразий и перенос форм». Для grad, rot и div
+такой простоты нет: в криволинейных координатах их формулы содержат
+коэффициенты Ламе. Это потому, что они, в отличие от $\dd$, используют
+метрику.
+
+## Инвариантная формула и циркуляция
+
+Без координат $\dd$ от 1-формы выражается через векторные поля:
+$$
+\dd\omega(X, Y) = X\bigl(\omega(Y)\bigr) - Y\bigl(\omega(X)\bigr) - \omega\bigl([X, Y]\bigr),
+$$
+где $[X, Y]$ — [коммутатор полей](/math/forms/flows.qmd). Проверим её для
+произвольной 1-формы и двух произвольных полей на плоскости:
+
+```{python}
+P, Q = sp.Function("P")(x, y), sp.Function("Q")(x, y)
+Xv = [sp.Function("X1")(x, y), sp.Function("X2")(x, y)]
+Yv = [sp.Function("Y1")(x, y), sp.Function("Y2")(x, y)]
+
+def apply(field, g):
+    return field[0] * sp.diff(g, x) + field[1] * sp.diff(g, y)
+
+def pair(form_components, v):
+    return form_components[0] * v[0] + form_components[1] * v[1]
+
+bracket = [apply(Xv, Yv[i]) - apply(Yv, Xv[i]) for i in range(2)]
+w = (P, Q)
+dw = d({(1,): P, (2,): Q}, (x, y))[(1, 2)]                       # dω = (∂_x Q − ∂_y P) dx∧dy
+lhs = dw * (Xv[0] * Yv[1] - Xv[1] * Yv[0])                         # dω(X, Y)
+rhs = apply(Xv, pair(w, Yv)) - apply(Yv, pair(w, Xv)) - pair(w, bracket)
+print("инвариантная формула верна:", sp.simplify(lhs - rhs) == 0)
+```
+
+Для координатных полей $[\partial_i, \partial_j] = 0$, и формула сводится к
+$(\dd\omega)_{ij} = \partial_i\omega_j - \partial_j\omega_i$.
+
+**Смысл.** Обойдём малый параллелограмм со сторонами $\varepsilon u$ и
+$\varepsilon v$. Циркуляция 1-формы по его границе равна
+$\varepsilon^2\,\dd\omega(u, v) + O(\varepsilon^3)$: $\dd\omega$ — плотность
+циркуляции, так же как ротор — «циркуляция на единицу площади».
+Проверим численно для формы $\omega = -y^3\,\dd x + x y\,\dd y$:
+
+```{python}
+import numpy as np
+from scipy.integrate import quad
+
+def omega_num(p):
+    return np.array([-p[1]**3, p[0] * p[1]])
+
+def circulation(p0, u, v, eps):
+    """∮ω по границе параллелограмма p0, p0 + εu, p0 + εu + εv, p0 + εv."""
+    corners = [p0, p0 + eps * u, p0 + eps * (u + v), p0 + eps * v]
+    total = 0.0
+    for a, b in zip(corners, corners[1:] + corners[:1]):
+        total += quad(lambda s: omega_num(a + s * (b - a)) @ (b - a), 0, 1)[0]
+    return total
+
+p0, u, v = np.array([0.5, 1.0]), np.array([1.0, 0.0]), np.array([0.3, 1.0])
+dw_coeff = sp.lambdify((x, y), d({(1,): -y**3, (2,): x * y}, (x, y))[(1, 2)])
+exact = dw_coeff(*p0) * (u[0] * v[1] - u[1] * v[0])
+for eps in (1e-1, 1e-2, 1e-3):
+    print(f"ε = {eps:g}: ∮ω/ε² = {circulation(p0, u, v, eps) / eps**2:.6f}")
+print(f"dω(u, v)        = {exact:.6f}")
+```
+
+Отношение стремится к $\dd\omega(u, v) = 4$, и с уменьшением $\varepsilon$ в 10 раз
+погрешность тоже убывает примерно в 10 раз (первый порядок по $\varepsilon$).
+Для конечных областей эта связь становится точной:
+$\oint_{\partial S}\omega = \int_S\dd\omega$ — тема «Обобщённая теорема Стокса».
+
+## Физика: первая пара уравнений Максвелла
+
+В пространстве-времени с координатами $x^0 = ct, x, y, z$ поле — 2-форма
+([конвенции](/conventions.qmd))
+$$
+F = \dd x^0\wedge(E_x\dd x + E_y\dd y + E_z\dd z)
+- \bigl(B_x\,\dd y\wedge\dd z + B_y\,\dd z\wedge\dd x + B_z\,\dd x\wedge\dd y\bigr).
+$$
+Её дифференциал — 3-форма с $\binom43 = 4$ компонентами:
+
+```{python}
+x0 = sp.Symbol("x0", real=True)                       # x⁰ = ct
+ST = (x0, x, y, z)
+Ef = [sp.Function(n)(*ST) for n in ("E_x", "E_y", "E_z")]
+Bf = [sp.Function(n)(*ST) for n in ("B_x", "B_y", "B_z")]
+
+F = {(1, 2): Ef[0], (1, 3): Ef[1], (1, 4): Ef[2],     # индексы 1…4 ↔ x⁰…x³
+     (2, 3): -Bf[2], (2, 4): Bf[1], (3, 4): -Bf[0]}
+dF = d(F, ST)
+for I, comp in dF.items():
+    print(I, ":", comp)
+```
+
+Компонента при $\dd x\wedge\dd y\wedge\dd z$ (индексы 2, 3, 4) равна
+$-\operatorname{div}\mathbf B$. Остальные три содержат $\dd x^0$: например,
+компонента $(1, 2, 3)$ — это $-\bigl(\operatorname{rot}\mathbf E + \partial_0\mathbf B\bigr)_z$,
+где $\partial_0 = \frac1c\partial_t$. Итак,
+$$
+\dd F = 0 \iff \operatorname{div}\mathbf B = 0,\qquad
+\operatorname{rot}\mathbf E = -\frac1c\pd{\mathbf B}{t}.
+$$
+Проверим это сравнением с векторными формулами:
+
+```{python}
+def rot(V):
+    return [sp.diff(V[2], y) - sp.diff(V[1], z),
+            sp.diff(V[0], z) - sp.diff(V[2], x),
+            sp.diff(V[1], x) - sp.diff(V[0], y)]
+
+div_B = sum(sp.diff(Bf[i], v) for i, v in enumerate((x, y, z)))
+faraday = [rot(Ef)[i] + sp.diff(Bf[i], x0) for i in range(3)]
+print("(dF)_{xyz} = −div B:", sp.simplify(dF[(2, 3, 4)] + div_B) == 0)
+print("(dF)_{0yz}, (dF)_{0zx}, (dF)_{0xy} = −(rot E + ∂₀B):",
+      [sp.simplify(dF[(1, 3, 4)] + faraday[0]) == 0,
+       sp.simplify(dF[(1, 2, 4)] - faraday[1]) == 0,
+       sp.simplify(dF[(1, 2, 3)] + faraday[2]) == 0])
+```
+
+(Компонента $(1, 2, 4)$ стоит при $\dd x^0\wedge\dd x\wedge\dd z = -\dd x^0\wedge\dd z\wedge\dd x$,
+отсюда другой знак.) Если поле получено из потенциала, $F = \dd A$, то
+$\dd F = \dd\dd A = 0$ автоматически: первая пара уравнений Максвелла — это
+просто $\dd^2 = 0$. Уравнение $\dd F = 0$ не содержит ни метрики, ни
+зарядов; вторая пара, с источниками, требует оператора Ходжа и разбирается
+в теме «Уравнения Максвелла на языке форм».
+
+## Итоги
+
+- Внешний дифференциал $\dd$ переводит $k$-формы в $(k+1)$-формы; в карте
+  дифференцируются компоненты: $\dd(\omega_I\,\dd x^I) = \dd\omega_I\wedge\dd x^I$.
+- В $\R^3$ $\dd$ на 0-, 1- и 2-формах — это grad, rot и div; тождество
+  $\dd^2 = 0$ (симметрия смешанных производных) объединяет
+  $\operatorname{rot}\operatorname{grad} = 0$ и $\operatorname{div}\operatorname{rot} = 0$.
+- Правило Лейбница $\dd(\alpha\wedge\beta) = \dd\alpha\wedge\beta + (-1)^k\alpha\wedge\dd\beta$
+  заменяет набор формул векторного анализа для производных произведений.
+- $\dd$ не использует метрику и не зависит от выбора координат;
+  $\dd\omega(X, Y) = X\omega(Y) - Y\omega(X) - \omega([X, Y])$.
+- $\dd\omega$ — плотность циркуляции: $\oint\omega$ по малому параллелограмму
+  $\approx \varepsilon^2\,\dd\omega(u, v)$.
+- Однородные уравнения Максвелла: $\dd F = 0$; при $F = \dd A$ они
+  выполняются тождественно.
+
+## Упражнения
+
+1. Вычислите $\dd\omega$ для $\omega = xy\,\dd z + yz\,\dd x$ в $\R^3$ и для
+   $\eta = x\,\dd y\wedge\dd z + y\,\dd z\wedge\dd x + z\,\dd x\wedge\dd y$.
+2. Выведите из правила Лейбница формулу для $\operatorname{div}(\mathbf a\times\mathbf b)$,
+   записав $\mathbf a\times\mathbf b$ как 2-форму $\alpha\wedge\beta$, где
+   $\alpha = \mathbf a\cdot\dd\mathbf r$, $\beta = \mathbf b\cdot\dd\mathbf r$.
+3. Проверьте инвариантную формулу для $\omega = y\,\dd x$, $X = \partial_x$,
+   $Y = x\,\partial_y$: вычислите обе части.
+4. Сила $\mathbf F = (yz, xz, xy)$. Найдите $\dd$ от 1-формы работы
+   $\mathbf F\cdot\dd\mathbf r$ и потенциальную энергию $U$ с $\mathbf F\cdot\dd\mathbf r = -\dd U$.
+   Тот же вопрос для $\mathbf F = (y, -x, 0)$.
+5. На фазовой плоскости $(q, p)$ найдите $\dd(p\,\dd q)$. Чем отличаются
+   $\dd(p\,\dd q)$ и $\dd(-q\,\dd p)$, и почему обе 1-формы годятся
+   как «$\theta$» для симплектической формы $\dd p\wedge\dd q$?
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $\dd\omega = (y\,\dd x + x\,\dd y)\wedge\dd z + (z\,\dd y + y\,\dd z)\wedge\dd x
+   = x\,\dd y\wedge\dd z - z\,\dd x\wedge\dd y$ (члены с $\dd x\wedge\dd z$ сокращаются);
+   $\dd\eta = 3\,\dd x\wedge\dd y\wedge\dd z$.
+2. $\dd(\alpha\wedge\beta) = \dd\alpha\wedge\beta - \alpha\wedge\dd\beta$, и
+   $\dd\alpha\wedge\beta = (\mathbf b\cdot\operatorname{rot}\mathbf a)\,\dd V$,
+   $\alpha\wedge\dd\beta = (\mathbf a\cdot\operatorname{rot}\mathbf b)\,\dd V$, поэтому
+   $\operatorname{div}(\mathbf a\times\mathbf b) = \mathbf b\cdot\operatorname{rot}\mathbf a - \mathbf a\cdot\operatorname{rot}\mathbf b$.
+3. $\dd\omega = -\dd x\wedge\dd y$, $\dd\omega(X, Y) = -x$. Справа: $\omega(Y) = 0$,
+   $\omega(X) = y$, $Y(y) = x$, $[X, Y] = \partial_y$, $\omega(\partial_y) = 0$; итого
+   $0 - x - 0 = -x$.
+4. Для $(yz, xz, xy)$: $\dd = 0$, $U = -xyz$ (с точностью до константы). Для
+   $(y, -x, 0)$: $\dd(y\,\dd x - x\,\dd y) = -2\,\dd x\wedge\dd y \ne 0$, потенциала нет.
+5. $\dd(p\,\dd q) = \dd p\wedge\dd q$ и $\dd(-q\,\dd p) = -\dd q\wedge\dd p = \dd p\wedge\dd q$ —
+   одно и то же. Сами 1-формы отличаются на точную форму:
+   $p\,\dd q - (-q\,\dd p) = \dd(pq)$, а $\dd$ точной формы равен нулю.
+:::
