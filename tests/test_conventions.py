@@ -210,3 +210,15 @@ def test_linear_field_bracket_sign():
     x, y, z = xs
     assert field(Jx) == sp.Matrix([0, -z, y])                             # L_x = y∂_z − z∂_y
     assert bracket(field(Jx), field(Jy)) == -field(Jz)                    # [L_x, L_y] = −L_z
+
+
+# --- Термодинамика: dU = δQ − p dV, δQ = T dS --------------------------------
+
+def test_ideal_gas_entropy_form():
+    from gmph.exterior import d, scale
+
+    T, V, nu, R, Cv = sp.symbols("T V nu R C_V", positive=True)
+    p = nu * R * T / V
+    heat = {(1,): Cv, (2,): p}                    # δQ = dU + p dV, U = C_V T; индексы 1, 2 ↔ dT, dV
+    assert d(heat, (T, V)) == {(1, 2): nu * R / V}               # δQ не замкнута
+    assert d(scale(1 / T, heat), (T, V)) == {}                   # δQ/T = dS
