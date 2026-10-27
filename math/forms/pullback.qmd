@@ -1,0 +1,255 @@
+---
+title: "Отображения многообразий и перенос форм"
+topic: pullback
+order: 9
+description: "Гладкие отображения; перенос векторов вперёд (дифференциал отображения) и форм назад (pullback); свойства: внешнее произведение, d и композиция; замена переменных и якобиан; ограничение форм на кривые и поверхности; преобразование полей E, B при бусте как перенос 2-формы F"
+---
+
+Мы много раз выражали формы в других координатах: $\dd x\wedge\dd y = r\,\dd r\wedge\dd\varphi$,
+работу силы вдоль траектории $\mathbf F\cdot\dd\mathbf r = \mathbf F\cdot\dot{\mathbf r}\,\dd t$,
+поток через сферу через углы $\theta, \varphi$. Во всех этих случаях
+работает одна операция — **перенос формы назад** (pullback) вдоль
+отображения. Замена координат — отображение одной карты в другую;
+параметризация траектории — отображение отрезка времени в пространство;
+параметризация поверхности — отображение области плоскости в $\R^3$.
+Векторы, наоборот, переносятся **вперёд**: скорость кривой в $\R^2$ —
+образ единичного вектора $\partial_t$. Асимметрия «векторы вперёд, формы
+назад» — одна из главных черт дифференциальной геометрии. Именно она
+объясняет, почему интегрируют формы, а не векторные поля.
+
+Нужны [дифференциальные k-формы](/math/forms/differential-forms.qmd).
+
+## Перенос векторов вперёд
+
+Пусть $\phi: M \to N$ — гладкое отображение многообразий (в картах — набор
+гладких функций $y^a = \phi^a(x^1, \dots, x^m)$, размерности $m$ и $n$
+могут быть разными).
+
+::: {#def-pushforward}
+**Дифференциал** отображения $\phi$ в точке $p$ — линейное отображение
+$\phi_*: T_pM \to T_{\phi(p)}N$: вектор, касательный к кривой $\gamma(t)$,
+переходит в вектор, касательный к кривой $\phi(\gamma(t))$. В координатах
+$$
+(\phi_* v)^a = \pd{\phi^a}{x^i}\,v^i ,
+$$
+то есть $\phi_*$ — умножение на матрицу Якоби.
+:::
+
+На языке производных по направлению:
+$(\phi_*v)(f) = v(f\circ\phi)$ — чтобы продифференцировать функцию на $N$
+вдоль образа вектора, достаточно поднять её на $M$ и продифференцировать
+там. Векторное *поле* перенести вперёд, вообще говоря, нельзя: если
+$\phi$ склеивает две точки, их образы получат два разных вектора, а если
+$\phi$ не сюръективно, в части точек $N$ вектора не будет вовсе.
+
+## Перенос форм назад
+
+::: {#def-pullback}
+**Перенос назад** $k$-формы $\omega$ на $N$ — $k$-форма $\phi^*\omega$ на $M$:
+$$
+(\phi^*\omega)_p(v_1, \dots, v_k) = \omega_{\phi(p)}(\phi_*v_1, \dots, \phi_*v_k).
+$$
+Для функций $\phi^*f = f\circ\phi$.
+:::
+
+Формы переносятся назад по *любому* гладкому отображению: в каждой точке
+$p \in M$ есть ровно одна точка $\phi(p)$, и форму там надо просто
+«накормить» образами векторов. В координатах это правило подстановки:
+в компонентах заменить $y$ на $\phi(x)$, а $\dd y^a$ — на
+$\dd\phi^a = \pd{\phi^a}{x^i}\,\dd x^i$. Именно это делает функция
+`pullback(form, old_coords, images, new_coords)` из `gmph.exterior`.
+
+Свойства переноса:
+$$
+\phi^*(\alpha\wedge\beta) = \phi^*\alpha\wedge\phi^*\beta,\qquad
+\phi^*(\dd\omega) = \dd(\phi^*\omega),\qquad
+(\psi\circ\phi)^* = \phi^*\psi^* .
+$$
+Первое очевидно из определения. Второе — центральное: внешний
+дифференциал не зависит от координат и вообще согласован с любыми
+отображениями. Третье говорит, что порядок переноса обратен порядку
+отображений. Проверим все три для отображения поверхности
+$\phi: \R^2 \to \R^3$, $\phi(u, v) = (u\cos v,\ u\sin v,\ u^2)$ (параболоид), и
+отображения $\psi: \R^3 \to \R^2$:
+
+```{python}
+import sympy as sp
+from gmph.exterior import add, d, pullback, scale, show, value, wedge
+
+u, v = sp.symbols("u v", real=True)
+x, y, z = sp.symbols("x y z", real=True)
+X, UV = (x, y, z), (u, v)
+paraboloid = (u * sp.cos(v), u * sp.sin(v), u**2)
+
+def same(a, b):
+    return add(a, scale(-1, b)) == {}
+
+alpha = {(1,): y * z, (3,): x}                          # yz dx + x dz
+beta = {(2,): x**2, (3,): sp.exp(y)}                    # x² dy + e^y dz
+phi_star = lambda form: pullback(form, X, paraboloid, UV)
+
+print("φ*(α∧β) = φ*α∧φ*β:", same(phi_star(wedge(alpha, beta)), wedge(phi_star(alpha), phi_star(beta))))
+print("φ*(dα) = d(φ*α):   ", same(phi_star(d(alpha, X)), d(phi_star(alpha), UV)))
+
+s, w = sp.symbols("s w", real=True)
+psi_map = (x + z, x * y)                                 # ψ(x, y, z) = (x + z, xy)
+gamma = {(1,): w, (2,): s**2}                            # форма на плоскости (s, w)
+composite = tuple(c.subs(dict(zip(X, paraboloid))) for c in psi_map)
+lhs = pullback(gamma, (s, w), composite, UV)                                  # (ψ∘φ)*γ
+rhs = phi_star(pullback(gamma, (s, w), psi_map, X))                           # φ*(ψ*γ)
+print("(ψ∘φ)* = φ*ψ*:     ", same(lhs, rhs))
+```
+
+Определение через значения на векторах тоже проверим: значение $\phi^*\alpha$
+на $\partial_u$ должно совпадать со значением $\alpha$ на образе
+$\phi_*\partial_u$ — столбце матрицы Якоби.
+
+```{python}
+J = sp.Matrix(paraboloid).jacobian(UV)
+on_image = value(alpha, tuple(J[:, 0])).subs(dict(zip(X, paraboloid)))
+print("(φ*α)(∂_u) = α(φ_*∂_u):", sp.simplify(value(phi_star(alpha), (1, 0)) - on_image) == 0)
+```
+
+## Замена переменных и якобиан
+
+Замена координат — частный случай: $\phi$ переводит точку, заданную новыми
+координатами, в ту же точку, заданную старыми. Для формы старшей
+степени перенос даёт определитель:
+$$
+\phi^*(f\,\dd y^1\wedge\dots\wedge\dd y^n) = (f\circ\phi)\,\det\left(\pd{\phi^a}{x^i}\right)\dd x^1\wedge\dots\wedge\dd x^n ,
+$$
+это и есть формула замены переменных в кратном интеграле (с якобианом со
+знаком — тема «Интегрирование форм»). Проверим на сферических координатах:
+
+```{python}
+r, th, ph = sp.symbols("r theta phi", positive=True)
+spherical = (r * sp.sin(th) * sp.cos(ph), r * sp.sin(th) * sp.sin(ph), r * sp.cos(th))
+volume = pullback({(1, 2, 3): 1}, X, spherical, (r, th, ph))
+print("dx∧dy∧dz =", show(volume, ["dr", "dθ", "dφ"]))
+print("det J =", sp.simplify(sp.Matrix(spherical).jacobian((r, th, ph)).det()))
+```
+
+## Ограничение на кривые и поверхности
+
+Если $\iota: \Sigma \to \R^n$ — вложение кривой или поверхности, то $\iota^*\omega$ —
+**ограничение** формы на $\Sigma$. Оно «забывает» компоненты, которые
+смотрят поперёк $\Sigma$.
+
+**Работа и мощность.** Для траектории $\gamma: t \mapsto \mathbf r(t)$ перенос
+1-формы работы $\mathbf F\cdot\dd\mathbf r$ даёт
+$\gamma^*(\mathbf F\cdot\dd\mathbf r) = \mathbf F(\mathbf r(t))\cdot\dot{\mathbf r}\,\dd t$ —
+мощность, умноженную на $\dd t$.
+
+**Поток через сферу.** Перенесём на единичную сферу 2-форму однородного
+поля $B\,\dd x\wedge\dd y$ и 2-форму кулоновского поля:
+
+```{python}
+B, q = sp.symbols("B q", positive=True)
+on_sphere = tuple(e.subs(r, 1) for e in spherical)
+uniform = pullback({(1, 2): B}, X, on_sphere, (th, ph))
+rr = sp.sqrt(x**2 + y**2 + z**2)
+coulomb = {(2, 3): q * x / rr**3, (1, 3): -q * y / rr**3, (1, 2): q * z / rr**3}
+coulomb_on_sphere = pullback(coulomb, X, on_sphere, (th, ph))
+print("однородное поле на сфере:", show(uniform, ["dθ", "dφ"]))
+print("кулоновское поле на сфере:", show(coulomb_on_sphere, ["dθ", "dφ"]))
+print("потоки через сферу:",
+      sp.integrate(uniform[(1, 2)], (th, 0, sp.pi), (ph, 0, 2 * sp.pi)), "и",
+      sp.integrate(coulomb_on_sphere[(1, 2)], (th, 0, sp.pi), (ph, 0, 2 * sp.pi)))
+```
+
+Поток однородного поля через замкнутую сферу равен нулю (сколько
+вошло, столько вышло), а поток кулоновского поля равен $4\pi q$ — это
+теорема Гаусса. Сами интегралы — тема «Интегрирование форм»; здесь важно,
+что подынтегральное выражение получилось механически, переносом формы.
+
+## Физика: преобразование полей при бусте
+
+Поле — 2-форма $F$ на пространстве-времени ([конвенции](/conventions.qmd)):
+$F_{0i} = E^i$, $F_{12} = -B_z$, $F_{13} = B_y$, $F_{23} = -B_x$. Пусть система $K'$
+движется относительно $K$ со скоростью $V = \beta c$ вдоль оси $x$. Связь
+координат — [преобразование Лоренца](/physics/relativity/lorentz-transformations.qmd)
+$$
+x^0 = \gamma(x'^0 + \beta x'),\quad x = \gamma(x' + \beta x'^0),\quad y = y',\quad z = z' .
+$$
+Это отображение «точка в координатах $K'$ $\mapsto$ та же точка в
+координатах $K$», и компоненты поля в $K'$ — компоненты переноса $\Lambda^*F$.
+Вся теория преобразования полей сводится к одному вызову `pullback`:
+
+```{python}
+beta_ = sp.Symbol("beta", positive=True)
+g = 1 / sp.sqrt(1 - beta_**2)
+Ex, Ey, Ez, Bx, By, Bz = sp.symbols("E_x E_y E_z B_x B_y B_z", real=True)
+ST = sp.symbols("x0 x1 x2 x3", real=True)          # координаты K
+STp = sp.symbols("x0' x1' x2' x3'", real=True)     # координаты K'
+boost = (g * (STp[0] + beta_ * STp[1]), g * (STp[1] + beta_ * STp[0]), STp[2], STp[3])
+
+def field(E, B):
+    return {(1, 2): E[0], (1, 3): E[1], (1, 4): E[2], (2, 3): -B[2], (2, 4): B[1], (3, 4): -B[0]}
+
+Fp = pullback(field((Ex, Ey, Ez), (Bx, By, Bz)), ST, boost, STp)
+E_new = [Fp.get((1, i), 0) for i in (2, 3, 4)]
+B_new = [-Fp.get((3, 4), 0), Fp.get((2, 4), 0), -Fp.get((2, 3), 0)]
+print("E' =", [sp.simplify(c) for c in E_new])
+print("B' =", [sp.simplify(c) for c in B_new])
+```
+
+Получились известные формулы
+$E'_x = E_x$, $E'_y = \gamma(E_y - \beta B_z)$, $E'_z = \gamma(E_z + \beta B_y)$,
+$B'_x = B_x$, $B'_y = \gamma(B_y + \beta E_z)$, $B'_z = \gamma(B_z - \beta E_y)$ — без
+единой матрицы $\Lambda^\mu{}_\nu$ с индексами. Например, чисто
+электрическое поле покоящегося заряда в движущейся системе приобретает
+магнитную составляющую $\mathbf B' = -\boldsymbol\beta\times\mathbf E'$ — это
+магнитное поле движущегося заряда (упражнение 5). Инварианты
+$F\wedge F$ и $F\wedge\hodge F$ сохраняются: перенос согласован с внешним
+произведением, а буст сохраняет форму объёма.
+
+```{python}
+E2B2 = lambda E, B: sum(c**2 for c in B) - sum(c**2 for c in E)
+EB = lambda E, B: sum(e * b for e, b in zip(E, B))
+print("B² − E² сохраняется:", sp.simplify(E2B2(E_new, B_new) - E2B2((Ex, Ey, Ez), (Bx, By, Bz))) == 0)
+print("E·B сохраняется:", sp.simplify(EB(E_new, B_new) - EB((Ex, Ey, Ez), (Bx, By, Bz))) == 0)
+```
+
+## Итоги
+
+- Гладкое отображение $\phi: M \to N$ переносит векторы вперёд
+  ($\phi_*$ — матрица Якоби) и формы назад:
+  $(\phi^*\omega)(v_1, \dots) = \omega(\phi_*v_1, \dots)$.
+- В координатах перенос — подстановка $y = \phi(x)$, $\dd y^a = \partial_i\phi^a\,\dd x^i$.
+- $\phi^*$ согласован с $\wedge$ и с $\dd$; $(\psi\circ\phi)^* = \phi^*\psi^*$.
+- Замена переменных — перенос; на формах старшей степени он даёт
+  якобиан.
+- Ограничение формы на кривую или поверхность — перенос по вложению:
+  мощность $\mathbf F\cdot\dot{\mathbf r}\,\dd t$, поток через сферу.
+- Преобразование $\mathbf E, \mathbf B$ при бусте — перенос 2-формы $F$
+  по преобразованию Лоренца.
+
+## Упражнения
+
+1. Найдите $\phi^*(x\,\dd y - y\,\dd x)$ для $\phi(t) = (\cos t, \sin t)$ и для
+   $\phi(t) = (t, t^2)$.
+2. Для $\phi(u, v) = (u + v, uv)$ найдите $\phi^*(\dd x\wedge\dd y)$. Где $\phi$
+   перестаёт быть локальной заменой координат?
+3. Отображение $\phi(u, v) = (u, v, f(u, v))$ задаёт график функции.
+   Найдите $\phi^*(\dd x\wedge\dd y)$, $\phi^*(\dd y\wedge\dd z)$, $\phi^*(\dd z\wedge\dd x)$.
+4. Проверьте $\phi^*\dd = \dd\phi^*$ для $\phi(u, v) = (u^2 - v^2, 2uv)$ и формы
+   $\omega = x\,\dd y$ (вычислите обе части).
+5. Заряд покоится в $K$: $\mathbf B = 0$, $\mathbf E$ произвольно. Найдите поля в
+   $K'$ и покажите, что $\mathbf B' = -\boldsymbol\beta\times\mathbf E'$, где
+   $\boldsymbol\beta = (\beta, 0, 0)$ — скорость $K'$ относительно $K$.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $\dd t$ (окружность: $\dd\varphi$ вдоль неё) и $t^2\,\dd t$.
+2. $\phi^*(\dd x\wedge\dd y) = (u - v)\,\dd u\wedge\dd v$; на прямой $u = v$ якобиан
+   обращается в нуль (там $\phi$ складывает плоскость пополам: $(u, v)$ и $(v, u)$
+   переходят в одну точку).
+3. $\dd u\wedge\dd v$, $-f_u\,\dd u\wedge\dd v$, $-f_v\,\dd u\wedge\dd v$. Вместе это
+   компоненты нормали $(-f_u, -f_v, 1)$ к графику.
+4. $\phi^*\omega = (u^2 - v^2)(2v\,\dd u + 2u\,\dd v)$;
+   $\dd\phi^*\omega = \phi^*(\dd x\wedge\dd y) = 4(u^2 + v^2)\,\dd u\wedge\dd v$.
+5. $\mathbf E' = (E_x, \gamma E_y, \gamma E_z)$, $\mathbf B' = (0, \gamma\beta E_z, -\gamma\beta E_y)$;
+   $-\boldsymbol\beta\times\mathbf E' = -(0, -\beta\gamma E_z, \beta\gamma E_y) = \mathbf B'$.
+   В $K'$ заряд движется со скоростью $-\boldsymbol\beta c$, и это поле
+   движущегося заряда $\mathbf B = \frac{\mathbf v}{c}\times\mathbf E$.
+:::
