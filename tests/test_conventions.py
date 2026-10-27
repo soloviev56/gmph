@@ -175,3 +175,38 @@ def test_hermitian_product_realification():
     assert sp.expand(sp.re(h(u, v)) - (x1 * x2 + y1 * y2)) == 0                # Re = евклидова метрика
     assert sp.expand(sp.im(h(u, v)) - (x1 * y2 - y1 * x2)) == 0                # Im = (dx∧dy)(u, v)
     assert sp.expand(sp.im(h(u, sp.I * v)) - sp.re(h(u, v))) == 0              # g(u, v) = Im⟨u|Jv⟩
+
+
+# --- Многообразия: стереографические карты и коммутатор полей ----------------
+
+def test_stereographic_transition():
+    u1, u2 = sp.symbols("u1 u2", real=True)
+    r2 = u1**2 + u2**2
+    X = sp.Matrix([2 * u1, 2 * u2, r2 - 1]) / (r2 + 1)       # обратная к u = (x, y)/(1 − z)
+    assert sp.simplify(X.dot(X) - 1) == 0
+    assert sp.simplify(X[0] / (1 - X[2]) - u1) == 0
+    v = sp.Matrix([X[0], X[1]]) / (1 + X[2])
+    assert sp.simplify(v - sp.Matrix([u1, u2]) / r2) == sp.zeros(2, 1)   # v = u/|u|²
+    assert sp.simplify(v.jacobian([u1, u2]).det() + 1 / r2**2) == 0       # якобиан −1/|u|⁴
+
+
+def test_linear_field_bracket_sign():
+    xs = sp.symbols("x1:4", real=True)
+
+    def field(A):
+        return A * sp.Matrix(xs)
+
+    def bracket(F, G):
+        return sp.Matrix([sum(F[j] * sp.diff(G[i], xs[j]) - G[j] * sp.diff(F[i], xs[j])
+                              for j in range(3)) for i in range(3)])
+
+    A = sp.Matrix(3, 3, sp.symbols("a0:9"))
+    B = sp.Matrix(3, 3, sp.symbols("b0:9"))
+    assert sp.expand(bracket(field(A), field(B)) + field(A * B - B * A)) == sp.zeros(3, 1)
+    Jx = sp.Matrix([[0, 0, 0], [0, 0, -1], [0, 1, 0]])
+    Jy = sp.Matrix([[0, 0, 1], [0, 0, 0], [-1, 0, 0]])
+    Jz = sp.Matrix([[0, -1, 0], [1, 0, 0], [0, 0, 0]])
+    assert Jx * Jy - Jy * Jx == Jz
+    x, y, z = xs
+    assert field(Jx) == sp.Matrix([0, -z, y])                             # L_x = y∂_z − z∂_y
+    assert bracket(field(Jx), field(Jy)) == -field(Jz)                    # [L_x, L_y] = −L_z

@@ -544,7 +544,7 @@ sections:
   - id: relativistic-particle
     title: Релятивистская частица
     level: 2
-    requires: [lorentz-transformations, least-action]
+    requires: [lorentz-transformations, least-action, lagrange-equations]
     about: Действие свободной частицы; 4-импульс; энергия и масса; распады и столкновения.
 
 - id: physics/fields
