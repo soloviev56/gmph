@@ -1,0 +1,298 @@
+---
+title: "Неинерциальные системы отсчёта"
+topic: noninertial
+order: 6
+description: "Переход в ускоренную и вращающуюся систему как зависящая от времени замена координат; лагранжиан и силы инерции — переносная, центробежная, кориолисова, вращательная; энергия Якоби; аналогия с магнитным полем и теорема Лармора; отклонение падающих тел к востоку; маятник Фуко — численный расчёт и скорость поворота плоскости"
+---
+
+Мы живём на вращающейся Земле, и законы Ньютона в «лабораторной» системе
+отсчёта выполнены лишь приближённо. Обычно поправки малы: угловая
+скорость Земли $\Omega = 7{,}29\cdot10^{-5}$ с⁻¹. Но они отклоняют падающие
+тела к востоку, закручивают циклоны и поворачивают плоскость качания
+маятника Фуко. Лагранжев формализм позволяет получить силы инерции без
+всяких рассуждений о «фиктивных силах». Переход в неинерциальную систему —
+это просто замена координат на конфигурационном пространстве, зависящая
+от времени. Уравнения Лагранжа инвариантны относительно любых таких замен
+(статья [об уравнениях Лагранжа](/physics/mechanics/lagrange-equations.qmd)),
+и достаточно переписать лагранжиан.
+
+Нужны [уравнения Лагранжа](/physics/mechanics/lagrange-equations.qmd).
+
+## Лагранжиан во вращающейся системе
+
+Пусть система $K'$ вращается относительно инерциальной $K$ с угловой
+скоростью $\boldsymbol\Omega(t)$ вокруг общего начала, а начало $K'$ к тому же
+движется с ускорением $\mathbf W(t)$. Радиус-векторы точки в $K$ и $K'$
+связаны равенством $\mathbf r = \mathbf R_0(t) + A(t)\,\mathbf r'$, где
+$A(t) \in SO(3)$ — поворот, а $\dot A A^{-1}\mathbf a = \boldsymbol\Omega\times\mathbf a$.
+Скорость в $K$, записанная в осях $K'$:
+$\mathbf v = \mathbf V_0 + \dot{\mathbf r}' + \boldsymbol\Omega\times\mathbf r'$.
+
+::: {#def-rotating-lagrangian}
+**Лагранжиан частицы в неинерциальной системе** (после отбрасывания
+полной производной по времени, которая не меняет уравнений):
+$$
+L = \frac{m\mathbf v'^2}{2} + m\,\mathbf v'\cdot(\boldsymbol\Omega\times\mathbf r')
++ \frac m2\,(\boldsymbol\Omega\times\mathbf r')^2 - m\,\mathbf W\cdot\mathbf r' - U(\mathbf r').
+$$
+Здесь $\mathbf W$ — ускорение начала $K'$, выраженное в осях $K'$.
+:::
+
+Уравнение Лагранжа даёт
+$$
+m\dot{\mathbf v}' = -\nabla U - m\mathbf W + m\,\mathbf r'\times\dot{\boldsymbol\Omega}
++ 2m\,\mathbf v'\times\boldsymbol\Omega + m\,\boldsymbol\Omega\times(\mathbf r'\times\boldsymbol\Omega).
+$$
+Слагаемые справа после $-\nabla U$ — силы инерции: **переносная** $-m\mathbf W$,
+**вращательная** $m\,\mathbf r'\times\dot{\boldsymbol\Omega}$, **кориолисова**
+$2m\,\mathbf v'\times\boldsymbol\Omega$ и **центробежная**
+$m\,\boldsymbol\Omega\times(\mathbf r'\times\boldsymbol\Omega)$. Проверим это
+символьно при произвольных $\boldsymbol\Omega(t)$, $\mathbf W(t)$ и $U$:
+
+```{python}
+import sympy as sp
+from gmph.mechanics import euler_lagrange
+
+t, m = sp.symbols("t m", positive=True)
+r = sp.Matrix([sp.Function(n)(t) for n in ("x", "y", "z")])
+Om = sp.Matrix([sp.Function(f"Omega_{c}")(t) for c in "xyz"])
+W = sp.Matrix([sp.Function(f"W_{c}")(t) for c in "xyz"])
+U = sp.Function("U")(*r)
+v = r.diff(t)
+
+L = m * v.dot(v) / 2 + m * v.dot(Om.cross(r)) + m * Om.cross(r).dot(Om.cross(r)) / 2 - m * W.dot(r) - U
+
+grad_U = sp.Matrix([U.diff(c) for c in r])
+forces = (-grad_U - m * W + m * r.cross(Om.diff(t)) + 2 * m * v.cross(Om)
+          + m * Om.cross(r.cross(Om)))
+eqs = euler_lagrange(L, list(r), t)               # d/dt ∂L/∂v − ∂L/∂r = 0
+print("m v̇ = сумма сил:", all(sp.simplify(eq - (m * r[i].diff(t, 2) - forces[i])) == 0
+                               for i, eq in enumerate(eqs)))
+```
+
+Сам лагранжиан получается подстановкой $\mathbf v = \mathbf V_0 + \mathbf v' + \boldsymbol\Omega\times\mathbf r'$
+в $m\mathbf v^2/2$. Член $m\mathbf V_0\cdot\mathbf v'$ после выделения полной
+производной $\frac{\dd}{\dd t}(m\mathbf V_0\cdot\mathbf r')$ превращается в
+$-m\dot{\mathbf V}_0\cdot\mathbf r'$; в осях $K'$ это и есть $-m\mathbf W\cdot\mathbf r'$
+(упражнение 1).
+
+## Энергия Якоби и центробежный потенциал
+
+При постоянной $\boldsymbol\Omega$ и $\mathbf W = 0$ лагранжиан не зависит от
+времени, и сохраняется функция энергии
+$$
+E' = \mathbf v'\cdot\pd{L}{\mathbf v'} - L = \frac{m\mathbf v'^2}{2} - \frac m2(\boldsymbol\Omega\times\mathbf r')^2 + U .
+$$
+Линейный по скорости кориолисов член в $E'$ не входит — он работы не
+совершает: сила $2m\,\mathbf v'\times\boldsymbol\Omega$ перпендикулярна скорости.
+Центробежная сила потенциальна, её потенциал
+$-\tfrac m2(\boldsymbol\Omega\times\mathbf r')^2$. Отсюда форма поверхности
+воды во вращающемся ведре — параболоид $z = \Omega^2\rho^2/(2g)$ — и
+сплюснутость Земли. В небесной механике $E'$ во вращающейся вместе с
+двумя телами системе называется **интегралом Якоби**.
+
+```{python}
+from gmph.mechanics import energy
+
+Om0 = sp.symbols("Omega_0:3", real=True)
+L_const = L.subs({Om[i]: Om0[i] for i in range(3)}).subs({W[i]: 0 for i in range(3)}).doit()
+Omv = sp.Matrix(Om0)
+E_jacobi = m * v.dot(v) / 2 - m * Omv.cross(r).dot(Omv.cross(r)) / 2 + U
+print("E' = mv'²/2 − m(Ω×r')²/2 + U:", sp.simplify(energy(L_const, list(r), t) - E_jacobi) == 0)
+```
+
+## Кориолисова сила и магнитное поле
+
+Член $m\,\mathbf v'\cdot(\boldsymbol\Omega\times\mathbf r')$ устроен точно так же,
+как взаимодействие заряда с магнитным полем $\frac ec\,\mathbf v\cdot\mathbf A$ с
+векторным потенциалом однородного поля $\mathbf A = \tfrac12\mathbf B\times\mathbf r$
+(статья [о замкнутых и точных формах](/math/forms/closed-exact.qmd)).
+Сравнивая, видим: вращение действует как магнитное поле
+$\mathbf B = 2mc\,\boldsymbol\Omega/e$, кориолисова сила
+$2m\,\mathbf v'\times\boldsymbol\Omega$ — как сила Лоренца
+$\frac ec\,\mathbf v\times\mathbf B$. В обоих случаях дифференциал 1-формы
+$\mathbf A\cdot\dd\mathbf r$ (или $m(\boldsymbol\Omega\times\mathbf r)\cdot\dd\mathbf r$)
+— это 2-форма, которая «закручивает» траектории, не меняя энергии.
+
+Отсюда **теорема Лармора**: заряд в слабом магнитном поле движется так же,
+как без поля, но в системе, вращающейся с угловой скоростью
+$\boldsymbol\Omega_L = -\dfrac{e\mathbf B}{2mc}$. Квадратичный по $\Omega$ центробежный член
+при этом отбрасывается, поэтому поле должно быть слабым.
+
+## Падение на вращающейся Земле
+
+Введём локальные оси: $x$ — на восток, $y$ — на север, $z$ — вверх; на
+широте $\lambda$ угловая скорость Земли $\boldsymbol\Omega = \Omega(0, \cos\lambda, \sin\lambda)$.
+Центробежную силу включим в наблюдаемое ускорение свободного падения $g$.
+Тело, падающее без начальной скорости, в первом порядке по $\Omega$
+отклоняется к востоку на
+$$
+x(t) = \frac13\,g\,\Omega\cos\lambda\;t^3 .
+$$
+Получим это последовательными приближениями и сравним с численным
+решением точных уравнений:
+
+```{python}
+import numpy as np
+from scipy.integrate import solve_ivp
+
+Omega_E = 7.292e-5                       # рад/с
+lam = np.radians(55.75)                  # широта Москвы
+g, h = 9.81, 100.0                       # м/с², высота падения, м
+
+# нулевое приближение v⁽⁰⁾ = (0, 0, −gt); первое: ẍ = −2(Ω×v⁽⁰⁾)_x
+ts, Om_s, lam_s, g_s = sp.symbols("t Omega lambda g", positive=True)
+Om_vec = Om_s * sp.Matrix([0, sp.cos(lam_s), sp.sin(lam_s)])
+v0 = sp.Matrix([0, 0, -g_s * ts])
+acc1 = -2 * Om_vec.cross(v0)
+x1 = sp.integrate(sp.integrate(acc1[0], (ts, 0, ts)), (ts, 0, ts))
+print("x(t) =", x1)
+
+Om_num = Omega_E * np.array([0, np.cos(lam), np.sin(lam)])
+
+def rhs(time, state):
+    pos, vel = state[:3], state[3:]
+    return np.concatenate([vel, np.array([0, 0, -g]) - 2 * np.cross(Om_num, vel)])
+
+hit = lambda time, state: state[2]
+hit.terminal = True
+sol = solve_ivp(rhs, (0, 10), [0, 0, h, 0, 0, 0], events=hit, rtol=1e-12, atol=1e-12)
+T_fall = sol.t_events[0][0]
+x_formula = float(x1.subs({g_s: g, Om_s: Omega_E, lam_s: lam, ts: T_fall}))
+print(f"время падения {T_fall:.3f} с; отклонение к востоку: численно {sol.y_events[0][0][0] * 1e3:.3f} мм, "
+      f"по формуле {x_formula * 1e3:.3f} мм")
+```
+
+С высоты 100 м на широте Москвы отклонение около 1,2 см — его измерял
+ещё Ф. Райх в шахте во Фрайберге в 1831 году.
+
+## Маятник Фуко
+
+Плоскость качания маятника на широте $\lambda$ поворачивается по часовой
+стрелке (в северном полушарии, если смотреть сверху) с угловой скоростью
+$\Omega\sin\lambda$. Для малых колебаний это видно сразу: в горизонтальной
+плоскости, с комплексной координатой $\xi = x + iy$, уравнения
+$\ddot x - 2\Omega_z\dot y + \omega^2x = 0$, $\ddot y + 2\Omega_z\dot x + \omega^2y = 0$
+(где $\Omega_z = \Omega\sin\lambda$, а горизонтальной составляющей $\boldsymbol\Omega$
+можно пренебречь, она даёт вертикальную силу) сливаются в одно
+$\ddot\xi + 2i\Omega_z\dot\xi + \omega^2\xi = 0$, и подстановка
+$\xi = e^{-i\Omega_z t}\eta$ даёт
+$\ddot\eta + (\omega^2 + \Omega_z^2)\eta = 0$ — обычный осциллятор в системе,
+вращающейся с угловой скоростью $-\Omega_z$.
+
+Проверим без приближений: возьмём полный лагранжиан сферического
+маятника во вращающейся системе (координаты $x, y$ груза, $z = -\sqrt{l^2 - x^2 - y^2}$),
+выведем уравнения функцией `first_order_system` и проинтегрируем. Чтобы
+поворот был виден за разумное время, увеличим $\Omega/\omega$ до 0,02 (в
+безразмерных единицах $l = g = 1$).
+
+```{python}
+from gmph.mechanics import first_order_system
+
+x, y = sp.Function("x")(t), sp.Function("y")(t)
+Om_c, lam_c, l, g_c = sp.symbols("Omega lambda l g", positive=True)
+pos = sp.Matrix([x, y, -sp.sqrt(l**2 - x**2 - y**2)])
+vel = pos.diff(t)
+Om_p = Om_c * sp.Matrix([0, sp.cos(lam_c), sp.sin(lam_c)])
+L_pend = m * vel.dot(vel) / 2 + m * vel.dot(Om_p.cross(pos)) + m * Om_p.cross(pos).dot(Om_p.cross(pos)) / 2 - m * g_c * pos[2]
+
+params = {m: 1, l: 1, g_c: 1, Om_c: 0.02, lam_c: lam}
+rhs_p = first_order_system(L_pend, [x, y], t, params)
+t_eval = np.linspace(0, 150, 30001)
+sol_p = solve_ivp(rhs_p, (0, 150), [0.05, 0, 0, 0], t_eval=t_eval, rtol=1e-10, atol=1e-12)
+X, Y = sol_p.y[0], sol_p.y[1]
+
+# направление качания — угол точек наибольшего отклонения (по модулю π)
+radius = np.hypot(X, Y)
+peaks = [i for i in range(1, len(radius) - 1) if radius[i] > radius[i - 1] and radius[i] >= radius[i + 1]]
+angles = np.unwrap(2 * np.arctan2(Y[peaks], X[peaks])) / 2
+rate = np.polyfit(t_eval[peaks], angles, 1)[0]
+print(f"скорость поворота плоскости: численно {rate:.6f}, −Ω sin λ = {-0.02 * np.sin(lam):.6f}")
+```
+
+Скорости совпадают с точностью около 0,1 %. Остаток дают отброшенные в
+приближённой теории поправки: нелинейность при конечной амплитуде и
+горизонтальная составляющая $\boldsymbol\Omega$.
+
+```{python}
+#| label: fig-foucault
+#| fig-cap: "Траектория маятника Фуко в горизонтальной плоскости (вид сверху; x — на восток, y — на север) при Ω/ω = 0,02 на широте 55,75°, t от 0 до 150. Плоскость качания поворачивается по часовой стрелке."
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots(figsize=(5, 5))
+ax.plot(X, Y, lw=0.4, color="tab:blue")
+for i, col in ((peaks[0], "tab:green"), (peaks[-1], "tab:red")):
+    ax.plot([-X[i], X[i]], [-Y[i], Y[i]], color=col, lw=2)
+ax.text(0.052, 0.003, "начало", color="tab:green", fontsize=10)
+ax.text(X[peaks[-1]] * 1.05, Y[peaks[-1]] * 1.05 - 0.004, "конец", color="tab:red", fontsize=10)
+ax.set(xlim=(-0.07, 0.07), ylim=(-0.07, 0.07), aspect="equal", xlabel="x (восток)", ylabel="y (север)")
+plt.show()
+```
+
+Для настоящей Земли полный оборот плоскости занимает
+$2\pi/(\Omega\sin\lambda)$ — сутки, делённые на $\sin\lambda$:
+
+```{python}
+sidereal_day = 2 * np.pi / Omega_E / 3600
+print(f"звёздные сутки {sidereal_day:.2f} ч; оборот плоскости в Москве {sidereal_day / np.sin(lam):.1f} ч, "
+      f"в Париже (48,85°) {sidereal_day / np.sin(np.radians(48.85)):.1f} ч")
+```
+
+У этого результата есть геометрический смысл, к которому мы вернёмся в
+теме о связностях. Плоскость качания переносится параллельно вдоль
+широты на сфере и за сутки поворачивается относительно Земли на угол
+$-2\pi\sin\lambda$. С точностью до полного оборота это
+$2\pi(1 - \sin\lambda)$ — телесный угол шапки над широтой. Поворот вектора
+при параллельном переносе по замкнутому контуру называется
+**голономией**; на сфере единичного радиуса он равен охваченной
+площади.
+
+## Итоги
+
+- Переход в неинерциальную систему — зависящая от времени замена
+  координат; лагранжиан получается подстановкой
+  $\mathbf v = \mathbf V_0 + \mathbf v' + \boldsymbol\Omega\times\mathbf r'$.
+- Силы инерции — переносная $-m\mathbf W$, вращательная $m\,\mathbf r'\times\dot{\boldsymbol\Omega}$,
+  кориолисова $2m\,\mathbf v'\times\boldsymbol\Omega$ и центробежная
+  $m\,\boldsymbol\Omega\times(\mathbf r'\times\boldsymbol\Omega)$ — следуют из уравнений Лагранжа.
+- При постоянной $\boldsymbol\Omega$ сохраняется энергия Якоби
+  $\tfrac{m\mathbf v'^2}2 - \tfrac m2(\boldsymbol\Omega\times\mathbf r')^2 + U$.
+- Кориолисова сила устроена как сила Лоренца в поле $\mathbf B = 2mc\boldsymbol\Omega/e$
+  (теорема Лармора).
+- Падающее тело отклоняется к востоку на $\tfrac13 g\Omega\cos\lambda\,t^3$;
+  плоскость маятника Фуко поворачивается со скоростью $-\Omega\sin\lambda$.
+
+## Упражнения
+
+1. Покажите, что $m\mathbf V_0(t)\cdot\mathbf v'$ отличается от $-m\dot{\mathbf V}_0\cdot\mathbf r'$
+   на полную производную по времени (при $\boldsymbol\Omega = 0$).
+2. Найдите форму поверхности жидкости во вращающемся с угловой скоростью
+   $\Omega$ сосуде из условия постоянства потенциала
+   $gz - \tfrac12\Omega^2\rho^2$.
+3. Тело брошено вертикально вверх со скоростью $v_0$ на широте $\lambda$. Куда и
+   на сколько оно отклонится, вернувшись в точку старта (в первом порядке по
+   $\Omega$)?
+4. Найдите частоты нормальных мод маятника Фуко из уравнения
+   $\ddot\xi + 2i\Omega_z\dot\xi + \omega^2\xi = 0$, $\xi \propto e^{-i\nu t}$, и объясните,
+   как из них получается поворот плоскости.
+5. Оцените горизонтальную кориолисову силу, действующую на поезд массы
+   1000 т, идущий со скоростью 72 км/ч на север на широте 55,75°. С какой
+   стороны рельсы сильнее изнашиваются?
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $m\mathbf V_0\cdot\mathbf v' = \frac{\dd}{\dd t}(m\mathbf V_0\cdot\mathbf r') - m\dot{\mathbf V}_0\cdot\mathbf r'$.
+2. Параболоид вращения $z = \dfrac{\Omega^2\rho^2}{2g} + \text{const}$.
+3. На запад, на $\dfrac43\,\Omega\cos\lambda\,\dfrac{v_0^3}{g^2}$. Кориолисово ускорение
+   $\ddot x = -2\Omega\cos\lambda\,\dot z$ интегрируется в $\dot x = -2\Omega\cos\lambda\,z(t) \le 0$:
+   скорость на запад пропорциональна высоте, и
+   $x = -2\Omega\cos\lambda\int_0^{2v_0/g}(v_0t - gt^2/2)\,\dd t$.
+4. $\nu^2 - 2\Omega_z\nu - \omega^2 = 0$, $\nu_\pm = \Omega_z \pm\sqrt{\omega^2 + \Omega_z^2}$.
+   Моды $e^{-i\nu_\pm t}$ — круговые движения в противоположные стороны с
+   немного разными частотами. Их сумма
+   $e^{-i\Omega_z t}\bigl(a e^{-i\omega' t} + b e^{i\omega' t}\bigr)$, $\omega' = \sqrt{\omega^2 + \Omega_z^2}$, —
+   эллипс, повёрнутый на угол $-\Omega_z t$: полусумма $(\nu_+ + \nu_-)/2 = \Omega_z$ даёт
+   скорость поворота.
+5. $F = 2m v\Omega\sin\lambda = 2\cdot10^6\cdot20\cdot7{,}29\cdot10^{-5}\cdot\sin55{,}75^\circ \approx 2{,}4$ кН,
+   направлена на восток (вправо по ходу); сильнее изнашивается правый рельс.
+:::
