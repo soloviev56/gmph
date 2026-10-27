@@ -222,3 +222,19 @@ def test_ideal_gas_entropy_form():
     heat = {(1,): Cv, (2,): p}                    # δQ = dU + p dV, U = C_V T; индексы 1, 2 ↔ dT, dV
     assert d(heat, (T, V)) == {(1, 2): nu * R / V}               # δQ не замкнута
     assert d(scale(1 / T, heat), (T, V)) == {}                   # δQ/T = dS
+
+
+def test_symplectic_matrix_form():
+    n = 2
+    qs, ps = sp.symbols("q1:3"), sp.symbols("p1:3")
+    Omega = sp.Matrix(sp.BlockMatrix([[sp.zeros(n), -sp.eye(n)], [sp.eye(n), sp.zeros(n)]]))
+    u = sp.Matrix(sp.symbols("u1:5"))
+    v = sp.Matrix(sp.symbols("v1:5"))
+    # ω = Σ dp_i∧dq^i при z = (q, p): ω(u, v) = Σ (u_{p_i} v_{q_i} − u_{q_i} v_{p_i})
+    omega_uv = sum(u[n + i] * v[i] - u[i] * v[n + i] for i in range(n))
+    assert sp.expand((u.T * Omega * v)[0] - omega_uv) == 0
+    assert Omega.inv() == -Omega
+    H = sp.Function("H")(*qs, *ps)
+    grad = sp.Matrix([H.diff(c) for c in (*qs, *ps)])
+    zdot = Omega.inv() * grad                         # ż = Ω⁻¹∇H
+    assert all(zdot[i] == H.diff(ps[i]) and zdot[n + i] == -H.diff(qs[i]) for i in range(n))

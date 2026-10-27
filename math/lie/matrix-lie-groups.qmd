@@ -82,8 +82,7 @@ def jacobian_rank(equations, point, n, complex_entries=False):
     return np.linalg.matrix_rank(np.array(columns).T, tol=1e-6), p.size
 
 eta = np.diag([1.0, -1, -1, -1])
-Om2 = np.array([[0.0, 1], [-1, 0]])
-Om4 = np.block([[np.zeros((2, 2)), np.eye(2)], [-np.eye(2), np.zeros((2, 2))]])
+Om4 = np.block([[np.zeros((2, 2)), -np.eye(2)], [np.eye(2), np.zeros((2, 2))]])   # Ω из конвенций
 rng = np.random.default_rng(1)
 sym = lambda A: A + A.T
 
