@@ -1,0 +1,264 @@
+---
+title: "Оператор Ходжа на многообразии"
+topic: hodge-star
+order: 7
+description: "Оператор Ходжа с переменной метрикой; сферические координаты; согласованность с заменой координат; лапласиан ⋆d⋆d без коэффициентов Ламе; пространство Минковского: ⋆⋆ = −1 на 2-формах, даламбертиан, уравнения Максвелла в пустоте d⋆F = 0; конформная инвариантность ⋆ на средних формах"
+---
+
+Внешний дифференциал $\dd$ не знает о метрике: он одинаков в любых
+координатах и на любом многообразии. Но лапласиан, дивергенция и уравнения
+Максвелла с источниками метрику используют. На языке форм вся
+зависимость от метрики собрана в одном операторе — операторе Ходжа $\hodge$.
+В [линейной алгебре](/math/algebra/hodge-algebraic.qmd) он сопоставлял
+$k$-формам $(n-k)$-формы на одном векторном пространстве со скалярным
+произведением. На многообразии с метрикой $g_{ij}(x)$ та же конструкция
+применяется в каждой точке. В результате получаются, например, лапласиан в
+сферических координатах без коэффициентов Ламе и вторая пара уравнений
+Максвелла.
+
+Нужны [дифференциальные k-формы](/math/forms/differential-forms.qmd) и
+[оператор Ходжа в линейной алгебре](/math/algebra/hodge-algebraic.qmd).
+
+## Определение
+
+Пусть на ориентированном многообразии задана метрика $g$ (риманова или
+псевдориманова) — гладкое поле невырожденных симметричных билинейных форм
+на касательных пространствах. Она задаёт скалярное произведение форм
+$\langle\alpha, \beta\rangle$ и форму объёма
+$\mathrm{vol} = \sqrt{|\det g|}\,\dd x^1\wedge\dots\wedge\dd x^n$ в положительно
+ориентированной карте ([конвенции](/conventions.qmd)).
+
+::: {#def-hodge-manifold}
+**Оператор Ходжа** переводит $k$-формы в $(n-k)$-формы и определяется
+равенством
+$$
+\alpha\wedge\hodge\beta = \langle\alpha, \beta\rangle\,\mathrm{vol}
+$$
+для всех $k$-форм $\alpha$ в каждой точке. В компонентах
+$$
+(\hodge\beta)_{j_1\dots j_{n-k}} = \frac{\sqrt{|\det g|}}{k!}\,\beta^{i_1\dots i_k}\,\varepsilon_{i_1\dots i_k j_1\dots j_{n-k}},
+$$
+где индексы $\beta$ подняты метрикой, а $\varepsilon$ — символ Леви-Чивиты.
+:::
+
+Как и в алгебре, $\hodge\hodge = (-1)^{k(n-k)}\operatorname{sign}\det g$ на
+$k$-формах. Функция `hodge(form, g)` из `gmph.exterior` работает с любой
+матрицей $g$, в том числе с переменными элементами.
+
+## Сферические координаты
+
+В сферических координатах $g = \operatorname{diag}(1, r^2, r^2\sin^2\theta)$.
+Функция `hodge` пишет $\sqrt{|\det g|} = r^2|\sin\theta|$; в области карты
+$0 < \theta < \pi$ модуль можно снять.
+
+```{python}
+import sympy as sp
+from gmph.exterior import add, d, hodge, inner, pullback, scale, show, volume, wedge
+
+r, th, ph = sp.symbols("r theta phi", positive=True)
+SPH = (r, th, ph)
+g_sph = sp.diag(1, r**2, r**2 * sp.sin(th)**2)
+names = ["dr", "dθ", "dφ"]
+
+def in_chart(form):
+    """Снять |sin θ| = sin θ (в карте 0 < θ < π) и упростить."""
+    return {I: sp.simplify(c.replace(sp.Abs, lambda a: a)) for I, c in form.items()}
+
+def star(form):
+    return in_chart(hodge(form, g_sph))
+
+for I in [(), (1,), (2,), (3,), (2, 3), (1, 2, 3)]:
+    label = "∧".join(names[i - 1] for i in I) or "1"
+    print(f"⋆({label}) =", show(star({I: 1}), names))
+```
+
+Получилось
+$\hodge 1 = r^2\sin\theta\,\dd r\wedge\dd\theta\wedge\dd\varphi$ (элемент объёма),
+$\hodge\dd r = r^2\sin\theta\,\dd\theta\wedge\dd\varphi$ (элемент площади сферы),
+$\hodge\dd\theta = \sin\theta\,\dd\varphi\wedge\dd r$,
+$\hodge\dd\varphi = \dfrac{1}{\sin\theta}\,\dd r\wedge\dd\theta$. Множители
+$r$, $r\sin\theta$ здесь не запоминаются, а вычисляются из метрики.
+Проверим определяющее равенство на произвольных 1-формах:
+
+```{python}
+a = {(i,): sp.Function(f"a{i}")(*SPH) for i in (1, 2, 3)}
+b = {(i,): sp.Function(f"b{i}")(*SPH) for i in (1, 2, 3)}
+lhs = wedge(a, star(b))
+rhs = scale(in_chart({(): inner(a, b, g_sph)})[()], in_chart(volume(g_sph)))
+print("α∧⋆β = ⟨α, β⟩ vol:", add(lhs, scale(-1, rhs)) == {})
+```
+
+## Согласованность с заменой координат
+
+Оператор Ходжа зависит от метрики и ориентации, но не от координат: если
+выразить форму и метрику в новых координатах, $\hodge$ даст то же, что и в
+старых. Проверим, вычислив $\hodge$ от 1-формы в декартовых координатах и
+перенеся результат в сферические, и наоборот. Метрика в сферических
+координатах — перенос евклидовой: $g_{\text{sph}} = J^{\mathsf T}J$.
+
+```{python}
+x, y, z = XYZ = sp.symbols("x y z", real=True)
+to_cart = (r * sp.sin(th) * sp.cos(ph), r * sp.sin(th) * sp.sin(ph), r * sp.cos(th))
+J = sp.Matrix(to_cart).jacobian(SPH)
+print("J^T J = g_sph:", sp.simplify(J.T * J - g_sph) == sp.zeros(3, 3))
+
+omega = {(1,): x * y, (2,): z**2, (3,): x}
+star_then_pull = in_chart(pullback(hodge(omega, sp.eye(3)), XYZ, to_cart, SPH))
+pull_then_star = star(pullback(omega, XYZ, to_cart, SPH))
+print("⋆ согласован с заменой координат:", add(star_then_pull, scale(-1, pull_then_star)) == {})
+```
+
+Поэтому $\hodge$ можно вычислять в любой удобной карте. Существенно лишь,
+чтобы замена сохраняла ориентацию: при смене ориентации $\hodge$ меняет
+знак ($\det J = r^2\sin\theta > 0$ — сферическая карта ориентирована
+положительно).
+
+## Лапласиан без коэффициентов Ламе
+
+Для функции $f$ цепочка
+$$
+f \xrightarrow{\ \dd\ } \dd f \xrightarrow{\ \hodge\ } \hodge\dd f \xrightarrow{\ \dd\ } \dd\hodge\dd f \xrightarrow{\ \hodge\ } \hodge\dd\hodge\dd f
+$$
+даёт функцию — это $\operatorname{div}\operatorname{grad} f$, **лапласиан**
+$\Delta f = \hodge\dd\hodge\dd f$ (в евклидовом пространстве любой
+размерности). Его формула в сферических координатах получается без
+коэффициентов Ламе:
+
+```{python}
+f = sp.Function("f")(*SPH)
+laplacian = star(d(star(d({(): f}, SPH)), SPH))[()]
+textbook = (sp.diff(r**2 * f.diff(r), r) / r**2
+            + sp.diff(sp.sin(th) * f.diff(th), th) / (r**2 * sp.sin(th))
+            + f.diff(ph, 2) / (r**2 * sp.sin(th)**2))
+print("⋆d⋆d f совпадает с формулой из справочника:", sp.simplify(laplacian - textbook) == 0)
+print("Δ(1/r) =", sp.simplify(star(d(star(d({(): 1 / r}, SPH)), SPH)).get((), 0)))
+```
+
+$\Delta(1/r) = 0$ при $r \ne 0$ — потенциал точечного заряда гармоничен вне
+заряда. Подробнее о векторных операциях через $\dd$, $\hodge$, $\flat$ и
+$\sharp$ — в теме «Векторный анализ на языке форм».
+
+## Пространство Минковского
+
+В координатах $x^\mu = (ct, x, y, z)$ с метрикой $\eta = \operatorname{diag}(1, -1, -1, -1)$
+($n = 4$, $\operatorname{sign}\det\eta = -1$):
+
+```{python}
+eta = sp.diag(1, -1, -1, -1)
+X4 = sp.symbols("x0 x1 x2 x3", real=True)
+mink = ["dx⁰", "dx¹", "dx²", "dx³"]
+for I in [(1,), (2,), (1, 2), (2, 3)]:
+    print(f"⋆({'∧'.join(mink[i - 1] for i in I)}) =", show(hodge({I: 1}, eta), mink))
+for k, I in [(1, (1,)), (2, (1, 2)), (3, (1, 2, 3))]:
+    print(f"⋆⋆ на {k}-формах:", show(hodge(hodge({I: 1}, eta), eta), mink))
+```
+
+На 2-формах $\hodge\hodge = -1$, как в [конвенциях](/conventions.qmd), а на
+1- и 3-формах $\hodge\hodge = +1$. Поэтому на 2-формах у $\hodge$ нет
+вещественных собственных значений: его собственные значения $\pm i$. Это
+основа разложения поля на самодуальную и антисамодуальную части,
+$\mathbf E \pm i\mathbf B$.
+
+**Даламбертиан.** Та же цепочка $\hodge\dd\hodge\dd$ на функциях:
+
+```{python}
+u = sp.Function("u")(*X4)
+box_u = hodge(d(hodge(d({(): u}, X4), eta), X4), eta)[()]
+wave = u.diff(X4[0], 2) - sum(u.diff(c, 2) for c in X4[1:])
+print("⋆d⋆d u = −(∂₀² − ∇²) u:", sp.simplify(box_u + wave) == 0)
+```
+
+Знак минус — следствие сигнатуры $(+,-,-,-)$: $\hodge\dd\hodge\dd = -\Box$, где
+$\Box = \partial_0^2 - \nabla^2$.
+
+**Уравнения Максвелла в пустоте.** Первая пара — $\dd F = 0$ (статья [о
+внешнем дифференциале](/math/forms/exterior-derivative.qmd)). Вторая пара в
+пустоте — $\dd\hodge F = 0$: поскольку $\hodge F$ получается из $F$ заменой
+$\mathbf E \to -\mathbf B$, $\mathbf B \to \mathbf E$, уравнение $\dd\hodge F = 0$
+— это $\dd F = 0$ после такой замены:
+$\operatorname{div}\mathbf E = 0$, $\operatorname{rot}\mathbf B = \partial_0\mathbf E$.
+
+```{python}
+Ef = [sp.Function(n)(*X4) for n in ("E_x", "E_y", "E_z")]
+Bf = [sp.Function(n)(*X4) for n in ("B_x", "B_y", "B_z")]
+
+def field(E, B):
+    return {(1, 2): E[0], (1, 3): E[1], (1, 4): E[2], (2, 3): -B[2], (2, 4): B[1], (3, 4): -B[0]}
+
+F = field(Ef, Bf)
+print("⋆F = F(E → −B, B → E):", add(hodge(F, eta), scale(-1, field([-c for c in Bf], Ef))) == {})
+dsF = d(hodge(F, eta), X4)
+xs = X4[1:]
+div_E = sum(Ef[i].diff(xs[i]) for i in range(3))
+rot_B_z = Bf[1].diff(xs[0]) - Bf[0].diff(xs[1])
+print("(d⋆F)_{xyz} = −div E:", sp.simplify(dsF[(2, 3, 4)] + div_E) == 0)
+print("(d⋆F)_{0xy} = (rot B − ∂₀E)_z:", sp.simplify(dsF[(1, 2, 3)] - (rot_B_z - Ef[2].diff(X4[0]))) == 0)
+```
+
+С источниками справа появляется 3-форма тока; точные знаки и множители —
+в теме «Уравнения Максвелла на языке форм».
+
+## Конформная инвариантность
+
+При растяжении метрики $g \to e^{2\sigma}g$ (σ — функция) скалярное
+произведение $k$-форм умножается на $e^{-2k\sigma}$, а форма объёма — на
+$e^{n\sigma}$, поэтому
+$$
+\hodge \to e^{(n - 2k)\sigma}\,\hodge \quad\text{на } k\text{-формах}.
+$$
+На средних формах ($k = n/2$) оператор Ходжа не зависит от масштаба
+метрики. Отсюда **конформная инвариантность** уравнений Максвелла в
+пустоте ($n = 4$, $F$ — 2-форма) и двумерной гармоничности ($n = 2$, $\dd f$ —
+1-форма): гармонические функции на плоскости остаются гармоническими при
+конформных отображениях.
+
+```{python}
+sigma = sp.Function("sigma", real=True)(*X4)
+g_conf = sp.exp(2 * sigma) * eta
+for k, I in [(1, (2,)), (2, (1, 3)), (3, (1, 2, 4))]:
+    (J, flat), = hodge({I: 1}, eta).items()           # ⋆ в метрике η: одно слагаемое
+    conformal = hodge({I: 1}, g_conf)[J]
+    print(f"k = {k}: ⋆ умножается на", sp.simplify(conformal / flat))
+```
+
+## Итоги
+
+- На многообразии с метрикой $\hodge$ действует поточечно:
+  $\alpha\wedge\hodge\beta = \langle\alpha, \beta\rangle\,\mathrm{vol}$, $\mathrm{vol} = \sqrt{|\det g|}\,\dd x^1\wedge\dots\wedge\dd x^n$.
+- $\hodge$ зависит от метрики и ориентации, но не от координат; множители
+  вроде $r^2\sin\theta$ берутся из $\sqrt{|\det g|}$ и $g^{ij}$.
+- Лапласиан $\Delta = \hodge\dd\hodge\dd$ на функциях; формула в любых
+  координатах вычисляется механически.
+- В пространстве Минковского $\hodge\hodge = -1$ на 2-формах,
+  $\hodge\dd\hodge\dd = -\Box$; уравнения Максвелла в пустоте —
+  $\dd F = 0$, $\dd\hodge F = 0$.
+- При $g \to e^{2\sigma}g$ $\hodge$ умножается на $e^{(n-2k)\sigma}$; на средних
+  формах он конформно инвариантен.
+
+## Упражнения
+
+1. Найдите $\hodge\dd\rho$, $\hodge\dd\varphi$, $\hodge\dd z$ в цилиндрических координатах
+   ($g = \operatorname{diag}(1, \rho^2, 1)$).
+2. Выведите лапласиан в цилиндрических координатах как $\hodge\dd\hodge\dd f$.
+3. Найдите все функции $f(r)$ с $\Delta f = 0$ в $\R^3\setminus\{0\}$ и в
+   $\R^2\setminus\{0\}$.
+4. Метрика плоскости Лобачевского в модели Пуанкаре:
+   $g = (\dd x^2 + \dd y^2)/y^2$, $y > 0$. Найдите $\hodge\dd x$, $\hodge\dd y$, $\hodge 1$ и
+   лапласиан $\hodge\dd\hodge\dd f$.
+5. Проверьте, что $\hodge\hodge = -1$ на 1-формах двумерной евклидовой плоскости и
+   что $\hodge$ на 1-формах — поворот на $90^\circ$. Какой знак у $\hodge\hodge$ на 1-формах
+   двумерного пространства-времени $\operatorname{diag}(1, -1)$?
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $\hodge\dd\rho = \rho\,\dd\varphi\wedge\dd z$, $\hodge\dd\varphi = \dfrac1\rho\,\dd z\wedge\dd\rho$,
+   $\hodge\dd z = \rho\,\dd\rho\wedge\dd\varphi$.
+2. $\Delta f = \dfrac1\rho\partial_\rho(\rho\,\partial_\rho f) + \dfrac{1}{\rho^2}\partial_\varphi^2 f + \partial_z^2 f$.
+3. В $\R^3$: $f = A + B/r$; в $\R^2$: $f = A + B\ln r$.
+4. $\sqrt{\det g} = 1/y^2$, $g^{ij} = y^2\delta^{ij}$: $\hodge\dd x = \dd y$, $\hodge\dd y = -\dd x$
+   (на 1-формах в двумерии $\hodge$ конформно инвариантен), $\hodge 1 = \dd x\wedge\dd y/y^2$,
+   $\Delta f = y^2(f_{xx} + f_{yy})$.
+5. $\hodge\dd x = \dd y$, $\hodge\dd y = -\dd x$ — поворот на $90^\circ$, $\hodge\hodge = -1$. При
+   $\operatorname{diag}(1, -1)$: $\hodge\hodge = (-1)^{1\cdot1}\cdot(-1) = +1$; например,
+   $\hodge\dd x^0 = \dd x^1$, $\hodge\dd x^1 = \dd x^0$.
+:::
