@@ -146,6 +146,12 @@ subtitle: "Обозначения и соглашения о знаках, ед�
   $\dd\mathcal D = 4\pi\rho\,\mathrm{vol}$; в пустоте $\mathcal D = \hodge\mathcal E$, в
   изотропном диэлектрике $\mathcal D = \varepsilon\hodge\mathcal E$. Потенциал:
   $\mathcal E = -\dd\varphi$.
+- Магнитостатика в той же записи: магнитная индукция — 2-форма
+  $\mathcal B = \mathbf B\cdot\dd\mathbf S$, напряжённость — 1-форма $\mathcal H = \mathbf H\cdot\dd\mathbf r$,
+  плотность тока — 2-форма $\mathcal J = \mathbf j\cdot\dd\mathbf S$. Уравнения: $\dd\mathcal B = 0$,
+  $\dd\mathcal H = \frac{4\pi}{c}\,\mathcal J$; в пустоте $\mathcal B = \hodge\mathcal H$, в
+  изотропном магнетике $\mathcal B = \mu\hodge\mathcal H$. Векторный потенциал:
+  $\mathcal B = \dd\mathcal A$, $\mathcal A = \mathbf A\cdot\dd\mathbf r$.
 
 Все знаки этого раздела проверяются автоматически в `tests/test_conventions.py`.
 

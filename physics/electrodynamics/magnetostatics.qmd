@@ -1,0 +1,298 @@
+---
+title: "Магнитостатика"
+topic: magnetostatics
+order: 2
+description: "Магнитная индукция как 2-форма, напряжённость как 1-форма, ток как 2-форма; уравнения dℬ = 0 и dℋ = (4π/c)𝒥; закон Ампера через теорему Стокса; поле прямого тока как замкнутая неточная форма; векторный потенциал из леммы Пуанкаре и калибровочная свобода; уравнение ΔA = −(4π/c)j и закон Био–Савара; виток с током и магнитный диполь; соленоид; монополь Дирака"
+---
+
+В [электростатике](/physics/electrodynamics/electrostatics.qmd) напряжённость
+была 1-формой, а индукция — 2-формой. В магнитостатике роли меняются
+местами. Магнитный поток через поверхность — то, что измеряет
+индукционная катушка, поэтому индукция $\mathbf B$ — 2-форма. Циркуляция
+$\mathbf H$ по контуру равна току через него (закон Ампера), поэтому
+напряжённость $\mathbf H$ — 1-форма. Отсутствие магнитных зарядов
+записывается как $\dd\mathcal B = 0$, и по [лемме
+Пуанкаре](/math/forms/closed-exact.qmd) отсюда следует существование
+векторного потенциала. А то, что $\mathcal B$ замкнута, но в областях
+сложной формы не обязательно точна, связано с соленоидом, эффектом
+Ааронова–Бома и монополем Дирака.
+
+Нужны [электростатика](/physics/electrodynamics/electrostatics.qmd) и
+[замкнутые и точные формы](/math/forms/closed-exact.qmd). Единицы гауссовы.
+
+## Поля как формы
+
+::: {#def-magnetostatic-forms}
+**Магнитостатическое поле** описывается формами
+([конвенции](/conventions.qmd)):
+
+- **магнитная индукция** — 2-форма $\mathcal B = \mathbf B\cdot\dd\mathbf S$; $\int_S\mathcal B$ —
+  магнитный поток;
+- **напряжённость** — 1-форма $\mathcal H = \mathbf H\cdot\dd\mathbf r$;
+- **ток** — 2-форма $\mathcal J = \mathbf j\cdot\dd\mathbf S$; $\int_S\mathcal J$ — сила тока через $S$.
+
+**Уравнения магнитостатики**:
+$$
+\dd\mathcal B = 0, \qquad \dd\mathcal H = \frac{4\pi}{c}\,\mathcal J,
+$$
+**материальное уравнение**: $\mathcal B = \hodge\mathcal H$ в пустоте, $\mathcal B = \mu\hodge\mathcal H$ в
+изотропном магнетике.
+:::
+
+В векторной записи это $\operatorname{div}\mathbf B = 0$ и
+$\operatorname{rot}\mathbf H = \frac{4\pi}{c}\mathbf j$. Из второго уравнения следует
+сохранение тока: $\dd\mathcal J = \frac{c}{4\pi}\,\dd\dd\mathcal H = 0$, то есть
+$\operatorname{div}\mathbf j = 0$ — в статике заряд нигде не накапливается. Это
+снова $\dd^2 = 0$.
+
+По [теореме Стокса](/math/forms/stokes.qmd) второе уравнение даёт **закон
+Ампера**: $\oint_{\partial S}\mathcal H = \frac{4\pi}{c}\int_S\mathcal J = \frac{4\pi}{c}I_S$,
+а первое — равенство нулю потока $\mathcal B$ через любую замкнутую поверхность.
+
+## Прямой ток
+
+Ток $I$ течёт по оси $z$. По закону Ампера для окружности радиуса $\rho$:
+$2\pi\rho H_\varphi = 4\pi I/c$, то есть $\mathbf H = \frac{2I}{c\rho}\mathbf e_\varphi$. Как
+1-форма (физическая компонента $H_\varphi$ стоит при $\rho\,\dd\varphi$):
+$$
+\mathcal H = \frac{2I}{c}\,\dd\varphi = \frac{2I}{c}\,\frac{x\,\dd y - y\,\dd x}{x^2 + y^2}.
+$$
+Вне провода она замкнута ($\mathcal J = 0$), но не точна: её циркуляция по
+любому контуру, охватывающему провод, равна $4\pi I/c$, а не нулю. Эту
+форму мы уже встречали в статье о [замкнутых и точных
+формах](/math/forms/closed-exact.qmd): магнитного скалярного потенциала
+$\mathcal H = -\dd\psi$ вокруг тока не существует.
+
+Внутри провода радиуса $a$ с однородной плотностью тока поле линейно
+растёт по $\rho$. Проверим уравнения в цилиндрических координатах функциями
+из `gmph.vectorcalc`:
+
+```{python}
+import sympy as sp
+from gmph.vectorcalc import div, from_physical, physical, rot
+
+rho, phi, z = CYL = sp.symbols("rho phi z", positive=True)
+g_cyl = sp.diag(1, rho**2, 1)
+I, c, a = sp.symbols("I c a", positive=True)
+j0 = I / (sp.pi * a**2)
+
+H_in = from_physical([0, 2 * I * rho / (c * a**2), 0], g_cyl)
+H_out = from_physical([0, 2 * I / (c * rho), 0], g_cyl)
+print("rot H внутри:", physical(rot(H_in, CYL, g_cyl), g_cyl), "  4πj₀/c =", 4 * sp.pi * j0 / c)
+print("rot H снаружи:", rot(H_out, CYL, g_cyl), "  div H:", div(H_in, CYL, g_cyl), div(H_out, CYL, g_cyl))
+```
+
+## Векторный потенциал
+
+Так как $\dd\mathcal B = 0$, в звёздной области $\mathcal B = \dd\mathcal A$ для некоторой
+1-формы $\mathcal A = \mathbf A\cdot\dd\mathbf r$ — **векторного потенциала**
+($\mathbf B = \operatorname{rot}\mathbf A$). Гомотопический оператор $K$ из леммы
+Пуанкаре даёт его явно. Для однородного поля $\mathcal B = B\,\dd x\wedge\dd y$:
+
+```{python}
+from gmph.exterior import add, d, hodge, poincare_potential, scale, show
+
+x, y, zz = X = sp.symbols("x y z", real=True)
+B = sp.Symbol("B", positive=True)
+names = ["dx", "dy", "dz"]
+
+A_sym = poincare_potential({(1, 2): B}, X)
+print("𝒜 = K𝓑 =", show(A_sym, names))
+print("d𝒜 =", show(d(A_sym, X), names))
+```
+
+Получилось $\mathbf A = \frac12\,\mathbf B\times\mathbf r$ — симметричная калибровка. Потенциал
+определён неоднозначно: $\mathcal A' = \mathcal A + \dd\chi$ даёт то же поле, потому что
+$\dd\dd\chi = 0$. Это **калибровочная свобода** ([конвенции](/conventions.qmd)):
+например, $\mathcal A' = -By\,\dd x$ (калибровка Ландау) отличается от
+симметричной на $\dd\chi$ с $\chi = -Bxy/2$:
+
+```{python}
+A_landau = {(1,): -B * y}
+chi = -B * x * y / 2
+print("𝒜_Ландау − 𝒜 − dχ =", show(add(A_landau, scale(-1, A_sym), scale(-1, d({(): chi}, X))), names))
+```
+
+Свободой можно распорядиться, наложив условие $\operatorname{div}\mathbf A = 0$
+(**кулоновская калибровка**; на языке форм $\dd\hodge\mathcal A = 0$). Тогда в
+пустоте $\operatorname{rot}\operatorname{rot}\mathbf A = \operatorname{grad}\operatorname{div}\mathbf A - \Delta\mathbf A = -\Delta\mathbf A$
+(в декартовых компонентах), и
+$$
+\Delta\mathbf A = -\frac{4\pi}{c}\,\mathbf j .
+$$
+Каждая декартова компонента удовлетворяет уравнению Пуассона, и по
+аналогии с электростатикой
+$\mathbf A(\mathbf r) = \frac1c\int\frac{\mathbf j(\mathbf r')}{|\mathbf r - \mathbf r'|}\,\dd V'$. Взяв ротор,
+получаем **закон Био–Савара**:
+$$
+\mathbf B(\mathbf r) = \frac1c\int\frac{\mathbf j(\mathbf r')\times(\mathbf r - \mathbf r')}{|\mathbf r - \mathbf r'|^3}\,\dd V',
+\qquad\text{для тонкого провода}\quad
+\mathbf B = \frac Ic\oint\frac{\dd\mathbf l\times(\mathbf r - \mathbf r')}{|\mathbf r - \mathbf r'|^3}.
+$$
+
+## Виток с током и магнитный диполь
+
+Круговой виток радиуса $a$ с током $I$ в плоскости $z = 0$. На оси
+$B_z = \dfrac{2\pi Ia^2}{c\,(a^2 + z^2)^{3/2}}$. Сравним с численным
+интегрированием по закону Био–Савара (виток разбит на 2000 отрезков,
+$I = c = a = 1$):
+
+```{python}
+import numpy as np
+
+def biot_savart_loop(points, radius=1.0, current=1.0, n=2000):
+    """B = (I/c)∮dl×(r − r')/|r − r'|³ для витка в плоскости z = 0 (c = 1)."""
+    s = np.linspace(0, 2 * np.pi, n, endpoint=False)
+    src = np.stack([radius * np.cos(s), radius * np.sin(s), 0 * s], axis=1)
+    dl = np.stack([-np.sin(s), np.cos(s), 0 * s], axis=1) * radius * 2 * np.pi / n
+    R = points[:, None, :] - src[None, :, :]
+    return current * np.sum(np.cross(dl[None], R) / np.linalg.norm(R, axis=2)[..., None] ** 3, axis=1)
+
+axis_points = np.array([[0, 0, zv] for zv in (0.0, 0.5, 2.0)])
+for p_, Bv in zip(axis_points, biot_savart_loop(axis_points)):
+    print(f"z = {p_[2]:.1f}: Био–Савар B_z = {Bv[2]:.10f}, формула = {2 * np.pi / (1 + p_[2]**2) ** 1.5:.10f}")
+```
+
+Вдали от витка его поле — поле **магнитного диполя** с моментом
+$\mathbf m = \frac{I S}{c}\,\mathbf e_z = \frac{\pi Ia^2}{c}\,\mathbf e_z$:
+$\mathbf A = \dfrac{\mathbf m\times\mathbf r}{r^3}$,
+$\mathbf B = \dfrac{3(\mathbf m\cdot\mathbf n)\mathbf n - \mathbf m}{r^3}$. Проверим
+символьно, что $\operatorname{rot}$ этого $\mathbf A$ — дипольное поле и что
+$\operatorname{div}\mathbf A = 0$, а затем численно — что поле витка к нему
+приближается:
+
+```{python}
+from gmph.vectorcalc import div as div_v, rot as rot_v
+
+m = sp.Symbol("m", positive=True)
+r = sp.sqrt(x**2 + y**2 + zz**2)
+m_vec, r_vec = sp.Matrix([0, 0, m]), sp.Matrix([x, y, zz])
+A_dip = list(m_vec.cross(r_vec) / r**3)
+n_vec = r_vec / r
+B_dip = (3 * m_vec.dot(n_vec) * n_vec - m_vec) / r**3
+print("rot A = поле диполя:", sp.simplify(sp.Matrix(rot_v(A_dip, X, sp.eye(3))) - B_dip) == sp.zeros(3, 1),
+      "  div A =", div_v(A_dip, X, sp.eye(3)))
+
+direction = np.array([3.0, 0.0, 4.0]) / 5.0
+m_num = np.pi                                          # πIa²/c при I = c = a = 1
+for dist in (5, 20, 80):
+    p_ = dist * direction
+    exact_dip = (3 * m_num * direction[2] * direction - np.array([0, 0, m_num])) / dist**3
+    ratio = np.linalg.norm(biot_savart_loop(p_[None])[0]) / np.linalg.norm(exact_dip)
+    print(f"r = {dist:3d}: |B_витка| / |B_диполя| = {ratio:.6f}")
+```
+
+Отличие убывает как $(a/r)^2$ — следующий член мультипольного
+разложения. Картина силовых линий витка в плоскости $xz$:
+
+```{python}
+#| label: fig-loop-field
+#| fig-cap: "Силовые линии магнитного поля кругового витка с током (сечение плоскостью y = 0; точки — сечения провода; ток в правой точке направлен от читателя, в левой — к читателю). Цвет — lg|B| (светлее — сильнее). Линии замкнуты: dℬ = 0, магнитных зарядов нет."
+import matplotlib.pyplot as plt
+
+xs = np.linspace(-2.5, 2.5, 90)
+zs = np.linspace(-2.5, 2.5, 90)
+Xg, Zg = np.meshgrid(xs, zs)
+grid = np.stack([Xg.ravel(), 0 * Xg.ravel(), Zg.ravel()], axis=1)
+Bg = biot_savart_loop(grid, n=400)
+Bx_g, Bz_g = Bg[:, 0].reshape(Xg.shape), Bg[:, 2].reshape(Xg.shape)
+strength = np.log10(np.hypot(Bx_g, Bz_g))
+
+fig, ax = plt.subplots(figsize=(5.4, 5.0))
+ax.streamplot(Xg, Zg, Bx_g, Bz_g, color=strength, cmap="viridis", density=1.3, linewidth=0.9, arrowsize=0.8)
+ax.plot([-1, 1], [0, 0], "o", color="tab:red", ms=8)
+ax.set_aspect("equal")
+ax.set_xlabel("x / a")
+ax.set_ylabel("z / a")
+plt.show()
+```
+
+## Соленоид и неточность вне него
+
+Внутри длинного соленоида с $n$ витками на единицу длины $B = 4\pi nI/c$,
+снаружи $B = 0$. Поток через сечение $\Phi = \pi R^2B$. Вне соленоида
+$\mathcal B = 0$, но векторный потенциал там **не равен нулю**: по теореме
+Стокса $\oint\mathcal A = \int\mathcal B = \Phi$ для любого контура, охватывающего
+соленоид. Поэтому снаружи
+$$
+\mathcal A = \frac{\Phi}{2\pi}\,\dd\varphi
+$$
+(с точностью до калибровки). Это замкнутая, но не точная форма: убрать её
+калибровочным преобразованием $\mathcal A \to \mathcal A + \dd\chi$ с однозначной функцией
+$\chi$ нельзя. Классическая частица вне соленоида поля не чувствует, а
+квантовая чувствует фазу $\frac{e}{\hbar c}\oint\mathcal A = \frac{e\Phi}{\hbar c}$ —
+это **эффект Ааронова–Бома**. Здесь топология области (плоскость без
+круга) прямо проявляется в физике.
+
+## Монополь Дирака
+
+Если бы существовал магнитный заряд $g$, его поле было бы $\mathbf B = g\,\mathbf e_r/r^2$,
+то есть $\mathcal B = g\sin\theta\,\dd\theta\wedge\dd\varphi$ — замкнутая форма с потоком
+$4\pi g$ через сферу. Глобального потенциала нет (по той же причине, что и
+у кулоновской формы, — [теорема Стокса](/math/forms/stokes.qmd)). Но на
+сфере без южного полюса подходит $\mathcal A_N = g(1 - \cos\theta)\,\dd\varphi$, а без
+северного — $\mathcal A_S = -g(1 + \cos\theta)\,\dd\varphi$:
+
+```{python}
+r_s, th, ph = SPH = sp.symbols("r theta phi", positive=True)
+g_m = sp.Symbol("g", positive=True)
+A_N = {(3,): g_m * (1 - sp.cos(th))}
+A_S = {(3,): -g_m * (1 + sp.cos(th))}
+print("d𝒜_N =", show(d(A_N, SPH), ["dr", "dθ", "dφ"]), "   d𝒜_S =", show(d(A_S, SPH), ["dr", "dθ", "dφ"]))
+print("𝒜_N − 𝒜_S =", show(add(A_N, scale(-1, A_S)), ["dr", "dθ", "dφ"]))
+```
+
+На перекрытии потенциалы различаются на $2g\,\dd\varphi$ — калибровочное
+преобразование с $\chi = 2g\varphi$. Функция $\chi$ неоднозначна, но волновая
+функция заряда $e$ умножается на $e^{ie\chi/\hbar c}$, и эта фаза однозначна,
+если $\frac{2eg}{\hbar c}$ — целое число. Это **условие квантования Дирака**:
+существование хотя бы одного монополя объяснило бы квантование
+электрического заряда. Точный язык для таких «склеенных» потенциалов —
+расслоения со связностью (3-й курс).
+
+## Итоги
+
+- $\mathbf B$ — 2-форма $\mathcal B$ (поток), $\mathbf H$ — 1-форма $\mathcal H$ (циркуляция),
+  ток — 2-форма $\mathcal J$; уравнения $\dd\mathcal B = 0$, $\dd\mathcal H = \frac{4\pi}{c}\mathcal J$.
+- Закон Ампера — теорема Стокса для $\mathcal H$; сохранение тока $\dd\mathcal J = 0$ —
+  следствие $\dd^2 = 0$.
+- Поле прямого тока $\mathcal H = \frac{2I}{c}\dd\varphi$ замкнуто, но не точно вне провода.
+- $\mathcal B = \dd\mathcal A$ по лемме Пуанкаре; $\mathcal A$ определён с точностью до $\dd\chi$; в
+  кулоновской калибровке $\Delta\mathbf A = -\frac{4\pi}{c}\mathbf j$, отсюда закон Био–Савара.
+- Вдали от витка — поле диполя $\mathbf m = IS/c$; вне соленоида $\mathcal A = \frac{\Phi}{2\pi}\dd\varphi$
+  (Ааронов–Бом); у монополя есть только локальные потенциалы (Дирак).
+
+## Упражнения
+
+1. Найдите поле $\mathbf H$ тороидальной катушки из $N$ витков с током $I$ внутри
+   и вне тора.
+2. Однородное поле $\mathbf B = B\,\mathbf e_z$. Найдите калибровочную функцию,
+   переводящую симметричный потенциал $\frac12\mathbf B\times\mathbf r$ в потенциал
+   $\mathbf A = (0, Bx, 0)$.
+3. По проводу радиуса $a$ течёт ток $I$ с однородной плотностью. Найдите
+   векторный потенциал $\mathbf A = A_z(\rho)\,\mathbf e_z$ внутри провода и проверьте
+   $\dd\mathcal A = \mathcal B$.
+4. Найдите поле на оси двух соосных витков радиуса $a$, разнесённых на
+   расстояние $h$ (катушки Гельмгольца), и подберите $h$ так, чтобы
+   $\partial_z^2B_z = 0$ в середине.
+5. Проверьте, что поток монопольной формы $\mathcal B = g\sin\theta\,\dd\theta\wedge\dd\varphi$ через
+   сферу равен $4\pi g$, и вычислите $\oint\mathcal A_N$ по окружности $\theta = \theta_0$.
+   Почему при $\theta_0 \to \pi$ этот интеграл не стремится к нулю?
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. По закону Ампера для окружности радиуса $\rho$ внутри тора
+   $2\pi\rho H_\varphi = 4\pi NI/c$, $H_\varphi = \dfrac{2NI}{c\rho}$; вне тора (контур охватывает
+   ток $NI - NI = 0$ или не охватывает его) $\mathbf H = 0$.
+2. $(0, Bx, 0) - \frac12(-By, Bx, 0) = \frac B2(y, x, 0) = \operatorname{grad}\chi$ с $\chi = \frac B2xy$.
+3. $\mathbf B = \operatorname{rot}(A_z\mathbf e_z) = -A_z'(\rho)\,\mathbf e_\varphi$, и $B_\varphi = \frac{2I\rho}{ca^2}$ даёт
+   $A_z = -\dfrac{I\rho^2}{ca^2}$ (плюс константа); в декартовых координатах
+   $\mathcal A = -\frac{I}{ca^2}(x^2 + y^2)\,\dd z$, $\dd\mathcal A = -\frac{2I}{ca^2}(x\,\dd x + y\,\dd y)\wedge\dd z$ — то же,
+   что $\hodge\mathcal H$.
+4. $B_z(z) = \dfrac{2\pi Ia^2}{c}\left[\dfrac{1}{(a^2 + (z - h/2)^2)^{3/2}} + \dfrac{1}{(a^2 + (z + h/2)^2)^{3/2}}\right]$;
+   $\partial_z^2B_z(0) = 0$ при $h = a$.
+5. $\int_0^\pi\!\!\int_0^{2\pi} g\sin\theta\,\dd\varphi\,\dd\theta = 4\pi g$;
+   $\oint\mathcal A_N = 2\pi g(1 - \cos\theta_0)$ — поток через «северную шапку». При
+   $\theta_0 \to \pi$ он стремится к $4\pi g$: окружность стягивается в южный полюс,
+   где $\mathcal A_N$ не определён (там «струна Дирака»).
+:::

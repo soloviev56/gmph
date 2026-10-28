@@ -255,3 +255,19 @@ def test_electrostatics_forms():
     assert d(D_form, X) == {(1, 2, 3): 4 * sp.pi * rho0}
     # 𝒟 = D·dS: компонента при dy∧dz — D_x
     assert D_form[(2, 3)] == E_form[(1,)]
+
+
+# --- Магнитостатика формами: dℬ = 0, dℋ = (4π/c)𝒥, ℬ = ⋆ℋ = d𝒜 ---------------
+
+def test_magnetostatics_forms():
+    from gmph.exterior import d, hodge
+
+    x, y, z = X = sp.symbols("x y z", real=True)
+    j0, c = sp.symbols("j_0 c", positive=True)
+    # внутри провода с током j₀ вдоль z: H = (2π j₀/c)(−y, x, 0)
+    H_form = {(1,): -2 * sp.pi * j0 / c * y, (2,): 2 * sp.pi * j0 / c * x}
+    assert d(H_form, X) == {(1, 2): 4 * sp.pi / c * j0}               # 𝒥 = j₀ dx∧dy
+    B_form = hodge(H_form, sp.eye(3))
+    assert d(B_form, X) == {}
+    A_form = {(3,): -sp.pi * j0 / c * (x**2 + y**2)}                  # A = A_z e_z
+    assert d(A_form, X) == B_form
