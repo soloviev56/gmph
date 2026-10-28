@@ -1,0 +1,328 @@
+---
+title: "Внутреннее произведение и производная Ли"
+topic: interior-lie
+order: 13
+description: "Внутреннее произведение ι_X и его свойства; сила Лоренца и поток как ι_X; производная Ли тензорных полей вдоль потока; L_X Y = [X, Y]; формула Картана L_X = dι_X + ι_X d; L_X vol = (div X) vol и сохранение объёма; уравнение непрерывности; вмороженность магнитного поля; производная Ли метрики и векторы Киллинга"
+---
+
+Жидкость течёт, и вместе с ней переносятся плотность, завихренность,
+магнитное поле в плазме. Гамильтонов поток в фазовом пространстве
+переносит фазовые объёмы. Каждый раз нужно ответить на вопрос: как
+меняется тензорная величина, если её переносить [потоком векторного
+поля](/math/forms/flows.qmd)? Ответ даёт **производная Ли** $\Lie{X}$. Для
+дифференциальных форм она вычисляется по удивительно простой формуле
+Картана $\Lie{X} = \dd\,\iprod{X} + \iprod{X}\,\dd$. В ней кроме внешнего
+дифференциала участвует **внутреннее произведение** $\iprod{X}$ —
+подстановка вектора в форму. Из этих двух операций выводятся теорема
+Лиувилля, уравнение непрерывности и закон «вмороженности» магнитного поля.
+
+Нужны [потоки векторных полей](/math/forms/flows.qmd) и [внешний
+дифференциал](/math/forms/exterior-derivative.qmd).
+
+## Внутреннее произведение
+
+::: {#def-interior}
+**Внутреннее произведение** векторного поля $X$ и $k$-формы $\omega$ — это
+$(k-1)$-форма
+$$
+(\iprod{X}\omega)(Y_1, \dots, Y_{k-1}) = \omega(X, Y_1, \dots, Y_{k-1}),
+$$
+то есть $X$ подставляется в **первый** аргумент ([конвенции](/conventions.qmd)).
+На функциях $\iprod{X}f = 0$.
+:::
+
+В компонентах $(\iprod{X}\omega)_{j_1\dots j_{k-1}} = X^i\omega_{ij_1\dots j_{k-1}}$, а на базисных
+формах
+$\iprod{X}(\dd x^{i_1}\wedge\dots\wedge\dd x^{i_k}) = \sum_m (-1)^{m-1}X^{i_m}\,\dd x^{i_1}\wedge\dots\widehat{\dd x^{i_m}}\dots\wedge\dd x^{i_k}$
+(крышка — пропуск). Например, $\iprod{X}(\dd x\wedge\dd y) = X^x\,\dd y - X^y\,\dd x$.
+Функция `interior(X, form)` из `gmph.exterior` делает именно это. Два
+главных свойства:
+
+1. $\iprod{X}\iprod{X} = 0$ — следствие антисимметрии;
+2. **антидифференцирование**: $\iprod{X}(\alpha\wedge\beta) = \iprod{X}\alpha\wedge\beta + (-1)^k\,\alpha\wedge\iprod{X}\beta$
+   для $k$-формы $\alpha$ — такое же правило знаков, как у $\dd$.
+
+```{python}
+import sympy as sp
+from itertools import combinations
+from gmph.exterior import add, d, interior, lie, pullback, scale, show, wedge
+
+x, y, z, t = sp.symbols("x y z t", real=True)
+X3 = (x, y, z)
+names = ["dx", "dy", "dz"]
+
+def generic_form(k, label="w"):
+    """k-форма в ℝ³ с произвольными функциями-компонентами."""
+    return {I: sp.Function(label + "".join(map(str, I)))(*X3) for I in combinations((1, 2, 3), k)}
+
+Xv = [sp.Function(f"X{i}")(*X3) for i in (1, 2, 3)]
+alpha, beta = generic_form(1, "a"), generic_form(2, "b")
+
+print("ι_X ι_X β =", show(interior(Xv, interior(Xv, beta))))
+lhs = interior(Xv, wedge(alpha, beta))
+rhs = add(wedge(interior(Xv, alpha), beta), scale(-1, wedge(alpha, interior(Xv, beta))))
+print("ι_X(α∧β) = ι_Xα∧β − α∧ι_Xβ:", add(lhs, scale(-1, rhs)) == {})
+```
+
+**Векторный анализ.** В $\R^3$ (словарь — в статье [«Векторный анализ на
+языке форм»](/math/forms/vector-calculus-forms.qmd)):
+
+- $\iprod{\mathbf v}\,\mathrm{vol} = \mathbf v\cdot\dd\mathbf S$ — поток поля скоростей через
+  площадку: объём, протекающий за единицу времени;
+- $\iprod{\mathbf v}(\mathbf B\cdot\dd\mathbf S) = (\mathbf B\times\mathbf v)\cdot\dd\mathbf r$;
+- $\iprod{\mathbf v}(\mathbf E\cdot\dd\mathbf r) = \mathbf E\cdot\mathbf v$.
+
+```{python}
+v = [sp.Function(n)(*X3) for n in ("v_x", "v_y", "v_z")]
+B = [sp.Function(n)(*X3) for n in ("B_x", "B_y", "B_z")]
+B_flux = {(2, 3): B[0], (1, 3): -B[1], (1, 2): B[2]}          # B·dS
+
+print("ι_v vol =", show(interior(v, {(1, 2, 3): 1}), names))
+Bxv = sp.Matrix(B).cross(sp.Matrix(v))
+iv_B = interior(v, B_flux)
+print("ι_v(B·dS) = (B × v)·dr:", all(sp.simplify(iv_B.get((i,), 0) - Bxv[i - 1]) == 0 for i in (1, 2, 3)))
+```
+
+Отсюда **сила Лоренца**: магнитная часть силы $\frac qc\,\mathbf v\times\mathbf B$ — это
+1-форма $-\frac qc\,\iprod{\mathbf v}\mathcal B$, где $\mathcal B = \mathbf B\cdot\dd\mathbf S$.
+Её мощность $\iprod{\mathbf v}\bigl(-\frac qc\,\iprod{\mathbf v}\mathcal B\bigr) = 0$ по свойству 1:
+магнитное поле не совершает работы, и это просто $\iprod{X}\iprod{X} = 0$.
+
+## Производная Ли
+
+Пусть $\phi_t$ — поток поля $X$. Перенося тензор назад потоком, мы сравниваем
+значение в точке $\phi_t(p)$ со значением в $p$.
+
+::: {#def-lie-derivative}
+**Производная Ли** тензорного поля $T$ (функции, формы, метрики) вдоль $X$:
+$$
+\Lie{X}T = \left.\frac{\dd}{\dd t}\right|_{t=0}\phi_t^*T .
+$$
+Для векторного поля $Y$ перенос делается обратным отображением:
+$\Lie{X}Y = \left.\frac{\dd}{\dd t}\right|_{t=0}(\phi_{-t})_*Y$.
+:::
+
+Свойства, которые следуют прямо из определения:
+
+- на функциях $\Lie{X}f = Xf$ — производная по направлению;
+- на векторных полях $\Lie{X}Y = [X, Y]$ — [коммутатор](/math/forms/flows.qmd);
+- $\Lie{X}$ коммутирует с $\dd$ (потому что $\dd$ коммутирует с [переносом
+  форм](/math/forms/pullback.qmd)) и подчиняется правилу Лейбница
+  $\Lie{X}(\alpha\wedge\beta) = \Lie{X}\alpha\wedge\beta + \alpha\wedge\Lie{X}\beta$ (без знаков:
+  $\Lie{X}$ не меняет степень).
+
+Тензор $T$ **инвариантен** относительно потока ($\phi_t^*T = T$ при всех $t$),
+если и только если $\Lie{X}T = 0$.
+
+## Формула Картана
+
+::: {#thm-cartan}
+**Формула Картана.** На дифференциальных формах
+$$
+\Lie{X} = \dd\,\iprod{X} + \iprod{X}\,\dd .
+$$
+:::
+
+Обе части — дифференцирования, коммутирующие с $\dd$, и на функциях обе
+дают $Xf$ (справа $\iprod{X}\dd f = \dd f(X) = Xf$). Поэтому они совпадают
+на $f\,\dd g$, а значит, и на всех формах. Проверим формулу на формах
+всех степеней в $\R^3$ с произвольным полем $X$, сравнивая с определением.
+Для производной при $t = 0$ поток достаточно знать в первом порядке:
+$\phi_t(x) = x + tX(x) + O(t^2)$.
+
+```{python}
+def lie_by_flow(field, form):
+    """L_X ω = d/dt φ_t*ω при t = 0, φ_t(x) ≈ x + tX(x)."""
+    moved = pullback(form, X3, [c + t * f for c, f in zip(X3, field)], X3)
+    return {I: sp.diff(c, t).subs(t, 0).doit() for I, c in moved.items()}
+
+for k in range(4):
+    omega = generic_form(k)
+    cartan = lie(Xv, omega, X3)                        # d ι_X ω + ι_X dω
+    print(f"k = {k}: формула Картана совпадает с определением:",
+          add(cartan, scale(-1, lie_by_flow(Xv, omega))) == {})
+```
+
+Функция `lie(X, form, coords)` из `gmph.exterior` вычисляет $\Lie{X}$ по формуле
+Картана. Два частных случая полезно помнить:
+
+- если $\omega$ замкнута, $\Lie{X}\omega = \dd(\iprod{X}\omega)$;
+- для формы старшей степени $\dd\omega = 0$ автоматически, и опять
+  $\Lie{X}\omega = \dd\iprod{X}\omega$.
+
+## Объём и уравнение непрерывности
+
+Для формы объёма в $\R^n$: $\Lie{X}\,\mathrm{vol} = \dd\,\iprod{X}\mathrm{vol} = (\operatorname{div}X)\,\mathrm{vol}$
+— это определение дивергенции без метрики (нужна только форма объёма).
+Поток сохраняет объёмы тогда и только тогда, когда $\operatorname{div}X = 0$. Это
+геометрическое содержание **теоремы Лиувилля**: гамильтонов поток
+бездивергентен и сохраняет фазовый объём (подробно — в теме «Гамильтоновы
+векторные поля»).
+
+```{python}
+print("L_X vol =", show(lie(Xv, {(1, 2, 3): 1}, X3), names))
+```
+
+Сравним два плоских течения: сдвиг $X = y\,\partial_x$ ($\operatorname{div}X = 0$,
+поток $(x + ty, y)$) и растяжение $X = x\,\partial_x + \tfrac12y\,\partial_y$
+($\operatorname{div}X = \tfrac32$, поток $(e^tx, e^{t/2}y)$). Площадь образа круга
+в первом случае постоянна, во втором растёт как $e^{3t/2}$.
+
+```{python}
+#| label: fig-flows-area
+#| fig-cap: 'Образы единичного круга под действием потоков при $t = 0;\ 0{,}5;\ 1$. Слева сдвиг $y\,\partial_x$ ($\operatorname{div} = 0$): площадь $\pi$ не меняется. Справа растяжение $x\,\partial_x + \frac12 y\,\partial_y$ ($\operatorname{div} = 3/2$): площадь умножается на $e^{3t/2}$.'
+import numpy as np
+import matplotlib.pyplot as plt
+
+s = np.linspace(0, 2 * np.pi, 4000)
+disk = np.array([np.cos(s), np.sin(s)])
+flows = {
+    r"сдвиг $y\partial_x$": lambda p, tt: np.array([p[0] + tt * p[1], p[1]]),
+    r"растяжение $x\partial_x + \frac{1}{2}y\partial_y$": lambda p, tt: np.array([np.exp(tt) * p[0], np.exp(tt / 2) * p[1]]),
+}
+
+def polygon_area(p):
+    return 0.5 * abs(np.dot(p[0], np.roll(p[1], 1)) - np.dot(p[1], np.roll(p[0], 1)))
+
+fig, axes = plt.subplots(1, 2, figsize=(8.5, 4.8))
+for ax, (title, flow) in zip(axes, flows.items()):
+    for tt, color in [(0, "0.6"), (0.5, "tab:blue"), (1, "tab:red")]:
+        img = flow(disk, tt)
+        ax.plot(*img, color=color, label=f"t = {tt:g}, S = {polygon_area(img):.4f}")
+    ax.set_title(title)
+    ax.set_aspect("equal")
+    ax.set_xlim(-3.2, 3.2)
+    ax.set_ylim(-2.2, 2.2)
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.1), fontsize=8)
+plt.tight_layout()
+plt.show()
+print("π e^{3t/2} при t = 0.5, 1:", [round(float(np.pi * np.exp(1.5 * tt)), 4) for tt in (0.5, 1)])
+```
+
+**Уравнение непрерывности.** Масса жидкости в объёме, движущемся вместе с
+ней, сохраняется: 3-форма $\mu = \rho\,\mathrm{vol}$ переносится течением. Для
+нестационарного поля скоростей это значит
+$\partial_t\mu + \Lie{\mathbf v}\mu = 0$, а
+$$
+\Lie{\mathbf v}(\rho\,\mathrm{vol}) = \dd\,\iprod{\mathbf v}(\rho\,\mathrm{vol}) = \operatorname{div}(\rho\mathbf v)\,\mathrm{vol},
+$$
+то есть $\partial_t\rho + \operatorname{div}(\rho\mathbf v) = 0$:
+
+```{python}
+rho = sp.Function("rho")(*X3)
+div_rho_v = sum(sp.diff(rho * v[i], c) for i, c in enumerate(X3))
+print("L_v(ρ vol) = div(ρv) vol:", sp.simplify(lie(v, {(1, 2, 3): rho}, X3)[(1, 2, 3)] - div_rho_v) == 0)
+```
+
+## Физика: вмороженное магнитное поле
+
+В идеально проводящей плазме магнитный поток через любой контур,
+движущийся вместе с плазмой, сохраняется (теорема Альвена). На языке форм:
+2-форма $\mathcal B = \mathbf B\cdot\dd\mathbf S$ переносится течением,
+$\partial_t\mathcal B + \Lie{\mathbf v}\mathcal B = 0$. По формуле Картана и
+$\dd\mathcal B = (\operatorname{div}\mathbf B)\,\mathrm{vol} = 0$:
+$$
+\Lie{\mathbf v}\mathcal B = \dd\,\iprod{\mathbf v}\mathcal B = \dd\bigl((\mathbf B\times\mathbf v)\cdot\dd\mathbf r\bigr)
+= -\operatorname{rot}(\mathbf v\times\mathbf B)\cdot\dd\mathbf S,
+$$
+и получается **уравнение индукции** идеальной магнитной гидродинамики
+$\partial_t\mathbf B = \operatorname{rot}(\mathbf v\times\mathbf B)$. Проверим общий случай
+(с $\operatorname{div}\mathbf B$, который даёт слагаемое $\iprod{\mathbf v}\dd\mathcal B$):
+
+```{python}
+def rot(V):
+    return [sp.diff(V[2], y) - sp.diff(V[1], z), sp.diff(V[0], z) - sp.diff(V[2], x), sp.diff(V[1], x) - sp.diff(V[0], y)]
+
+L_B = lie(v, B_flux, X3)
+R = rot(sp.Matrix(v).cross(sp.Matrix(B)))
+div_B = sum(sp.diff(B[i], c) for i, c in enumerate(X3))
+expected = {(2, 3): -R[0] + v[0] * div_B, (1, 3): R[1] - v[1] * div_B, (1, 2): -R[2] + v[2] * div_B}
+print("L_v(B·dS) = [−rot(v×B) + v div B]·dS:", add(L_B, scale(-1, expected)) == {})
+```
+
+(Компонента при $\dd x\wedge\dd z$ входит с обратным знаком, так как
+$\dd z\wedge\dd x = -\dd x\wedge\dd z$.)
+
+## Производная Ли метрики
+
+Производная Ли определена для любых тензоров. Для симметричного тензора
+$g_{ij}$ из определения получается
+$$
+(\Lie{X}g)_{ij} = X^k\partial_kg_{ij} + g_{kj}\,\partial_iX^k + g_{ik}\,\partial_jX^k .
+$$
+Поток сохраняет расстояния (состоит из изометрий), если $\Lie{X}g = 0$; такие
+поля называются **полями Киллинга**. Проверим формулу по определению
+($\phi_t^*g = J^{\mathsf T}g(\phi_t)J$, $J$ — якобиан потока) и вычислим $\Lie{X}g$
+для поворота и растяжения плоскости:
+
+```{python}
+XY = (x, y)
+g_plane = sp.eye(2)
+
+def lie_metric(field, g, coords):
+    n = len(coords)
+    return sp.Matrix(n, n, lambda i, j: sp.simplify(
+        sum(field[k] * sp.diff(g[i, j], coords[k]) + g[k, j] * sp.diff(field[k], coords[i])
+            + g[i, k] * sp.diff(field[k], coords[j]) for k in range(n))))
+
+def lie_metric_by_flow(field, g, coords):
+    images = sp.Matrix([c + t * f for c, f in zip(coords, field)])
+    J = images.jacobian(coords)
+    moved = J.T * g.subs(dict(zip(coords, images)), simultaneous=True) * J
+    return sp.simplify(sp.diff(moved, t).subs(t, 0))
+
+g_poincare = sp.diag(1 / y**2, 1 / y**2)                  # для проверки — метрика с переменными элементами
+test_field = (x**2 * y, x + y**3)
+print("формула совпадает с определением:",
+      sp.simplify(lie_metric(test_field, g_poincare, XY) - lie_metric_by_flow(test_field, g_poincare, XY)) == sp.zeros(2, 2))
+print("поворот −y∂ₓ + x∂ᵧ:   L_X g =", lie_metric((-y, x), g_plane, XY).tolist())
+print("растяжение x∂ₓ + y∂ᵧ: L_X g =", lie_metric((x, y), g_plane, XY).tolist())
+```
+
+Поворот — поле Киллинга, а растяжение даёт $\Lie{X}g = 2g$: оно сохраняет углы,
+но не длины (**конформное поле Киллинга**). Поля Киллинга задают
+симметрии пространства и через теорему Нётер — законы сохранения; этому
+посвящена тема «Изометрии и векторы Киллинга».
+
+## Итоги
+
+- $\iprod{X}\omega$ — подстановка $X$ в первый аргумент; $\iprod{X}\iprod{X} = 0$,
+  $\iprod{X}$ — антидифференцирование.
+- В $\R^3$: $\iprod{\mathbf v}\,\mathrm{vol} = \mathbf v\cdot\dd\mathbf S$, $\iprod{\mathbf v}(\mathbf B\cdot\dd\mathbf S) = (\mathbf B\times\mathbf v)\cdot\dd\mathbf r$;
+  магнитная сила не совершает работы, потому что $\iprod{\mathbf v}\iprod{\mathbf v} = 0$.
+- $\Lie{X}T = \frac{\dd}{\dd t}\phi_t^*T|_{t=0}$; на функциях $Xf$, на полях $[X, Y]$;
+  $T$ инвариантен относительно потока $\iff \Lie{X}T = 0$.
+- Формула Картана $\Lie{X} = \dd\iprod{X} + \iprod{X}\dd$; $\Lie{X}\mathrm{vol} = (\operatorname{div}X)\,\mathrm{vol}$.
+- Уравнение непрерывности и уравнение индукции МГД — условия переноса
+  3-формы $\rho\,\mathrm{vol}$ и 2-формы $\mathcal B$ течением.
+- $\Lie{X}g = 0$ — поля Киллинга (изометрии).
+
+## Упражнения
+
+1. Найдите $\iprod{X}(\dd x\wedge\dd y)$ для поля поворота $X = -y\,\partial_x + x\,\partial_y$.
+   Какой функции $H$ соответствует равенство $\iprod{X}(\dd x\wedge\dd y) = -\dd H$?
+2. Вычислите $\Lie{X}(x\,\dd y)$ для $X = x\,\partial_x$ двумя способами: по формуле Картана
+   и по явному потоку $\phi_t(x, y) = (e^tx, y)$.
+3. Проверьте тождество $\Lie{X}\iprod{Y} - \iprod{Y}\Lie{X} = \iprod{[X, Y]}$ на примере
+   $X = \partial_x$, $Y = x\,\partial_y$, $\omega = \dd x\wedge\dd y$.
+4. При каком $a$ поток поля $X = (x, ay, z)$ сохраняет объём в $\R^3$? Найдите
+   $\Lie{X}(\dd x\wedge\dd y\wedge\dd z)$.
+5. Магнитное поле $\mathbf B = B\,\mathbf e_z$, $\mathcal B = B\,\dd x\wedge\dd y$. Найдите 1-форму
+   силы $-\frac qc\,\iprod{\mathbf v}\mathcal B$ для $\mathbf v = (v_x, v_y, 0)$ и сравните с
+   $\frac qc\,\mathbf v\times\mathbf B$.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $\iprod{X}(\dd x\wedge\dd y) = X^x\,\dd y - X^y\,\dd x = -x\,\dd x - y\,\dd y = -\dd\bigl(\tfrac12(x^2 + y^2)\bigr)$,
+   $H = \tfrac12(x^2 + y^2)$: поворот — гамильтонов поток «гармонического
+   осциллятора» относительно формы $\dd x\wedge\dd y$.
+2. Картан: $\iprod{X}(x\,\dd y) = 0$, $\dd(x\,\dd y) = \dd x\wedge\dd y$,
+   $\iprod{X}(\dd x\wedge\dd y) = x\,\dd y$; итого $\Lie{X}(x\,\dd y) = x\,\dd y$. Поток:
+   $\phi_t^*(x\,\dd y) = e^tx\,\dd y$, производная при $t = 0$ — $x\,\dd y$.
+3. $\Lie{X}\omega = 0$, $\iprod{Y}\omega = -x\,\dd x$, $\Lie{X}(-x\,\dd x) = -\dd x$; слева
+   $-\dd x - 0 = -\dd x$. Справа $[X, Y] = \partial_y$, $\iprod{\partial_y}(\dd x\wedge\dd y) = -\dd x$.
+4. $\Lie{X}\,\mathrm{vol} = (\operatorname{div}X)\,\mathrm{vol} = (a + 2)\,\dd x\wedge\dd y\wedge\dd z$; объём
+   сохраняется при $a = -2$.
+5. $\iprod{\mathbf v}(B\,\dd x\wedge\dd y) = B(v_x\,\dd y - v_y\,\dd x)$, сила
+   $\frac{qB}{c}(v_y\,\dd x - v_x\,\dd y)$, то есть $\mathbf F = \frac{qB}{c}(v_y, -v_x, 0) = \frac qc\,\mathbf v\times\mathbf B$.
+:::

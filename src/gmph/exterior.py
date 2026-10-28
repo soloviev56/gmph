@@ -67,6 +67,24 @@ def d(form, coords):
                  for I, c in form.items() for j, x in enumerate(coords, 1)])
 
 
+def interior(vector, form):
+    """Внутреннее произведение ι_X ω: подстановка X в первый аргумент.
+
+    ``vector`` — компоненты X¹, …, Xⁿ; ι_X(e^{i₁}∧…∧e^{i_k}) = Σ_m (−1)^m X^{i_m} e^{…без i_m…}.
+    """
+    result = {}
+    for I, c in form.items():
+        for m, i in enumerate(I):
+            J = I[:m] + I[m + 1:]
+            result[J] = result.get(J, 0) + (-1) ** m * vector[i - 1] * c
+    return _clean(result)
+
+
+def lie(vector, form, coords):
+    """Производная Ли формы по формуле Картана: L_X ω = d ι_X ω + ι_X dω."""
+    return add(d(interior(vector, form), coords), interior(vector, d(form, coords)))
+
+
 def pullback(form, old_coords, images, new_coords):
     """Перенос формы назад по отображению y ↦ x(y).
 

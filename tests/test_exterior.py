@@ -124,3 +124,20 @@ def test_integrate_form_orientation():
     u, v = sp.symbols("u v", real=True)
     assert integrate_form({(1, 2): 1}, (x, y), (u, v), (u, v), [(u, 0, 2), (v, 0, 3)]) == 6
     assert integrate_form({(1, 2): 1}, (x, y), (u, v), (v, u), [(v, 0, 3), (u, 0, 2)]) == -6
+
+
+def test_interior_and_lie():
+    from gmph.exterior import d, interior, lie, pullback
+    x, y, z, t = sp.symbols("x y z t", real=True)
+    X3 = (x, y, z)
+    assert interior((1, 2, 3), {(1, 2): 1}) == {(2,): 1, (1,): -2}        # ι_v dx∧dy = v¹dy − v²dx
+    vec = (y * z, x**2, x + y)
+    omega = {(1, 2): x * y, (2, 3): z, (1, 3): y**2}
+    assert interior(vec, interior(vec, omega)) == {}
+    # L_X ω = d/dt φ_t*ω при t = 0, φ_t(x) ≈ x + tX(x)
+    moved = pullback(omega, X3, [c + t * v for c, v in zip(X3, vec)], X3)
+    by_flow = {I: sp.diff(c, t).subs(t, 0) for I, c in moved.items()}
+    assert add(lie(vec, omega, X3), scale(-1, by_flow)) == {}
+    # L_X vol = (div X) vol
+    assert lie(vec, {(1, 2, 3): 1}, X3) == {}
+    assert lie((x, y, z), {(1, 2, 3): 1}, X3) == {(1, 2, 3): 3}
