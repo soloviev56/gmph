@@ -1,0 +1,287 @@
+---
+title: "Симплектические многообразия"
+topic: symplectic-manifolds
+order: 2
+description: "Замкнутая невырожденная 2-форма; объём Лиувилля ωⁿ/n!; кокасательное расслоение, форма Лиувилля θ = p dq и её независимость от координат; поднятие замены координат на импульсы; теорема Дарбу; сфера как фазовое пространство спина и теорема Архимеда о площадях; почему нужна замкнутость"
+---
+
+Фазовое пространство маятника — не плоскость $(q, p)$: угол $q$ определён
+по модулю $2\pi$, и фазовое пространство — цилиндр. У волчка
+конфигурации — повороты, и фазовое пространство — кокасательное
+расслоение группы $SO(3)$. У классического спина фиксированной длины
+состояния — точки сферы. Во всех случаях гамильтонова механика
+строится одинаково: нужна 2-форма $\omega$, которая в каждой точке
+устроена как [симплектическая форма векторного
+пространства](/math/symplectic/symplectic-linear.qmd), и, кроме того,
+**замкнута**. Теорема Дарбу утверждает, что тогда локально все такие
+многообразия выглядят одинаково: в подходящих координатах
+$\omega = \sum\dd p_i\wedge\dd q^i$.
+
+Нужны [симплектическое векторное пространство](/math/symplectic/symplectic-linear.qmd)
+и [дифференциальные k-формы](/math/forms/differential-forms.qmd).
+
+## Определение
+
+::: {#def-symplectic-manifold}
+**Симплектическое многообразие** — гладкое многообразие $M$ с 2-формой
+$\omega$, которая
+
+1. **замкнута**: $\dd\omega = 0$;
+2. **невырождена** в каждой точке: если $\omega(u, v) = 0$ для всех $v \in T_xM$, то $u = 0$.
+:::
+
+Из невырожденности следует, что $\dim M = 2n$ чётна (как в линейной
+алгебре), а $n$-я внешняя степень $\omega^n = \omega\wedge\dots\wedge\omega$ нигде не
+обращается в нуль. Значит, $\omega^n$ — форма объёма; объём
+$\omega^n/n!$ называется **объёмом Лиувилля**. Симплектическое многообразие
+автоматически ориентировано. В координатах $z = (q^1, \dots, q^n, p_1, \dots, p_n)$
+стандартной формы $\omega = \sum_i\dd p_i\wedge\dd q^i$ ([конвенции](/conventions.qmd)):
+
+```{python}
+import sympy as sp
+from gmph.exterior import add, d, pullback, scale, show, wedge
+
+def standard_omega(n):
+    """ω = Σ dp_i∧dq^i в координатах (q¹…qⁿ, p₁…pₙ): dp_i∧dq^i = −dq^i∧dp_i."""
+    return {(i, n + i): -1 for i in range(1, n + 1)}
+
+for n in (1, 2, 3):
+    print(f"n = {n}: ωⁿ =", show(wedge(*[standard_omega(n)] * n)))
+```
+
+Здесь $e^1, \dots, e^{2n}$ — это $\dd q^1, \dots, \dd q^n, \dd p_1, \dots, \dd p_n$.
+Коэффициент равен $\pm n!$, знак зависит от порядка базисных форм:
+$\omega^n/n! = \dd p_1\wedge\dd q^1\wedge\dots\wedge\dd p_n\wedge\dd q^n$.
+
+**Примеры.**
+
+- $\R^{2n}$ со стандартной формой; цилиндр $S^1\times\R$ (маятник) с той же
+  формой $\dd p\wedge\dd q$, где $q$ — угол.
+- Любая ориентируемая поверхность с формой площади: в двумерии всякая
+  2-форма замкнута, и невырожденность значит лишь, что форма нигде не
+  обращается в нуль.
+- Кокасательное расслоение $T^*Q$ любого многообразия $Q$ — фазовое
+  пространство механической системы с конфигурационным пространством $Q$.
+
+## Кокасательное расслоение и форма Лиувилля
+
+Точка $T^*Q$ — пара (точка $q \in Q$, ковектор $p \in T^*_qQ$). Импульс —
+ковектор: он «съедает» скорость и даёт число (действие за единицу
+времени), $p(\dot q) = p_i\dot q^i$. В координатах $q^i$ на $Q$ ковектор
+раскладывается как $p = p_i\,\dd q^i$, и $(q^i, p_i)$ — координаты на $T^*Q$.
+
+::: {#def-liouville-form}
+**Форма Лиувилля** (тавтологическая 1-форма) на $T^*Q$:
+$\theta = p_i\,\dd q^i$. **Каноническая симплектическая форма**
+$\omega = \dd\theta = \dd p_i\wedge\dd q^i$.
+:::
+
+Название «тавтологическая» объясняется тем, что $\theta$ определена без
+координат: на векторе $\xi$, касательном к $T^*Q$ в точке $(q, p)$, она
+равна $p(\pi_*\xi)$, где $\pi: (q, p) \mapsto q$ — проекция. Поэтому, если
+сменить координаты на $Q$ и **согласованно** пересчитать импульсы, запись
+$\theta = p_i\dd q^i$ сохранится. Согласованно — значит как компоненты
+ковектора: $p'_j = \pd{q^i}{q'^j}p_i$. Проверим для перехода к полярным
+координатам на плоскости: $p_r = p_x\cos\varphi + p_y\sin\varphi$,
+$p_\varphi = r(-p_x\sin\varphi + p_y\cos\varphi) = xp_y - yp_x$ (момент импульса).
+
+```{python}
+x, y, px, py = sp.symbols("x y p_x p_y", real=True)
+r, ph = sp.symbols("r phi", positive=True)
+pr, pph = sp.symbols("p_r p_phi", real=True)
+
+# (x, y, p_x, p_y) через (r, φ, p_r, p_φ): обращение формул для импульсов
+images = (r * sp.cos(ph), r * sp.sin(ph),
+          pr * sp.cos(ph) - pph * sp.sin(ph) / r, pr * sp.sin(ph) + pph * sp.cos(ph) / r)
+new = ["dr", "dφ", "dp_r", "dp_φ"]
+
+theta_cart = {(1,): px, (2,): py}                       # p_x dx + p_y dy
+omega_cart = d(theta_cart, (x, y, px, py))
+print("θ в полярных координатах:", show(pullback(theta_cart, (x, y, px, py), images, (r, ph, pr, pph)), new))
+print("ω в полярных координатах:", show(pullback(omega_cart, (x, y, px, py), images, (r, ph, pr, pph)), new))
+```
+
+(Здесь $\dd r\wedge\dd p_r = -\dd p_r\wedge\dd r$, так что $\omega = \dd p_r\wedge\dd r + \dd p_\varphi\wedge\dd\varphi$.)
+Замена $q \mapsto q'$ на конфигурационном пространстве, продолженная на
+импульсы, — **точечное каноническое преобразование**: оно сохраняет $\theta$ и
+тем более $\omega$. Канонические преобразования общего вида, перемешивающие
+$q$ и $p$, сохраняют только $\omega$ (тема «Канонические преобразования»).
+
+## Почему нужна замкнутость
+
+Невырожденность нужна, чтобы из $\dd H$ однозначно получалось векторное
+поле: уравнение $\iprod{X}\omega = -\dd H$ разрешимо относительно $X$. Замкнутость
+нужна, чтобы поток этого поля сохранял $\omega$. По [формуле
+Картана](/math/forms/interior-lie.qmd)
+$$
+\Lie{X}\omega = \dd\,\iprod{X}\omega + \iprod{X}\dd\omega = -\dd\dd H + \iprod{X}\dd\omega = \iprod{X}\dd\omega,
+$$
+и это ноль для всех $H$ тогда и только тогда, когда $\dd\omega = 0$. Вот
+пример невырожденной, но не замкнутой формы в $\R^4$:
+
+```{python}
+from gmph.exterior import interior, lie
+
+X4 = sp.symbols("x1:5", real=True)
+bad = {(1, 2): 1, (3, 4): 1 + X4[0]**2}                  # dx¹∧dx² + (1 + (x¹)²) dx³∧dx⁴
+print("dω =", show(d(bad, X4)))
+print("ω∧ω =", show(wedge(bad, bad)), "— невырождена")
+
+H = X4[2]                                                # H = x³
+# ι_X ω = −dH: X = (1 + (x¹)²)⁻¹ ∂₄, так как ι_{∂₄}(dx³∧dx⁴) = −dx³ (проверка ниже)
+Xh = (0, 0, 0, 1 / (1 + X4[0]**2))
+print("ι_X ω + dH =", show(add(interior(Xh, bad), d({(): H}, X4))))
+print("L_X ω =", show(lie(Xh, bad, X4)), "≠ 0: поток не сохраняет ω")
+```
+
+## Теорема Дарбу
+
+::: {#thm-darboux}
+**Теорема Дарбу.** Около каждой точки симплектического многообразия есть
+координаты $(q^1, \dots, q^n, p_1, \dots, p_n)$, в которых
+$\omega = \sum_i\dd p_i\wedge\dd q^i$.
+:::
+
+Такие координаты называются **каноническими** (или координатами Дарбу).
+В отличие от римановой геометрии, где кривизна — локальный инвариант
+метрики, у симплектических многообразий **локальных инвариантов нет**:
+любые два симплектических многообразия одной размерности локально
+одинаковы. Различия только глобальные (объём, топология). Доказательство
+(метод Мозера) использует как раз замкнутость $\omega$ и формулу Картана; мы
+ограничимся примерами.
+
+**Двумерный случай.** Для формы $\omega = f(x, y)\,\dd x\wedge\dd y$ с $f > 0$ можно
+взять $q = y$, $p = \int f\,\dd x$: тогда $\dd p\wedge\dd q = f\,\dd x\wedge\dd y$
+(слагаемое $\partial_yp\,\dd y$ в $\dd p$ уничтожается при умножении на $\dd y$).
+Для $f = 1 + x^2$:
+
+```{python}
+xx, yy, q_, p_ = sp.symbols("x y q p", real=True)
+darboux_map = (yy, xx + xx**3 / 3)                       # q = y, p = x + x³/3
+print("φ*(dp∧dq) =", show(pullback({(1, 2): -1}, (q_, p_), darboux_map, (xx, yy)), ["dx", "dy"]))
+```
+
+**Сфера.** На единичной сфере с формой площади $\sin\theta\,\dd\theta\wedge\dd\varphi$
+канонические координаты — $q = \varphi$ и $p = -\cos\theta = -z$:
+$\dd p\wedge\dd q = \sin\theta\,\dd\theta\wedge\dd\varphi$.
+
+```{python}
+th = sp.Symbol("theta", positive=True)
+print("φ*(dp∧dq) =", show(pullback({(1, 2): -1}, (q_, p_), (ph, -sp.cos(th)), (th, ph)), ["dθ", "dφ"]))
+```
+
+Это **теорема Архимеда**: проекция сферы на описанный цилиндр
+(горизонтально, от оси) сохраняет площади. Пояс сферы между высотами
+$z_1$ и $z_2$ имеет площадь $2\pi(z_2 - z_1)$ — такую же, как у пояса цилиндра,
+независимо от того, близко он к экватору или к полюсу.
+
+```{python}
+#| label: fig-archimedes
+#| fig-cap: "Пояса сферы одинаковой высоты Δz = 0,4 (слева) и их образы на развёртке цилиндра (справа). Подписи — площади поясов на сфере, найденные численным интегрированием: все равны 2π·0,4 ≈ 2,5133, как у прямоугольников справа."
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.integrate import quad
+
+def sphere_band_area(z0, z1):
+    """Площадь пояса сферы ∫∫ sin θ dθ dφ между высотами z0 < z1 (численно)."""
+    return 2 * np.pi * quad(np.sin, np.arccos(z1), np.arccos(z0))[0]
+
+z_edges = np.linspace(-1, 1, 6)
+fig = plt.figure(figsize=(8, 4))
+ax3 = fig.add_subplot(1, 2, 1, projection="3d")
+phis = np.linspace(0, 2 * np.pi, 80)
+colors = ["tab:blue", "tab:orange"]
+P, Z = np.meshgrid(phis, np.linspace(-1, 1, 101))
+R = np.sqrt(1 - Z**2)
+band_index = np.clip(np.searchsorted(z_edges, Z, side="right") - 1, 0, len(z_edges) - 2)
+face = np.empty(Z.shape, dtype=object)
+face[:] = [[colors[k % 2] for k in row] for row in band_index]
+ax3.plot_surface(R * np.cos(P), R * np.sin(P), Z, facecolors=face, linewidth=0, shade=False)
+ax3.set_box_aspect((1, 1, 1))
+ax3.set_axis_off()
+ax3.set_title("сфера")
+
+ax2 = fig.add_subplot(1, 2, 2)
+for k, (z0, z1) in enumerate(zip(z_edges[:-1], z_edges[1:])):
+    ax2.fill_between([0, 2 * np.pi], z0, z1, color=colors[k % 2], alpha=0.85)
+    ax2.text(np.pi, (z0 + z1) / 2, f"на сфере S = {sphere_band_area(z0, z1):.4f}", ha="center", va="center", color="white", fontsize=9)
+ax2.set_xlabel("q = φ")
+ax2.set_ylabel("z = −p")
+ax2.set_xlim(0, 2 * np.pi)
+ax2.set_title("развёртка цилиндра")
+plt.tight_layout()
+plt.show()
+```
+
+## Физика: фазовое пространство спина
+
+Классический спин (магнитный момент) фиксированной длины $S$ задаётся
+направлением — точкой сферы. Канонические координаты: $q = \varphi$ (азимут),
+$p = S_z = S\cos\theta$, то есть
+$$
+\omega = \dd S_z\wedge\dd\varphi = -S\sin\theta\,\dd\theta\wedge\dd\varphi .
+$$
+(Знак выбран так, чтобы уравнения ниже дали правильную ларморовскую
+прецессию; он соответствует ориентации сферы внутренней нормалью.)
+Гамильтониан во внешнем поле $\mathbf B = B\,\mathbf e_z$ — $H = -\gamma\,\mathbf B\cdot\mathbf S = -\gamma BS_z$,
+где $\gamma$ — гиромагнитное отношение. Решим $\iprod{X}\omega = -\dd H$ в
+координатах $(\theta, \varphi)$:
+
+```{python}
+S, gamma, B = sp.symbols("S gamma B", positive=True)
+SPH2 = (th, ph)
+omega_spin = {(1, 2): -S * sp.sin(th)}
+H_spin = -gamma * B * S * sp.cos(th)
+a_, b_ = sp.symbols("a b")                               # X = a ∂_θ + b ∂_φ
+eqs = add(interior((a_, b_), omega_spin), d({(): H_spin}, SPH2))
+print("ι_X ω + dH =", eqs)
+print("X =", sp.solve(list(eqs.values()), [a_, b_]))
+```
+
+Получилось $\dot\theta = 0$, $\dot\varphi = -\gamma B$: спин прецессирует вокруг поля с
+ларморовой частотой, сохраняя угол с полем, — как и следует из
+$\dot{\mathbf S} = \gamma\,\mathbf S\times\mathbf B$. Полная симплектическая площадь сферы равна
+$4\pi S$. В квантовой механике фазовая площадь $2\pi\hbar$ соответствует одному
+состоянию, и $4\pi S/(2\pi\hbar) = 2S/\hbar$ — при $S = \hbar s$ это примерно $2s + 1$,
+число проекций спина $s$. Подсчёт состояний по объёму Лиувилля работает и
+на искривлённом фазовом пространстве.
+
+## Итоги
+
+- Симплектическое многообразие — $(M, \omega)$ с замкнутой невырожденной
+  2-формой; $\dim M = 2n$, $\omega^n/n!$ — объём Лиувилля.
+- На $T^*Q$ есть каноническая 1-форма $\theta = p_i\dd q^i$, не зависящая от координат,
+  если импульсы преобразуются как ковекторы; $\omega = \dd\theta$.
+- Невырожденность делает уравнение $\iprod{X}\omega = -\dd H$ разрешимым,
+  замкнутость — гарантирует $\Lie{X}\omega = 0$.
+- Теорема Дарбу: локально $\omega = \sum\dd p_i\wedge\dd q^i$; локальных инвариантов нет.
+- На сфере канонические координаты $(\varphi, z)$ — теорема Архимеда о
+  площадях; спин — гамильтонова система на сфере.
+
+## Упражнения
+
+1. При каких функциях $f(x^1, \dots, x^4)$ форма $\dd x^1\wedge\dd x^2 + f\,\dd x^3\wedge\dd x^4$
+   симплектическая?
+2. Запишите $\omega^3/3!$ для стандартной формы в $\R^6$ как произведение $\dd q$ и $\dd p$
+   в порядке $\dd q^1\wedge\dd q^2\wedge\dd q^3\wedge\dd p_1\wedge\dd p_2\wedge\dd p_3$.
+3. Найдите импульсы $p_r, p_\theta, p_\varphi$, сопряжённые сферическим координатам,
+   через декартовы $\mathbf p$ (так, чтобы $\theta = \mathbf p\cdot\dd\mathbf r = p_r\dd r + p_\theta\dd\theta + p_\varphi\dd\varphi$).
+4. Найдите координаты Дарбу для $\omega = e^{x}\,\dd x\wedge\dd y$ на плоскости.
+5. Найдите площадь части единичной сферы, где $\theta < \theta_0$ (шапки), с
+   помощью координат Дарбу $(\varphi, -\cos\theta)$.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $\dd\omega = \dd f\wedge\dd x^3\wedge\dd x^4 = 0$ требует, чтобы $f$ зависела только от
+   $x^3, x^4$; невырожденность ($\omega\wedge\omega = 2f\,\dd x^1\wedge\dots\wedge\dd x^4 \ne 0$) — $f \ne 0$.
+2. $\omega^3/3! = \dd p_1\wedge\dd q^1\wedge\dd p_2\wedge\dd q^2\wedge\dd p_3\wedge\dd q^3
+   = \dd q^1\wedge\dd q^2\wedge\dd q^3\wedge\dd p_1\wedge\dd p_2\wedge\dd p_3$ (вычисление выше даёт
+   $\omega^3 = +6\,e^1\wedge\dots\wedge e^6$).
+3. $p_r = \mathbf p\cdot\mathbf e_r$, $p_\theta = r\,\mathbf p\cdot\mathbf e_\theta$,
+   $p_\varphi = r\sin\theta\,\mathbf p\cdot\mathbf e_\varphi = xp_y - yp_x = L_z$: это компоненты
+   ковектора $\mathbf p$ по базису $\partial_r, \partial_\theta, \partial_\varphi$, то есть
+   $p_i = \mathbf p\cdot\partial_i\mathbf r$.
+4. $q = y$, $p = e^{x}$: $\dd p\wedge\dd q = e^x\,\dd x\wedge\dd y$.
+5. $p$ меняется от $-1$ до $-\cos\theta_0$, $q$ — от 0 до $2\pi$:
+   площадь $2\pi(1 - \cos\theta_0)$.
+:::
