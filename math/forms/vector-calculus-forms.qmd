@@ -1,0 +1,271 @@
+---
+title: "Векторный анализ на языке форм"
+topic: vector-calculus-forms
+order: 8
+description: "Изоморфизмы ♭ и ♯; grad, rot, div и лапласиан как композиции d и ⋆; скалярное и векторное произведения через ∧ и ⋆; тождества rot grad = 0, div rot = 0 в любых координатах; общие формулы с коэффициентами Ламе выводятся, а не запоминаются; цилиндрические, сферические и параболические координаты; поле диполя"
+---
+
+Формулы для градиента, ротора и дивергенции в сферических координатах
+обычно берут из справочника: в них множители $r$, $r\sin\theta$ и
+$1/(r^2\sin\theta)$ стоят в разных местах, и ошибиться легко. В
+[статье о внешнем дифференциале](/math/forms/exterior-derivative.qmd) мы
+видели, что grad, rot и div — это один оператор $\dd$ на формах разных
+степеней. Чтобы получить из него операции над **векторными** полями,
+нужны ещё метрика и ориентация. Они входят через три операции: $\flat$
+(вектор → 1-форма), $\sharp$ (обратно) и [оператор
+Ходжа](/math/forms/hodge-star.qmd) $\hodge$. После этого формулы в любых
+координатах получаются механически, а тождества
+$\operatorname{rot}\operatorname{grad} = 0$ и $\operatorname{div}\operatorname{rot} = 0$
+сводятся к $\dd^2 = 0$.
+
+Нужны [внешний дифференциал](/math/forms/exterior-derivative.qmd) и
+[оператор Ходжа на многообразии](/math/forms/hodge-star.qmd).
+
+## Музыкальные изоморфизмы
+
+Метрика $g$ сопоставляет вектору $v$ ковектор $g(v, \cdot)$: это
+[опускание индекса](/math/algebra/metric.qmd), только теперь в каждой точке
+многообразия.
+
+::: {#def-musical}
+**Изоморфизмы ♭ и ♯.** Векторному полю $v = v^i\partial_i$ сопоставляется
+1-форма $v^\flat = g_{ij}v^j\,\dd x^i$, а 1-форме $\omega = \omega_i\,\dd x^i$ —
+векторное поле $\omega^\sharp = g^{ij}\omega_j\,\partial_i$. Эти отображения
+взаимно обратны.
+:::
+
+В ортогональных координатах $g = \operatorname{diag}(h_1^2, h_2^2, h_3^2)$
+($h_i$ — **коэффициенты Ламе**) удобно пользоваться **физическими
+компонентами** — компонентами по ортонормированному базису
+$\mathbf e_i = \partial_i/h_i$: $\hat v^i = h_i v^i$ (без суммирования). Так
+записывают поля в справочниках: $\mathbf E = E_r\mathbf e_r + E_\theta\mathbf e_\theta + E_\varphi\mathbf e_\varphi$.
+Тогда $v^\flat = \sum_i h_i\hat v^i\,\dd x^i$. В сферических координатах
+$h = (1, r, r\sin\theta)$:
+
+```{python}
+import sympy as sp
+from gmph.exterior import show
+from gmph.vectorcalc import div, flat, from_physical, grad, laplacian, physical, rot, sharp
+
+r, th, ph = SPH = sp.symbols("r theta phi", positive=True)
+g_sph = sp.diag(1, r**2, r**2 * sp.sin(th)**2)
+names = ["dr", "dθ", "dφ"]
+
+for label, v_hat in [("e_r", [1, 0, 0]), ("e_θ", [0, 1, 0]), ("e_φ", [0, 0, 1])]:
+    v = from_physical(v_hat, g_sph)
+    print(f"{label}: компоненты vⁱ = {v}, v♭ = {show(flat(v, g_sph), names)}")
+```
+
+Единичный вектор $\mathbf e_\varphi$ имеет компоненту $v^\varphi = 1/(r\sin\theta)$,
+а его 1-форма — $r\sin\theta\,\dd\varphi$. В пакете `gmph.vectorcalc`
+функции `flat`, `sharp`, `physical` и `from_physical` выполняют эти
+переходы.
+
+## Словарь
+
+::: {#def-vector-operators}
+**Векторные операции через формы.** В ориентированном трёхмерном
+пространстве с метрикой $g$
+$$
+\operatorname{grad} f = (\dd f)^\sharp, \qquad
+\operatorname{rot}\mathbf A = \bigl(\hodge\dd\mathbf A^\flat\bigr)^\sharp, \qquad
+\operatorname{div}\mathbf B = \hodge\dd\hodge\mathbf B^\flat, \qquad
+\Delta f = \hodge\dd\hodge\dd f,
+$$
+а скалярное и векторное произведения —
+$$
+\mathbf a\cdot\mathbf b = \hodge\bigl(\mathbf a^\flat\wedge\hodge\mathbf b^\flat\bigr),\qquad
+\mathbf a\times\mathbf b = \bigl(\hodge(\mathbf a^\flat\wedge\mathbf b^\flat)\bigr)^\sharp .
+$$
+:::
+
+Каждая формула читается как цепочка: например, для дивергенции
+вектор → 1-форма ($\flat$) → 2-форма потока ($\hodge$) → 3-форма ($\dd$) →
+функция ($\hodge$). Вектор $\mathbf B$ здесь входит как 2-форма $\hodge\mathbf B^\flat$
+— та самая «$\mathbf B\cdot\dd\mathbf S$» из статьи о внешнем
+дифференциале. Метрика нужна только в $\flat$, $\sharp$ и $\hodge$; сам $\dd$ от
+неё не зависит. Функции `grad`, `rot`, `div` и `laplacian` из
+`gmph.vectorcalc` реализуют ровно эти цепочки.
+
+Проверим словарь в декартовых координатах, где $\flat$, $\sharp$ ничего не
+меняют, а $\hodge\dd x = \dd y\wedge\dd z$ (и циклически):
+
+```{python}
+from gmph.exterior import hodge, wedge
+
+x, y, z = XYZ = sp.symbols("x y z", real=True)
+E3 = sp.eye(3)
+A = [sp.Function(n)(*XYZ) for n in ("A_x", "A_y", "A_z")]
+a = sp.symbols("a1:4", real=True)
+b = sp.symbols("b1:4", real=True)
+
+rot_textbook = [A[2].diff(y) - A[1].diff(z), A[0].diff(z) - A[2].diff(x), A[1].diff(x) - A[0].diff(y)]
+dot = hodge(wedge(flat(a, E3), hodge(flat(b, E3), E3)), E3)[()]
+cross = sharp(hodge(wedge(flat(a, E3), flat(b, E3)), E3), E3)
+
+print("rot A — привычная формула:", sp.simplify(sp.Matrix(rot(A, XYZ, E3)) - sp.Matrix(rot_textbook)) == sp.zeros(3, 1))
+print("div A =", div(A, XYZ, E3))
+print("⋆(a♭∧⋆b♭) =", dot)
+print("(⋆(a♭∧b♭))♯ = a × b:", sp.Matrix(cross) == sp.Matrix(a).cross(sp.Matrix(b)))
+```
+
+Внутренняя часть $\mathbf a^\flat\wedge\hodge\mathbf b^\flat$ — это 3-форма
+$(\mathbf a\cdot\mathbf b)\,\dd x\wedge\dd y\wedge\dd z$ (по определению $\hodge$), а внешний
+$\hodge$ превращает её в функцию. Векторное произведение
+существует только в трёхмерии потому, что лишь при $n = 3$ оператор $\hodge$
+переводит 2-формы снова в 1-формы, а значит, в векторы.
+
+## Тождества в любых координатах
+
+Тождества векторного анализа следуют из $\dd^2 = 0$ и $\hodge\hodge = 1$ (в
+трёхмерном евклидовом пространстве на любых формах):
+$$
+\operatorname{rot}\operatorname{grad} f = \bigl(\hodge\dd\,(\dd f)^{\sharp\flat}\bigr)^\sharp = (\hodge\dd\dd f)^\sharp = 0, \qquad
+\operatorname{div}\operatorname{rot}\mathbf A = \hodge\dd\hodge\hodge\dd\mathbf A^\flat = \hodge\dd\dd\mathbf A^\flat = 0 .
+$$
+В этих выкладках нет ни одной производной коэффициентов Ламе, поэтому
+тождества верны в любой системе координат и для любой метрики. Проверим
+для произвольных ортогональных координат $q^1, q^2, q^3$ с произвольными
+функциями $h_i(q)$:
+
+```{python}
+q = sp.symbols("q1:4", positive=True)
+h = [sp.Function(f"h{i}", positive=True)(*q) for i in (1, 2, 3)]
+g_orth = sp.diag(*[hi**2 for hi in h])
+f = sp.Function("f")(*q)
+A_hat = [sp.Function(f"A{i}")(*q) for i in (1, 2, 3)]       # физические компоненты
+A_q = from_physical(A_hat, g_orth)
+
+print("rot grad f =", rot(grad(f, q, g_orth), q, g_orth))
+print("div rot A =", div(rot(A_q, q, g_orth), q, g_orth))
+```
+
+Те же функции выдают общие формулы для ортогональных координат, которые
+обычно запоминают:
+$$
+\operatorname{div}\mathbf A = \frac{1}{h_1h_2h_3}\Bigl[\partial_1(h_2h_3\hat A^1) + \partial_2(h_3h_1\hat A^2) + \partial_3(h_1h_2\hat A^3)\Bigr],
+\qquad
+(\operatorname{rot}\mathbf A)^{\hat 1} = \frac{1}{h_2h_3}\Bigl[\partial_2(h_3\hat A^3) - \partial_3(h_2\hat A^2)\Bigr].
+$$
+
+```{python}
+H = h[0] * h[1] * h[2]
+div_lame = (sp.diff(h[1] * h[2] * A_hat[0], q[0]) + sp.diff(h[2] * h[0] * A_hat[1], q[1])
+            + sp.diff(h[0] * h[1] * A_hat[2], q[2])) / H
+rot_lame = (sp.diff(h[2] * A_hat[2], q[1]) - sp.diff(h[1] * A_hat[1], q[2])) / (h[1] * h[2])
+grad_hat = physical(grad(f, q, g_orth), g_orth)
+
+print("div — формула с коэффициентами Ламе:", sp.simplify(div(A_q, q, g_orth) - div_lame) == 0)
+print("rot¹ — формула с коэффициентами Ламе:", sp.simplify(physical(rot(A_q, q, g_orth), g_orth)[0] - rot_lame) == 0)
+print("физические компоненты grad f:", grad_hat)
+```
+
+Откуда множители? В дивергенции $h_2h_3$ пришло из $\hodge\dd q^1 = (h_2h_3/h_1)\,\dd q^2\wedge\dd q^3$
+и из $\flat$ (множитель $h_1$): это площадь грани координатного кубика.
+Общий делитель $h_1h_2h_3$ — объём кубика из последнего $\hodge$. Ротор
+— плотность циркуляции, и $h_3\hat A^3$ — работа вдоль ребра длины $h_3\,\dd q^3$.
+
+## Цилиндрические и сферические координаты
+
+Подставляя конкретные метрики, получаем справочные формулы. Проверим
+ротор в сферических координатах — самую неудобную для запоминания:
+
+```{python}
+Ar, At, Ap = A_sph = [sp.Function(n)(*SPH) for n in ("A_r", "A_theta", "A_phi")]
+rot_hat = physical(rot(from_physical(A_sph, g_sph), SPH, g_sph), g_sph)
+handbook = [
+    (sp.diff(sp.sin(th) * Ap, th) - sp.diff(At, ph)) / (r * sp.sin(th)),
+    sp.diff(Ar, ph) / (r * sp.sin(th)) - sp.diff(r * Ap, r) / r,
+    (sp.diff(r * At, r) - sp.diff(Ar, th)) / r,
+]
+print("rot A в сферических координатах = справочник:",
+      [sp.simplify(u - w) == 0 for u, w in zip(rot_hat, handbook)])
+
+rho, phi_c, zc = CYL = sp.symbols("rho phi z", positive=True)
+g_cyl = sp.diag(1, rho**2, 1)
+u = sp.Function("u")(*CYL)
+print("Δu в цилиндрических координатах:", sp.expand(laplacian(u, CYL, g_cyl)))
+```
+
+Твёрдое тело, вращающееся с угловой скоростью $\Omega$ вокруг оси $z$, имеет
+поле скоростей $\mathbf v = \Omega\rho\,\mathbf e_\varphi$. Его ротор, вычисленный в
+цилиндрических и в сферических координатах ($\mathbf v = \Omega r\sin\theta\,\mathbf e_\varphi$):
+
+```{python}
+Om = sp.Symbol("Omega", positive=True)
+w_cyl = physical(rot(from_physical([0, Om * rho, 0], g_cyl), CYL, g_cyl), g_cyl)
+w_sph = physical(rot(from_physical([0, 0, Om * r * sp.sin(th)], g_sph), SPH, g_sph), g_sph)
+print("цилиндрические (ρ, φ, z):", w_cyl)
+print("сферические (r, θ, φ):  ", w_sph)
+```
+
+В обоих случаях это вектор $2\Omega\,\mathbf e_z$ (в сферических координатах
+$\mathbf e_z = \cos\theta\,\mathbf e_r - \sin\theta\,\mathbf e_\theta$): ротор поля
+скоростей вдвое больше угловой скорости. Это **завихренность** твёрдого
+вращения.
+
+## Физика: поле диполя
+
+Потенциал точечного диполя $\mathbf p = p\,\mathbf e_z$ в гауссовых единицах —
+$\varphi = p\cos\theta/r^2$. Поле $\mathbf E = -\operatorname{grad}\varphi$:
+
+```{python}
+p = sp.Symbol("p", positive=True)
+phi_dip = p * sp.cos(th) / r**2
+E = [-c for c in grad(phi_dip, SPH, g_sph)]
+print("E (физические компоненты E_r, E_θ, E_φ):", physical(E, g_sph))
+print("div E =", div(E, SPH, g_sph), "  rot E =", rot(E, SPH, g_sph))
+print("Δφ =", laplacian(phi_dip, SPH, g_sph))
+```
+
+Получилось $E_r = 2p\cos\theta/r^3$, $E_\theta = p\sin\theta/r^3$ — справочное поле
+диполя. Вне источника $\operatorname{div}\mathbf E = 0$ и $\operatorname{rot}\mathbf E = 0$;
+второе автоматически, ведь $\mathbf E$ — градиент. На языке форм это значит:
+1-форма $\mathcal E = \mathbf E^\flat = -\dd\varphi$ точна, а 2-форма потока
+$\hodge\mathcal E$ замкнута. Разделение ролей — напряжённость как 1-форма,
+индукция как 2-форма — основа статьи «Электростатика».
+
+## Итоги
+
+- Метрика связывает векторы и 1-формы: $v^\flat = g_{ij}v^j\dd x^i$,
+  $\omega^\sharp = g^{ij}\omega_j\partial_i$; в ортогональных координатах
+  физические компоненты $\hat v^i = h_iv^i$.
+- $\operatorname{grad} f = (\dd f)^\sharp$, $\operatorname{rot}\mathbf A = (\hodge\dd\mathbf A^\flat)^\sharp$,
+  $\operatorname{div}\mathbf B = \hodge\dd\hodge\mathbf B^\flat$, $\Delta = \hodge\dd\hodge\dd$;
+  $\mathbf a\times\mathbf b = (\hodge(\mathbf a^\flat\wedge\mathbf b^\flat))^\sharp$.
+- $\operatorname{rot}\operatorname{grad} = 0$ и $\operatorname{div}\operatorname{rot} = 0$ —
+  следствия $\dd^2 = 0$ и верны в любых координатах.
+- Формулы с коэффициентами Ламе не нужно запоминать: они получаются
+  подстановкой метрики в одну и ту же цепочку операций.
+- Электрическое поле удобно считать 1-формой ($\mathbf E^\flat = -\dd\varphi$), а
+  его поток — 2-формой $\hodge\mathbf E^\flat$.
+
+## Упражнения
+
+1. В цилиндрических координатах найдите $\operatorname{rot}$ и $\operatorname{div}$ поля
+   $\mathbf v = \rho^n\,\mathbf e_\varphi$. При каком $n$ поле безвихревое (вне оси)?
+2. Выведите на языке форм $\operatorname{div}(f\mathbf A) = f\operatorname{div}\mathbf A + \mathbf A\cdot\operatorname{grad} f$.
+3. Вычислите $\mathbf e_r\times\mathbf e_\theta$ по формуле $(\hodge(\mathbf a^\flat\wedge\mathbf b^\flat))^\sharp$
+   в сферических координатах.
+4. Параболические цилиндрические координаты: $x = (u^2 - v^2)/2$, $y = uv$, $z = z$.
+   Найдите метрику и лапласиан.
+5. Найдите $\operatorname{div}(r^n\,\mathbf e_r)$ в $\R^3$. При каком $n$ дивергенция равна нулю
+   вне начала координат, и какое это поле?
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $\operatorname{rot}\mathbf v = (n + 1)\rho^{n-1}\,\mathbf e_z$, $\operatorname{div}\mathbf v = 0$;
+   безвихревое при $n = -1$ (поле прямого тока, $\mathbf v = \mathbf e_\varphi/\rho$).
+2. $\hodge(f\mathbf A^\flat) = f\hodge\mathbf A^\flat$, и по правилу Лейбница
+   $\dd(f\hodge\mathbf A^\flat) = \dd f\wedge\hodge\mathbf A^\flat + f\,\dd\hodge\mathbf A^\flat$.
+   Первое слагаемое — $\langle\dd f, \mathbf A^\flat\rangle\,\mathrm{vol} = (\mathbf A\cdot\operatorname{grad} f)\,\mathrm{vol}$,
+   второе — $f\operatorname{div}\mathbf A\,\mathrm{vol}$; остаётся применить $\hodge$.
+3. $\mathbf e_r^\flat = \dd r$, $\mathbf e_\theta^\flat = r\,\dd\theta$,
+   $\hodge(r\,\dd r\wedge\dd\theta) = r\sin\theta\,\dd\varphi = \mathbf e_\varphi^\flat$, то есть
+   $\mathbf e_r\times\mathbf e_\theta = \mathbf e_\varphi$.
+4. $g = \operatorname{diag}(u^2 + v^2,\ u^2 + v^2,\ 1)$;
+   $\Delta F = \dfrac{F_{uu} + F_{vv}}{u^2 + v^2} + F_{zz}$.
+5. $\operatorname{div}(r^n\mathbf e_r) = (n + 2)\,r^{n-1}$; ноль при $n = -2$ — кулоновское поле
+   $\mathbf e_r/r^2$. Его поток через любую сферу вокруг начала равен $4\pi$, хотя
+   дивергенция вне нуля равна нулю, — см. «Обобщённая теорема Стокса».
+:::
