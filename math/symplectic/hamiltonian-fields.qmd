@@ -1,0 +1,244 @@
+---
+title: "Гамильтоновы векторные поля"
+topic: hamiltonian-fields
+order: 3
+description: "Гамильтоново поле ι_X ω = −dH; уравнения Гамильтона в канонических координатах и в матричной записи; сохранение энергии и движение по линиям уровня; фазовый портрет маятника; L_X ω = 0 по формуле Картана и симплектичность потока (проверка через уравнения в вариациях для системы Энона–Хейлеса); теорема Лиувилля; заряд в магнитном поле как гамильтонова система с «магнитной» симплектической формой"
+---
+
+Уравнения Гамильтона $\dot q = \partial H/\partial p$, $\dot p = -\partial H/\partial q$ обычно
+записывают в канонических координатах. Но фазовое пространство маятника
+— цилиндр, спина — сфера, а заряд в магнитном поле удобно описывать
+кинетическим импульсом $m\mathbf v$, который не является каноническим. Нужна
+запись, не зависящая от координат. Она есть: функция $H$ на
+[симплектическом многообразии](/math/symplectic/symplectic-manifolds.qmd)
+определяет векторное поле $X_H$ одним уравнением $\iprod{X_H}\omega = -\dd H$. Из
+этой записи в одну строку следуют сохранение энергии, сохранение
+симплектической формы и теорема Лиувилля о фазовом объёме.
+
+Нужны [симплектические многообразия](/math/symplectic/symplectic-manifolds.qmd)
+и [внутреннее произведение и производная Ли](/math/forms/interior-lie.qmd).
+
+## Определение
+
+::: {#def-hamiltonian-field}
+Пусть $(M, \omega)$ — симплектическое многообразие, $H$ — гладкая функция на
+$M$. **Гамильтоново векторное поле** функции $H$ — поле $X_H$, для которого
+$$
+\iprod{X_H}\omega = -\dd H .
+$$
+Функция $H$ называется **гамильтонианом**, поток поля $X_H$ —
+**гамильтоновым потоком**.
+:::
+
+Поле существует и единственно: в каждой точке отображение
+$X \mapsto \iprod{X}\omega$ линейно и (по невырожденности $\omega$) обратимо. В
+координатах с матрицей $\omega_{ij} = \omega(\partial_i, \partial_j)$ уравнение
+$X^i\omega_{ij} = -\partial_jH$ даёт $X = W^{-1}\nabla H$, где $W = (\omega_{ij})$. Знак
+выбран по [конвенциям](/conventions.qmd): для $\omega = \sum\dd p_i\wedge\dd q^i$ получаются
+обычные уравнения Гамильтона. Функции `hamiltonian_field(H, coords, omega)`
+и `canonical_omega(n)` из пакета `gmph.symplectic` реализуют это
+определение.
+
+```{python}
+import sympy as sp
+from gmph.exterior import add, d, interior, lie, show
+from gmph.symplectic import canonical_omega, form_matrix, hamiltonian_field
+
+q1, q2, p1, p2 = Z = sp.symbols("q1 q2 p1 p2", real=True)
+H = sp.Function("H")(*Z)
+omega = canonical_omega(2)
+
+X_H = hamiltonian_field(H, Z, omega)
+print("X_H =", X_H)
+print("ι_X ω + dH =", show(add(interior(X_H, omega), d({(): H}, Z))))
+print("матрица ω =", form_matrix(omega, 4).tolist())
+```
+
+Компоненты $X_H$ — это $(\partial H/\partial p_1, \partial H/\partial p_2, -\partial H/\partial q^1, -\partial H/\partial q^2)$, то
+есть $\dot q^i = \partial H/\partial p_i$, $\dot p_i = -\partial H/\partial q^i$. Матрица формы — $\Omega$ из
+[линейной теории](/math/symplectic/symplectic-linear.qmd), и $\dot z = \Omega^{-1}\nabla H$.
+
+## Сохранение энергии и линии уровня
+
+Производная $H$ вдоль собственного поля:
+$$
+X_H(H) = \dd H(X_H) = -\omega(X_H, X_H) = 0
+$$
+по антисимметрии $\omega$. Энергия сохраняется, и траектории лежат на
+поверхностях уровня $H = E$. На двумерном фазовом пространстве поверхности
+уровня — кривые, и фазовый портрет — это просто линии уровня $H$, а
+$X_H$ указывает направление движения по ним. Если ввести евклидову метрику
+на плоскости $(q, p)$, то $X_H$ — градиент $H$, повёрнутый на $90^\circ$; но
+метрика здесь лишняя, ведь $\omega$ однозначно задаёт $X_H$ без неё.
+
+Маятник: $H = \frac{p^2}{2} - \cos q$ ($m = l = g = 1$), фазовое пространство —
+цилиндр, $q \in [-\pi, \pi)$ с отождествлёнными краями.
+
+```{python}
+#| label: fig-pendulum-portrait
+#| fig-cap: "Фазовый портрет маятника H = p²/2 − cos q на развёртке цилиндра (края q = ±π отождествлены). Линии уровня H — траектории; стрелки — поле X_H; красная линия — сепаратриса H = 1, отделяющая колебания от вращений."
+import numpy as np
+import matplotlib.pyplot as plt
+
+q, p = sp.symbols("q p", real=True)
+H_pend = p**2 / 2 - sp.cos(q)
+X_pend = sp.lambdify((q, p), hamiltonian_field(H_pend, (q, p), canonical_omega(1)))
+H_num = sp.lambdify((q, p), H_pend)
+
+qs, ps = np.linspace(-np.pi, np.pi, 300), np.linspace(-3, 3, 300)
+Qg, Pg = np.meshgrid(qs, ps)
+fig, ax = plt.subplots(figsize=(7, 4.2))
+ax.contour(Qg, Pg, H_num(Qg, Pg), levels=[-0.9, -0.6, -0.2, 0.3, 0.7, 1.5, 2.2, 3.0], colors="0.45", linewidths=0.9, linestyles="solid")
+ax.contour(Qg, Pg, H_num(Qg, Pg), levels=[1.0], colors="tab:red", linewidths=1.6)
+qa, pa = np.meshgrid(np.linspace(-3, 3, 13), np.linspace(-2.6, 2.6, 11))
+U, V = X_pend(qa, pa)
+ax.quiver(qa, pa, U, V, color="tab:blue", angles="xy", width=0.003)
+ax.set_xlabel("q")
+ax.set_ylabel("p")
+ax.set_xlim(-np.pi, np.pi)
+plt.show()
+```
+
+## Сохранение симплектической формы
+
+По формуле Картана и замкнутости $\omega$
+$$
+\Lie{X_H}\omega = \dd\,\iprod{X_H}\omega + \iprod{X_H}\dd\omega = -\dd\dd H = 0 .
+$$
+Значит, поток $\phi_t$ гамильтонова поля **симплектичен**: $\phi_t^*\omega = \omega$.
+Проверим символьно для произвольного $H$:
+
+```{python}
+print("L_{X_H} ω =", show(lie(X_H, omega, Z)))
+```
+
+Верно и обратное (локально): если поток сохраняет $\omega$, то $\iprod{X}\omega$
+замкнута и потому локально точна, $\iprod{X}\omega = -\dd H$. Глобально
+однозначной $H$ может не быть. На торе $T^2$ с угловыми координатами $q, p$ и
+формой $\dd p\wedge\dd q$ поле $\partial_q$ сохраняет форму, но
+$\iprod{\partial_q}(\dd p\wedge\dd q) = -\dd p$, а «гамильтониан» $H = p$ — угол,
+многозначная функция: форма $\dd p$ на торе замкнута, но не точна. Такие
+поля называют **локально гамильтоновыми**.
+
+**Численная проверка.** Симплектичность потока означает, что матрица Якоби
+$M = \partial\phi_t/\partial z$ симплектическая: $M^{\mathsf T}\Omega M = \Omega$. Матрицу $M$ найдём из
+**уравнений в вариациях** $\dot M = (\partial X_H/\partial z)\,M$, $M(0) = 1$, решая их вместе
+с уравнениями движения. Возьмём неинтегрируемую систему Энона–Хейлеса
+$H = \frac12(p_1^2 + p_2^2) + \frac12(q_1^2 + q_2^2) + q_1^2q_2 - \frac13q_2^3$:
+
+```{python}
+from scipy.integrate import solve_ivp
+
+H_hh = (p1**2 + p2**2) / 2 + (q1**2 + q2**2) / 2 + q1**2 * q2 - q2**3 / 3
+X_hh = sp.Matrix(hamiltonian_field(H_hh, Z, omega))
+field = sp.lambdify(Z, list(X_hh))
+jacobian = sp.lambdify(Z, X_hh.jacobian(Z))
+
+def with_variations(_, state):
+    z, M = state[:4], state[4:].reshape(4, 4)
+    return np.r_[field(*z), (np.array(jacobian(*z), dtype=float) @ M).ravel()]
+
+z0 = np.array([0.1, 0.2, 0.3, 0.1])
+sol = solve_ivp(with_variations, (0, 50), np.r_[z0, np.eye(4).ravel()], rtol=1e-11, atol=1e-12)
+M = sol.y[4:, -1].reshape(4, 4)
+Omega = np.array(form_matrix(omega, 4), dtype=float)
+H_hh_num = sp.lambdify(Z, H_hh)
+print(f"энергия: {H_hh_num(*z0):.10f} → {H_hh_num(*sol.y[:4, -1]):.10f}")
+print(f"max |MᵀΩM − Ω| = {np.abs(M.T @ Omega @ M - Omega).max():.1e},  det M = {np.linalg.det(M):.10f}")
+```
+
+Отклонения на уровне погрешности интегрирования. Сохраняется не только
+определитель (объём), но и все $\binom42 = 6$ «симплектических площадей» — это
+гораздо сильнее.
+
+## Теорема Лиувилля
+
+Из $\Lie{X_H}\omega = 0$ и правила Лейбница следует $\Lie{X_H}\omega^n = 0$: гамильтонов
+поток сохраняет объём Лиувилля $\omega^n/n!$. В канонических координатах это
+$\operatorname{div}X_H = \sum_i\bigl(\partial_{q^i}\partial_{p_i}H - \partial_{p_i}\partial_{q^i}H\bigr) = 0$ —
+равенство смешанных производных. Это **теорема Лиувилля**. Она лежит в
+основе статистической механики: равномерное распределение по
+энергетической поверхности (микроканонический ансамбль) не меняется со
+временем.
+
+```{python}
+from gmph.exterior import wedge
+
+vol = wedge(omega, omega)
+print("ω∧ω =", show(vol), "   L_{X_H}(ω∧ω) =", show(lie(X_H, vol, Z)))
+```
+
+## Заряд в магнитном поле
+
+Частица с зарядом $e$ в однородном магнитном поле $\mathbf B = B\mathbf e_z$
+(движение в плоскости $xy$). Канонический импульс $\mathbf p = m\mathbf v + \frac ec\mathbf A$
+([конвенции](/conventions.qmd)), $H = \frac{1}{2m}(\mathbf p - \frac ec\mathbf A)^2$. Перейдём к
+кинетическому импульсу $\boldsymbol\pi = m\mathbf v = \mathbf p - \frac ec\mathbf A$: гамильтониан становится
+просто $\boldsymbol\pi^2/2m$, а магнитное поле переходит в симплектическую форму.
+Перенесём $\omega = \dd p_x\wedge\dd x + \dd p_y\wedge\dd y$ в координаты $(x, y, \pi_x, \pi_y)$
+при $\mathbf A = \frac12\mathbf B\times\mathbf r$:
+
+```{python}
+from gmph.exterior import pullback
+
+x, y, px, py = sp.symbols("x y p_x p_y", real=True)
+pix, piy = sp.symbols("pi_x pi_y", real=True)
+e, c, B, m = sp.symbols("e c B m", positive=True)
+A = (-B * y / 2, B * x / 2)
+
+omega_mag = pullback(canonical_omega(2), (x, y, px, py),
+                     (x, y, pix + e / c * A[0], piy + e / c * A[1]), (x, y, pix, piy))
+print("ω в координатах (x, y, π_x, π_y):", show(omega_mag, ["dx", "dy", "dπ_x", "dπ_y"]))
+X_mag = hamiltonian_field((pix**2 + piy**2) / (2 * m), (x, y, pix, piy), omega_mag)
+print("X_H =", X_mag)
+```
+
+Получилось $\omega = \dd\pi_x\wedge\dd x + \dd\pi_y\wedge\dd y + \frac{eB}{c}\,\dd x\wedge\dd y$ — «магнитная»
+симплектическая форма: к канонической добавлена 2-форма поля $\frac ec\mathcal B$. В
+общем случае $\omega = \sum\dd\pi_i\wedge\dd q^i + \frac ec\,\mathcal B$, и в эту запись входит
+только $\mathcal B$, а не потенциал: калибровочная свобода исчезла.
+Гамильтоново поле даёт $\dot{\mathbf r} = \boldsymbol\pi/m$ и
+$\dot\pi_x = \frac{eB}{cm}\pi_y$, $\dot\pi_y = -\frac{eB}{cm}\pi_x$ — это сила Лоренца
+$\frac ec\,\mathbf v\times\mathbf B$. Гамильтониан чисто кинетический, а магнитное поле
+«спрятано» в геометрию фазового пространства.
+
+## Итоги
+
+- Гамильтоново поле определено условием $\iprod{X_H}\omega = -\dd H$; в канонических
+  координатах это уравнения Гамильтона, в матричной записи — $\dot z = \Omega^{-1}\nabla H$.
+- $X_H(H) = -\omega(X_H, X_H) = 0$: энергия сохраняется, движение идёт по
+  поверхностям уровня $H$.
+- $\Lie{X_H}\omega = -\dd\dd H = 0$: поток симплектичен ($M^{\mathsf T}\Omega M = \Omega$ для матрицы Якоби).
+- Сохраняется объём Лиувилля $\omega^n/n!$ — теорема Лиувилля.
+- Магнитное поле можно перенести из гамильтониана в симплектическую форму:
+  $\omega = \sum\dd\pi_i\wedge\dd q^i + \frac ec\mathcal B$.
+
+## Упражнения
+
+1. Найдите $X_H$ и поток для $H = qp$ на плоскости. Как деформируется квадрат
+   $[1, 2]\times[1, 2]$ и сохраняется ли его площадь?
+2. Для осциллятора $H = \frac{p^2}{2m} + \frac{m\omega_0^2q^2}{2}$ найдите площадь $S(E)$,
+   ограниченную линией уровня $H = E$, и проверьте, что период $T = \dd S/\dd E$.
+3. Спин в поле $\mathbf B = B\mathbf e_x$: $H = -\gamma BS\sin\theta\cos\varphi$ на сфере с
+   $\omega = -S\sin\theta\,\dd\theta\wedge\dd\varphi$. Найдите точки равновесия ($X_H = 0$).
+4. Покажите, что в канонических координатах $X_H$ ортогонален $\nabla H$ в
+   евклидовой метрике $\dd q^2 + \dd p^2$, и объясните, почему это утверждение
+   не инвариантно, а $X_H(H) = 0$ — инвариантно.
+5. Проверьте, что в «магнитной» форме $\omega = \dd\pi_x\wedge\dd x + \dd\pi_y\wedge\dd y + \frac{eB}{c}\dd x\wedge\dd y$
+   траектории — окружности, и найдите частоту обращения.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $X_H = q\,\partial_q - p\,\partial_p$, поток $(qe^t, pe^{-t})$: квадрат переходит в
+   прямоугольник $[e^t, 2e^t]\times[e^{-t}, 2e^{-t}]$ той же площади 1.
+2. Эллипс с полуосями $\sqrt{2E/m\omega_0^2}$ и $\sqrt{2mE}$: $S = 2\pi E/\omega_0$,
+   $\dd S/\dd E = 2\pi/\omega_0 = T$.
+3. $\dd H = 0$ при $\cos\theta\cos\varphi = 0$ и $\sin\theta\sin\varphi = 0$: $\theta = \pi/2$,
+   $\varphi = 0$ или $\pi$ — спин вдоль поля или против него. (Полюса $\theta = 0, \pi$
+   — особенности карты, а не точки равновесия.)
+4. $X_H\cdot\nabla H = H_pH_q - H_qH_p = 0$. Ортогональность зависит от выбранной
+   метрики, а $X_H(H) = \dd H(X_H)$ использует только $\omega$ и $\dd H$.
+5. $\dot{\boldsymbol\pi} = \frac{eB}{mc}(\pi_y, -\pi_x)$ — вращение вектора $\boldsymbol\pi$ с частотой
+   $\omega_B = \frac{|e|B}{mc}$ (циклотронная); $|\boldsymbol\pi|$ постоянен, $\dot{\mathbf r} = \boldsymbol\pi/m$
+   тоже вращается, и траектория — окружность радиуса $|\boldsymbol\pi|c/(|e|B)$.
+:::
