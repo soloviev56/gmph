@@ -1,0 +1,300 @@
+---
+title: "Электростатика"
+topic: electrostatics
+order: 1
+description: "Напряжённость как 1-форма, индукция как 2-форма, заряд как 3-форма; уравнения dℰ = 0 и d𝒟 = 4πρ vol; метрика только в связи 𝒟 = ε⋆ℰ; потенциал и уравнение Пуассона; теорема Гаусса; однородно заряженный шар и энергия поля; метод изображений; граничные условия и диэлектрический шар в однородном поле; картина поля двух зарядов"
+---
+
+Как измерить электрическое поле? Можно перенести пробный заряд из точки в
+точку и измерить работу: так определяется напряжённость $\mathbf E$, и её
+естественно интегрировать **вдоль кривых**. А можно, как в теореме Гаусса,
+измерить заряд внутри замкнутой поверхности по потоку через неё: так
+определяется индукция $\mathbf D$, и её естественно интегрировать **по
+поверхностям**. На языке форм это объекты разных степеней: $\mathbf E$ —
+1-форма, $\mathbf D$ — 2-форма, а заряд — 3-форма, которую интегрируют по
+объёмам. Уравнения электростатики записываются через одно лишь $\dd$, а
+метрика пространства и свойства среды входят только в связь между
+$\mathcal E$ и $\mathcal D$.
+
+Нужны [векторный анализ на языке форм](/math/forms/vector-calculus-forms.qmd)
+и [обобщённая теорема Стокса](/math/forms/stokes.qmd). Единицы
+гауссовы, обозначения — по [конвенциям](/conventions.qmd).
+
+## Поля как формы
+
+::: {#def-electrostatic-forms}
+**Электростатическое поле** описывается тремя формами в трёхмерном
+пространстве:
+
+- **напряжённость** — 1-форма $\mathcal E = \mathbf E\cdot\dd\mathbf r = E_i\,\dd x^i$;
+  $\int_\gamma\mathcal E$ — работа поля над единичным зарядом вдоль пути $\gamma$;
+- **индукция** — 2-форма $\mathcal D = \mathbf D\cdot\dd\mathbf S$;
+  $\int_S\mathcal D$ — поток индукции через поверхность $S$;
+- **заряд** — 3-форма $\rho\,\mathrm{vol}$; $\int_V\rho\,\mathrm{vol}$ — заряд в объёме $V$.
+
+**Уравнения электростатики**:
+$$
+\dd\mathcal E = 0, \qquad \dd\mathcal D = 4\pi\rho\,\mathrm{vol},
+$$
+**материальное уравнение**: $\mathcal D = \hodge\mathcal E$ в пустоте,
+$\mathcal D = \varepsilon\hodge\mathcal E$ в изотропном диэлектрике.
+:::
+
+Первое уравнение — $\operatorname{rot}\mathbf E = 0$: работа по замкнутому
+пути равна нулю. Второе — $\operatorname{div}\mathbf D = 4\pi\rho$. Оба уравнения
+записаны без метрики, а оператор Ходжа (метрика и ориентация) стоит
+только в материальном уравнении. Это разделение станет важным в
+криволинейных координатах, в среде и в теории относительности: законы
+$\dd\mathcal E = 0$ и $\dd\mathcal D = 4\pi\rho\,\mathrm{vol}$ одинаковы в любых координатах.
+
+Для точечного заряда $q$ в начале координат $\mathcal E = q\,(x\,\dd x + y\,\dd y + z\,\dd z)/r^3$.
+Проверим уравнения вне заряда и найдём $\mathcal D$:
+
+```{python}
+import sympy as sp
+from gmph.exterior import d, hodge, integrate_form, show
+
+x, y, z = X = sp.symbols("x y z", real=True)
+q = sp.Symbol("q", positive=True)
+rr = sp.sqrt(x**2 + y**2 + z**2)
+names = ["dx", "dy", "dz"]
+
+E_point = {(i,): q * c / rr**3 for i, c in enumerate(X, 1)}
+D_point = hodge(E_point, sp.eye(3))
+print("𝒟 = ⋆ℰ =", show(D_point, names))
+print("dℰ =", show(d(E_point, X), names), "   d𝒟 =", show(d(D_point, X), names))
+```
+
+$\mathcal D$ — та же кулоновская 2-форма, что в статье о теореме Стокса
+(компонента при $\dd x\wedge\dd z$ равна $-D_y$, так как $\dd z\wedge\dd x = -\dd x\wedge\dd z$).
+
+## Теорема Гаусса и потенциал
+
+Проинтегрируем $\dd\mathcal D = 4\pi\rho\,\mathrm{vol}$ по области $V$ и применим
+теорему Стокса:
+$$
+\oint_{\partial V}\mathcal D = 4\pi\int_V\rho\,\mathrm{vol} = 4\pi Q_V .
+$$
+Это **теорема Гаусса**. Для точечного заряда поток через любую
+окружающую его поверхность равен $4\pi q$:
+
+```{python}
+th, ph = sp.symbols("theta phi", positive=True)
+R = sp.Symbol("R", positive=True)
+sphere = (R * sp.sin(th) * sp.cos(ph), R * sp.sin(th) * sp.sin(ph), R * sp.cos(th))
+print("поток 𝒟 через сферу радиуса R:", integrate_form(D_point, X, sphere, (th, ph), [(th, 0, sp.pi), (ph, 0, 2 * sp.pi)]))
+```
+
+Из $\dd\mathcal E = 0$ по [лемме Пуанкаре](/math/forms/closed-exact.qmd) в
+звёздной области $\mathcal E = -\dd\varphi$; $\varphi$ — **потенциал**, и работа
+$\int_\gamma\mathcal E = \varphi(\text{начало}) - \varphi(\text{конец})$ не зависит от пути.
+Подставив его во второе уравнение (в пустоте), получим **уравнение
+Пуассона**:
+$$
+\dd\hodge\dd\varphi = -4\pi\rho\,\mathrm{vol}
+\quad\Longleftrightarrow\quad
+\Delta\varphi = \hodge\dd\hodge\dd\varphi = -4\pi\rho .
+$$
+Вне зарядов $\Delta\varphi = 0$ — **уравнение Лапласа**.
+
+## Однородно заряженный шар
+
+Шар радиуса $R$ с зарядом $Q$, $\rho_0 = 3Q/(4\pi R^3)$. По теореме Гаусса для
+сферы радиуса $r$: $4\pi r^2E_r = 4\pi Q(r)$, где $Q(r)$ — заряд внутри, отсюда
+$E_r = Qr/R^3$ внутри и $Q/r^2$ снаружи. Потенциал (непрерывный, $\varphi \to 0$
+на бесконечности):
+$$
+\varphi = \frac{Q\,(3R^2 - r^2)}{2R^3}\ (r \le R), \qquad \varphi = \frac Qr\ (r \ge R).
+$$
+Проверим уравнение Пуассона в сферических координатах (функции из
+`gmph.vectorcalc`) и сшивку на границе:
+
+```{python}
+from gmph.vectorcalc import from_physical, grad, laplacian, physical
+
+r = sp.Symbol("r", positive=True)
+SPH = (r, th, ph)
+g_sph = sp.diag(1, r**2, r**2 * sp.sin(th)**2)
+Q = sp.Symbol("Q", positive=True)
+rho0 = 3 * Q / (4 * sp.pi * R**3)
+
+phi_in = Q * (3 * R**2 - r**2) / (2 * R**3)
+phi_out = Q / r
+print("Δφ + 4πρ внутри:", sp.simplify(laplacian(phi_in, SPH, g_sph) + 4 * sp.pi * rho0))
+print("Δφ снаружи:", laplacian(phi_out, SPH, g_sph))
+print("скачок φ и ∂φ/∂r при r = R:",
+      sp.simplify((phi_in - phi_out).subs(r, R)), sp.simplify((phi_in - phi_out).diff(r).subs(r, R)))
+print("E_r внутри:", physical([-c for c in grad(phi_in, SPH, g_sph)], g_sph)[0])
+```
+
+**Энергия поля** — интеграл 3-формы $\frac{1}{8\pi}\,\mathcal E\wedge\mathcal D$
+(в пустоте $\mathcal E\wedge\hodge\mathcal E = E^2\,\mathrm{vol}$). Её можно
+вычислить и как энергию зарядов $\frac12\int\rho\varphi\,\mathrm{vol}$; ответы совпадают:
+
+```{python}
+E_in, E_out = Q * r / R**3, Q / r**2
+W_field = (sp.integrate(E_in**2 * 4 * sp.pi * r**2, (r, 0, R))
+           + sp.integrate(E_out**2 * 4 * sp.pi * r**2, (r, R, sp.oo))) / (8 * sp.pi)
+W_charges = sp.integrate(rho0 * phi_in * 4 * sp.pi * r**2, (r, 0, R)) / 2
+print("(1/8π)∫ℰ∧𝒟 =", sp.simplify(W_field), "   (1/2)∫ρφ =", sp.simplify(W_charges))
+```
+
+Энергия $W = \frac{3Q^2}{5R}$. Равенство двух выражений — снова теорема
+Стокса: $\mathcal E\wedge\mathcal D = -\dd\varphi\wedge\mathcal D = -\dd(\varphi\mathcal D) + \varphi\,\dd\mathcal D$,
+а интеграл $\dd(\varphi\mathcal D)$ сводится к потоку через бесконечно
+удалённую сферу и равен нулю.
+
+## Картина поля
+
+Два заряда, $+2$ в точке $(-1, 0)$ и $-1$ в точке $(1, 0)$: силовые линии
+(линии поля $\mathbf E$) и эквипотенциали в плоскости $z = 0$.
+
+```{python}
+#| label: fig-two-charges
+#| fig-cap: "Поле зарядов +2 (слева) и −1 (справа) в плоскости z = 0: силовые линии и эквипотенциали φ = const. Часть линий от заряда +2 уходит на бесконечность: его поток вдвое больше."
+import numpy as np
+import matplotlib.pyplot as plt
+
+charges = [(2.0, np.array([-1.0, 0.0])), (-1.0, np.array([1.0, 0.0]))]
+xs = np.linspace(-3.5, 3.5, 400)
+Xg, Yg = np.meshgrid(xs, xs)
+phi_g = np.zeros_like(Xg)
+Ex, Ey = np.zeros_like(Xg), np.zeros_like(Xg)
+for qc, pos in charges:
+    dx_, dy_ = Xg - pos[0], Yg - pos[1]
+    dist = np.sqrt(dx_**2 + dy_**2) + 1e-9
+    phi_g += qc / dist
+    Ex += qc * dx_ / dist**3
+    Ey += qc * dy_ / dist**3
+
+fig, ax = plt.subplots(figsize=(6, 5.2))
+ax.streamplot(Xg, Yg, Ex, Ey, color="0.35", density=1.4, linewidth=0.8, arrowsize=0.8)
+levels = [-1.5, -0.8, -0.4, -0.2, 0, 0.2, 0.4, 0.8, 1.5, 3]
+cs = ax.contour(Xg, Yg, phi_g, levels=levels, colors="tab:orange", linewidths=1.0)
+ax.clabel(cs, fontsize=7, fmt="%g")
+for qc, pos in charges:
+    ax.plot(*pos, "o", ms=12, color="tab:red" if qc > 0 else "tab:blue")
+    ax.text(*pos, f"{qc:+g}", color="white", ha="center", va="center", fontsize=8, fontweight="bold")
+ax.set_aspect("equal")
+ax.set_xlabel("x")
+ax.set_ylabel("y")
+plt.show()
+```
+
+Силовые линии перпендикулярны эквипотенциалям: $\mathbf E = (\dd\varphi)^\sharp$ со
+знаком минус, а $\sharp$ превращает ковектор в вектор, ортогональный его
+линиям уровня. Без метрики понятия «перпендикулярно» нет; форма
+$\mathcal E$ сама по себе — это семейство поверхностей уровня $\varphi$.
+
+## Метод изображений
+
+Заряд $q$ на высоте $a$ над заземлённой проводящей плоскостью $z = 0$. Нужно
+решить уравнение Пуассона при $z > 0$ с условием $\varphi = 0$ на плоскости.
+Решение дают «изображения»: заряд $-q$ в зеркальной точке $(0, 0, -a)$. В
+области $z > 0$ уравнение то же (изображение лежит вне её), граничное
+условие выполнено, а решение единственно. Индуцированный на плоскости
+заряд — скачок потока: $\sigma = E_z/4\pi$ на поверхности проводника.
+
+```{python}
+a = sp.Symbol("a", positive=True)
+phi_img = q / sp.sqrt(x**2 + y**2 + (z - a)**2) - q / sp.sqrt(x**2 + y**2 + (z + a)**2)
+sigma = sp.simplify(-phi_img.diff(z).subs(z, 0) / (4 * sp.pi))
+rho_c = sp.Symbol("rho", positive=True)
+print("φ на плоскости:", phi_img.subs(z, 0))
+print("σ =", sigma)
+print("полный индуцированный заряд:", sp.integrate(sigma.subs({x: rho_c, y: 0}) * 2 * sp.pi * rho_c, (rho_c, 0, sp.oo)))
+```
+
+Весь поток, ушедший от заряда вниз, заканчивается на плоскости: индуцированный
+заряд равен $-q$.
+
+## Диэлектрик и граничные условия
+
+На границе двух сред уравнения дают условия сшивки — снова по теореме
+Стокса:
+
+- $\dd\mathcal E = 0$, проинтегрированное по узкой петле поперёк границы,
+  даёт непрерывность касательной компоненты $\mathbf E$
+  (1-форма $\mathcal E$, ограниченная на поверхность, непрерывна);
+- $\dd\mathcal D = 4\pi\rho\,\mathrm{vol}$, проинтегрированное по плоской
+  «таблетке», даёт скачок нормальной компоненты: $D_n^{(2)} - D_n^{(1)} = 4\pi\sigma$
+  (2-форма $\mathcal D$, ограниченная на поверхность, непрерывна при $\sigma = 0$).
+
+Ограничение формы на поверхность — это [перенос](/math/forms/pullback.qmd)
+по вложению; поэтому граничные условия естественно формулируются для
+$\mathcal E$ и $\mathcal D$, а не для векторов.
+
+**Диэлектрический шар в однородном поле.** Шар радиуса $R$ с проницаемостью
+$\varepsilon$ во внешнем поле $E_0\mathbf e_z$. Ищем потенциал в виде
+$\varphi = -Ar\cos\theta$ внутри и $\varphi = -E_0r\cos\theta + B\cos\theta/r^2$ снаружи
+(оба гармоничны). Условия на сфере: непрерывность $\varphi$ (это касательная
+$\mathbf E$) и непрерывность $\varepsilon\,\partial_r\varphi$ (нормальная $\mathbf D$):
+
+```{python}
+eps, E0 = sp.symbols("epsilon E_0", positive=True)
+A_, B_ = sp.symbols("A B")
+phi_inside = -A_ * r * sp.cos(th)
+phi_outside = -E0 * r * sp.cos(th) + B_ * sp.cos(th) / r**2
+print("гармоничность:", laplacian(phi_inside, SPH, g_sph), laplacian(phi_outside, SPH, g_sph))
+sol = sp.solve([(phi_inside - phi_outside).subs(r, R),
+                (eps * phi_inside.diff(r) - phi_outside.diff(r)).subs(r, R)], [A_, B_], dict=True)[0]
+print("поле внутри E =", sp.factor(sol[A_]), "  дипольный момент шара p =", sp.factor(sol[B_]))
+```
+
+Поле внутри шара однородно и ослаблено: $E = \dfrac{3E_0}{\varepsilon + 2}$. Снаружи к
+внешнему полю добавляется поле диполя с моментом
+$p = \dfrac{\varepsilon - 1}{\varepsilon + 2}\,E_0R^3$ (сравните с потенциалом диполя
+$p\cos\theta/r^2$ в статье о векторном анализе). При $\varepsilon \to \infty$ шар ведёт себя
+как проводник: $E = 0$ внутри, $p = E_0R^3$.
+
+## Итоги
+
+- $\mathbf E$ — 1-форма $\mathcal E$ (работа), $\mathbf D$ — 2-форма $\mathcal D$ (поток), заряд —
+  3-форма $\rho\,\mathrm{vol}$.
+- Уравнения $\dd\mathcal E = 0$, $\dd\mathcal D = 4\pi\rho\,\mathrm{vol}$ не содержат метрики;
+  она входит только в материальное уравнение $\mathcal D = \varepsilon\hodge\mathcal E$.
+- Теорема Гаусса — теорема Стокса для $\mathcal D$; потенциал $\mathcal E = -\dd\varphi$ — лемма
+  Пуанкаре; уравнение Пуассона $\Delta\varphi = -4\pi\rho$.
+- Энергия поля $\frac1{8\pi}\int\mathcal E\wedge\mathcal D$; для однородного шара $\frac{3Q^2}{5R}$.
+- Граничные условия: ограничения $\mathcal E$ и (без поверхностного заряда) $\mathcal D$ на
+  границу непрерывны.
+
+## Упражнения
+
+1. Сфера радиуса $R$ несёт заряд $Q$, распределённый по поверхности. Найдите
+   поле и потенциал внутри и снаружи, а также энергию поля.
+2. Бесконечный цилиндр радиуса $a$ однородно заряжен с зарядом $\lambda$ на единицу
+   длины. Найдите $E_\rho$ внутри и снаружи и проверьте уравнение Пуассона в
+   цилиндрических координатах.
+3. Плоский конденсатор: зазор заполнен двумя слоями толщины $d_1$, $d_2$ с
+   проницаемостями $\varepsilon_1$, $\varepsilon_2$. Найдите ёмкость на единицу площади.
+4. Почему в методе изображений для заряда над плоскостью сила притяжения
+   заряда к плоскости равна $q^2/(2a)^2$, а энергия взаимодействия
+   $-q^2/(4a)$, а не $-q^2/(2a)$?
+5. Покажите, что для точечного заряда $\int_\gamma\mathcal E$ по любому пути из точки
+   на расстоянии $r_1$ в точку на расстоянии $r_2$ равен $q/r_1 - q/r_2$, и
+   объясните, почему для поля $\mathbf E = (-y, x, 0)/(x^2 + y^2)$ (тоже $\dd\mathcal E = 0$
+   вне оси) это неверно.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. Внутри $\mathbf E = 0$, $\varphi = Q/R$; снаружи $E_r = Q/r^2$, $\varphi = Q/r$; энергия
+   $\frac{1}{8\pi}\int_R^\infty (Q/r^2)^2\,4\pi r^2\,\dd r = \dfrac{Q^2}{2R}$.
+2. $E_\rho = 2\lambda\rho/a^2$ внутри, $2\lambda/\rho$ снаружи; например,
+   $\varphi = -\lambda\rho^2/a^2$ внутри и $\varphi = -2\lambda\ln(\rho/a) - \lambda$ снаружи
+   ($\varphi$ непрерывен при $\rho = a$); $\Delta\varphi = -4\lambda/a^2 = -4\pi\rho_0$ при
+   $\rho_0 = \lambda/(\pi a^2)$ внутри и $0$ снаружи.
+3. $D = 4\pi\sigma$ одинаково в обоих слоях (нормальная $\mathbf D$ непрерывна),
+   $E_i = D/\varepsilon_i$, $U = E_1d_1 + E_2d_2$; $\dfrac{C}{S} = \dfrac{1}{4\pi\,(d_1/\varepsilon_1 + d_2/\varepsilon_2)}$.
+4. Энергия взаимодействия — работа против силы притяжения при удалении
+   заряда на бесконечность: $U(a) = -\int_a^\infty \frac{q^2}{(2z)^2}\,\dd z = -\frac{q^2}{4a}$.
+   Изображение движется вместе с зарядом, поэтому это не энергия пары
+   неподвижных зарядов $-q^2/(2a)$. Иначе: поле существует только при $z > 0$, и
+   энергия $\frac{1}{8\pi}\int\mathcal E\wedge\mathcal D$ берётся по половине пространства —
+   половина от энергии взаимодействия двух настоящих зарядов.
+5. $\mathcal E = -\dd(q/r)$ точна во всём $\R^3\setminus\{0\}$, поэтому интеграл зависит
+   только от концов. Форма $(-y\,\dd x + x\,\dd y)/(x^2 + y^2) = \dd\varphi$ замкнута, но не
+   точна вне оси: её интеграл по пути, обходящему ось, равен $2\pi$. Такое
+   поле не может быть электростатическим полем зарядов: его потенциал
+   был бы многозначным.
+:::

@@ -139,6 +139,14 @@ subtitle: "Обозначения и соглашения о знаках, ед�
   $\varphi \to \varphi - \frac1c \pd{f}{t}$),
   $\psi \to e^{\,ie f/\hbar c}\,\psi$; при этом $D_\mu\psi \to e^{\,ie f/\hbar c}\,D_\mu\psi$.
 
+- Трёхмерная запись. Напряжённость — 1-форма $\mathcal E = \mathbf E\cdot\dd\mathbf r = E_i\,\dd x^i$
+  (работа над единичным зарядом), индукция — 2-форма потока
+  $\mathcal D = \mathbf D\cdot\dd\mathbf S = \hodge\mathbf D^\flat$, плотность заряда — 3-форма
+  $\rho\,\mathrm{vol}$. Уравнения электростатики: $\dd\mathcal E = 0$,
+  $\dd\mathcal D = 4\pi\rho\,\mathrm{vol}$; в пустоте $\mathcal D = \hodge\mathcal E$, в
+  изотропном диэлектрике $\mathcal D = \varepsilon\hodge\mathcal E$. Потенциал:
+  $\mathcal E = -\dd\varphi$.
+
 Все знаки этого раздела проверяются автоматически в `tests/test_conventions.py`.
 
 ## Калибровочные поля

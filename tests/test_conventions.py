@@ -238,3 +238,20 @@ def test_symplectic_matrix_form():
     grad = sp.Matrix([H.diff(c) for c in (*qs, *ps)])
     zdot = Omega.inv() * grad                         # ż = Ω⁻¹∇H
     assert all(zdot[i] == H.diff(ps[i]) and zdot[n + i] == -H.diff(qs[i]) for i in range(n))
+
+
+# --- Электростатика формами: dℰ = 0, d𝒟 = 4πρ vol, 𝒟 = ⋆ℰ, ℰ = −dφ ----------
+
+def test_electrostatics_forms():
+    from gmph.exterior import d, hodge
+
+    x, y, z = X = sp.symbols("x y z", real=True)
+    rho0 = sp.Symbol("rho_0", positive=True)
+    # внутри однородно заряженного шара φ = −(2π/3) ρ₀ r² + const
+    phi = -sp.Rational(2, 3) * sp.pi * rho0 * (x**2 + y**2 + z**2)
+    E_form = {(i,): -sp.diff(phi, c) for i, c in enumerate(X, 1)}
+    D_form = hodge(E_form, sp.eye(3))
+    assert d(E_form, X) == {}
+    assert d(D_form, X) == {(1, 2, 3): 4 * sp.pi * rho0}
+    # 𝒟 = D·dS: компонента при dy∧dz — D_x
+    assert D_form[(2, 3)] == E_form[(1,)]
