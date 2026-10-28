@@ -56,3 +56,20 @@ def test_numeric_pendulum_conserves_energy():
     # малые колебания: период близок к 2π√(l/g)
     small = solve_ivp(rhs, (0, 2 * np.pi / np.sqrt(9.81)), [1e-3, 0.0], rtol=1e-11, atol=1e-14)
     assert abs(small.y[0, -1] - 1e-3) < 1e-8
+
+
+def test_legendre_transform():
+    from gmph.mechanics import hamiltonian
+    r, phi = sp.Function("r")(t), sp.Function("phi")(t)
+    R, PHI, pr, pphi = sp.symbols("R PHI p_r p_phi", real=True)
+    L = m / 2 * (r.diff(t)**2 + r**2 * phi.diff(t)**2) - k / r
+    H = hamiltonian(L, [r, phi], t, [R, PHI], [pr, pphi])
+    assert sp.simplify(H - (pr**2 / (2 * m) + pphi**2 / (2 * m * R**2) + k / R)) == 0
+    # заряд в поле: H = (p − eA/c)²/2m + eφ
+    x = sp.Function("x")(t)
+    X, P = sp.symbols("X P", real=True)
+    e, c = sp.symbols("e c", positive=True)
+    A, phi_el = sp.Function("A"), sp.Function("varphi")
+    L_charge = m * x.diff(t)**2 / 2 + e / c * A(x) * x.diff(t) - e * phi_el(x)
+    H_charge = hamiltonian(L_charge, [x], t, [X], [P])
+    assert sp.simplify(H_charge - ((P - e * A(X) / c)**2 / (2 * m) + e * phi_el(X))) == 0

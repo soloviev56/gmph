@@ -1,0 +1,286 @@
+---
+title: "Уравнения Гамильтона"
+topic: legendre-hamilton
+order: 8
+description: "Преобразование Лежандра выпуклой функции и его геометрия; та же операция, что в термодинамических потенциалах; послойная производная TQ → T*Q и невырожденность лагранжиана; гамильтониан натуральной системы и заряда в поле; уравнения Лагранжа ⇔ гамильтоново поле на T*Q (проверка для сферического маятника); вариационный принцип в фазовом пространстве; релятивистская частица; вырожденные лагранжианы"
+---
+
+[Уравнения Лагранжа](/physics/mechanics/lagrange-equations.qmd) — система
+второго порядка для точки конфигурационного пространства $Q$; её
+состояние — точка касательного расслоения $TQ$, пара (положение,
+скорость). Гамильтон предложил описывать состояние парой (положение,
+импульс), то есть точкой кокасательного расслоения $T^*Q$. Тогда уравнения
+движения становятся системой первого порядка с симметричной ролью $q$ и $p$.
+Главное же в том, что на $T^*Q$ есть каноническая [симплектическая
+форма](/math/symplectic/symplectic-manifolds.qmd), а уравнения движения
+задаются [гамильтоновым полем](/math/symplectic/hamiltonian-fields.qmd). Весь
+аппарат предыдущих статей — сохранение фазового объёма,
+симплектичность потока — становится механикой. Переход от $L$ к $H$
+делается преобразованием Лежандра, тем же, которое в термодинамике
+переводит внутреннюю энергию в свободную энергию и энтальпию
+([термодинамические потенциалы](/physics/statistical/thermodynamic-potentials.qmd)).
+
+Нужны [уравнения Лагранжа](/physics/mechanics/lagrange-equations.qmd) и
+[гамильтоновы векторные поля](/math/symplectic/hamiltonian-fields.qmd).
+
+## Преобразование Лежандра
+
+::: {#def-legendre}
+Пусть $f(v)$ — строго выпуклая функция ($f'' > 0$). Её **преобразование
+Лежандра** —
+$$
+g(p) = \max_v\bigl(pv - f(v)\bigr) = pv(p) - f(v(p)),
+\qquad\text{где } v(p) \text{ находится из } p = f'(v).
+$$
+Для функции нескольких переменных $p_i = \partial f/\partial v^i$, и требуется
+положительная определённость матрицы $\partial^2f/\partial v^i\partial v^j$.
+:::
+
+**Геометрия.** Выпуклая функция задаётся не только своими значениями, но и
+семейством касательных: касательная с наклоном $p$ пересекает ось
+ординат в точке $-g(p)$. Преобразование Лежандра заменяет описание
+«по точкам» описанием «по касательным», не теряя информации, и потому
+обратимо: $g' = v$, а повторное преобразование возвращает $f$. Так же в
+термодинамике $F(T, V) = U - TS$ получается из $U(S, V)$ при замене
+переменной $S$ на сопряжённую ей $T = \partial U/\partial S$ (с противоположным знаком
+по историческим причинам).
+
+```{python}
+#| label: fig-legendre
+#| fig-cap: "Преобразование Лежандра функции f(v) = v²/2 + v⁴/12: касательная с наклоном p = f′(v₀) отсекает на оси ординат отрезок −g(p). Максимум pv − f(v) по v — вертикальное расстояние между прямой pv и графиком f, оно наибольшее в точке касания v₀."
+import numpy as np
+import matplotlib.pyplot as plt
+import sympy as sp
+
+v, p = sp.symbols("v p", real=True)
+f = v**2 / 2 + v**4 / 12
+v0 = 1.2
+slope = float(sp.diff(f, v).subs(v, v0))
+g_val = slope * v0 - float(f.subs(v, v0))
+
+fv = sp.lambdify(v, f)
+vs = np.linspace(-0.6, 2.0, 200)
+fig, ax = plt.subplots(figsize=(6, 4.2))
+ax.plot(vs, fv(vs), color="tab:blue", label="f(v)")
+ax.plot(vs, slope * vs - g_val, color="tab:red", label=f"касательная, наклон p = {slope:.3f}")
+ax.plot(vs, slope * vs, color="tab:red", ls=":", label="прямая p·v")
+ax.vlines(v0, fv(v0), slope * v0, color="0.3", lw=2)
+ax.text(v0 - 0.05, 1.0, f"g(p) = {g_val:.3f}", fontsize=9, ha="right", va="center")
+ax.plot([0], [-g_val], "o", color="tab:red")
+ax.text(0.05, -g_val, "−g(p)", va="top", fontsize=9)
+ax.axhline(0, color="0.7", lw=0.8)
+ax.axvline(0, color="0.7", lw=0.8)
+ax.set_xlabel("v")
+ax.legend(loc="upper left", fontsize=8)
+plt.show()
+```
+
+Проверим обратимость для нескольких функций: найдём $g$, затем
+преобразование Лежандра от $g$, и сравним с исходной функцией:
+
+```{python}
+pos_v, pos_p = sp.symbols("v p", positive=True)
+
+def legendre(func, var, new_var):
+    """g(new) = new·var − func при new = func'(var); выбираем положительный корень."""
+    root = [s for s in sp.solve(sp.Eq(new_var, sp.diff(func, var)), var) if s.is_positive is not False][0]
+    return sp.simplify(new_var * root - func.subs(var, root))
+
+m, c = sp.symbols("m c", positive=True)
+
+def same(a, b):
+    """Равенство выражений: simplify, а если он не справился — в точках с v < c."""
+    if sp.simplify(a - b) == 0:
+        return True
+    points = [{pos_v: 0.3, m: 1.7, c: 1.0}, {pos_v: 1.9, m: 0.4, c: 2.0}]
+    return all(abs(complex((a - b).subs(pt))) < 1e-12 for pt in points)
+
+for func in (m * pos_v**2 / 2, pos_v**3 / 3, -m * c**2 * sp.sqrt(1 - pos_v**2 / c**2)):
+    g = legendre(func, pos_v, pos_p)
+    back = legendre(g, pos_p, pos_v)
+    print(f"f = {func}:  g = {g},  обратно: {same(back, func)}")
+```
+
+(Для релятивистского лагранжиана `simplify` не сводит
+$\sqrt{1/(c - v)}\,(c^2 - v^2)/\sqrt{c + v}$ к $\sqrt{c^2 - v^2}$, поэтому
+равенство проверяется ещё и численно.)
+
+Последняя строка — лагранжиан свободной релятивистской частицы: его
+преобразование Лежандра — энергия $\sqrt{p^2c^2 + m^2c^4}$.
+
+## От TQ к T*Q
+
+Лагранжиан $L(q, \dot q, t)$ при фиксированном $q$ — функция скорости.
+Преобразование Лежандра по скоростям даёт:
+
+::: {#def-hamiltonian}
+**Послойная производная** — отображение $\mathbb FL: TQ \to T^*Q$,
+$(q, \dot q) \mapsto (q, p)$, $p_i = \partial L/\partial\dot q^i$. Лагранжиан **невырожден**,
+если $\det\bigl(\partial^2L/\partial\dot q^i\partial\dot q^j\bigr) \ne 0$; тогда $\mathbb FL$ локально
+обратимо. **Функция Гамильтона**
+$$
+H(q, p, t) = p_i\dot q^i - L(q, \dot q, t)\Big|_{\dot q = \dot q(q, p, t)} .
+$$
+:::
+
+Импульс — ковектор (статья [об уравнениях
+Лагранжа](/physics/mechanics/lagrange-equations.qmd)), поэтому $\mathbb FL$
+переводит касательное расслоение в кокасательное. Численно $H$ совпадает с
+функцией энергии $E = \dot q^i\partial L/\partial\dot q^i - L$, но это функция других переменных.
+Для натуральной системы $L = \frac12M_{ij}(q)\dot q^i\dot q^j - U(q)$ имеем $p = M\dot q$ и
+$$
+H = \tfrac12\,M^{ij}(q)\,p_ip_j + U(q), \qquad M^{ij} = (M^{-1})^{ij}:
+$$
+кинетическая энергия, выраженная через импульсы обратной матрицей масс.
+Функция `hamiltonian(L, coords, t, q, p)` из пакета `gmph.mechanics`
+выполняет этот переход. Частица в центральном поле и заряд в
+электромагнитном поле ([конвенции](/conventions.qmd): $L = \frac{mv^2}{2} + \frac ec\mathbf A\cdot\mathbf v - e\varphi$):
+
+```{python}
+from gmph.mechanics import hamiltonian
+
+t = sp.Symbol("t", real=True)
+k = sp.Symbol("k", positive=True)
+r, phi = sp.Function("r")(t), sp.Function("phi")(t)
+R, PHI, pr, pphi = sp.symbols("r phi p_r p_phi", real=True)
+L_central = m / 2 * (r.diff(t)**2 + r**2 * phi.diff(t)**2) + k / r
+print("центральное поле: H =", hamiltonian(L_central, [r, phi], t, [R, PHI], [pr, pphi]))
+
+e = sp.Symbol("e", real=True)
+xs = [sp.Function(n)(t) for n in ("x", "y", "z")]
+Xs, Ps = sp.symbols("x y z", real=True), sp.symbols("p_x p_y p_z", real=True)
+A = [sp.Function(n)(*xs) for n in ("A_x", "A_y", "A_z")]
+L_charge = (m / 2 * sum(q.diff(t)**2 for q in xs) + e / c * sum(a * q.diff(t) for a, q in zip(A, xs))
+            - e * sp.Function("varphi")(*xs))
+H_charge = hamiltonian(L_charge, xs, t, Xs, Ps)
+to_phase = dict(zip(xs, Xs))
+expected = sum((pc - e / c * a.subs(to_phase))**2 for pc, a in zip(Ps, A)) / (2 * m) + e * sp.Function("varphi")(*Xs)
+print("заряд: H = (p − eA/c)²/2m + eφ:", sp.simplify(H_charge - expected) == 0)
+```
+
+## Уравнения Гамильтона
+
+::: {#thm-hamilton}
+Пусть $L$ невырожден. Кривая $q(t)$ удовлетворяет уравнениям Лагранжа
+тогда и только тогда, когда $(q(t), p(t))$ с $p = \partial L/\partial\dot q$ — интегральная
+кривая гамильтонова поля $X_H$ на $T^*Q$ с формой $\omega = \dd p_i\wedge\dd q^i$:
+$$
+\dot q^i = \pd{H}{p_i}, \qquad \dot p_i = -\pd{H}{q^i} .
+$$
+Кроме того, $\partial H/\partial t = -\partial L/\partial t$.
+:::
+
+*Доказательство.* Дифференциал $H = p\dot q - L$ при $p = \partial L/\partial\dot q$:
+$\dd H = \dot q\,\dd p + p\,\dd\dot q - \partial_qL\,\dd q - \partial_{\dot q}L\,\dd\dot q - \partial_tL\,\dd t
+= \dot q\,\dd p - \partial_qL\,\dd q - \partial_tL\,\dd t$ — слагаемые с $\dd\dot q$ сокращаются
+(в этом смысл выбора $p$). Отсюда $\partial H/\partial p = \dot q$, $\partial H/\partial q = -\partial L/\partial q$, а
+уравнение Лагранжа $\dot p = \partial L/\partial q$ превращается в $\dot p = -\partial H/\partial q$. $\square$
+
+Проверим для сферического маятника: построим $H$, гамильтоново поле
+(функцией `hamiltonian_field` из `gmph.symplectic`) и сравним ускорения,
+которые даёт поле, с ускорениями из уравнений Лагранжа:
+
+```{python}
+from gmph.mechanics import accelerations
+from gmph.symplectic import canonical_omega, hamiltonian_field
+
+grav, l = sp.symbols("g l", positive=True)
+th, ph = sp.Function("theta")(t), sp.Function("phi")(t)
+L_sph = m * l**2 / 2 * (th.diff(t)**2 + sp.sin(th)**2 * ph.diff(t)**2) + m * grav * l * sp.cos(th)
+Q = sp.symbols("theta phi", real=True)
+P = sp.symbols("p_theta p_phi", real=True)
+Zs = (*Q, *P)
+
+H_sph = hamiltonian(L_sph, [th, ph], t, Q, P)
+X_sph = hamiltonian_field(H_sph, Zs, canonical_omega(2))
+print("H =", sp.expand(H_sph))
+print("X_H =", X_sph)
+
+# q̈ из гамильтонова поля: производная q̇ = X^q вдоль X_H
+acc_hamilton = [sum(sp.diff(X_sph[i], zv) * X_sph[j] for j, zv in enumerate(Zs)) for i in range(2)]
+to_phase = {th.diff(t): X_sph[0], ph.diff(t): X_sph[1]}
+acc_lagrange = [a.subs(to_phase).subs({th: Q[0], ph: Q[1]}) for a in accelerations(L_sph, [th, ph], t)]
+print("ускорения совпадают:", [sp.simplify(a - b) == 0 for a, b in zip(acc_hamilton, acc_lagrange)])
+```
+
+Последняя компонента $X_H$ — $\dot p_\varphi = 0$: угол $\varphi$ циклический, и в
+гамильтоновой записи сохранение $p_\varphi$ видно сразу, без вычисления
+ускорений. Уравнения Гамильтона — первого порядка и уже разрешены
+относительно производных; для численного интегрирования это удобнее,
+а симплектические интеграторы (тема «Симплектические интеграторы») используют
+именно эту форму.
+
+## Вариационный принцип в фазовом пространстве
+
+Уравнения Гамильтона тоже следуют из [принципа наименьшего
+действия](/physics/mechanics/least-action.qmd), если варьировать $q(t)$ и $p(t)$
+независимо:
+$$
+S[q, p] = \int\bigl(p_i\dot q^i - H(q, p, t)\bigr)\,\dd t = \int\bigl(\theta - H\,\dd t\bigr).
+$$
+Подынтегральное выражение — 1-форма $\theta - H\,\dd t$ на расширенном фазовом
+пространстве ($\theta = p\,\dd q$ — форма Лиувилля), **форма
+Пуанкаре–Картана**. Уравнения Эйлера–Лагранжа для «лагранжиана»
+$p\dot q - H$ с координатами $(q, p)$:
+
+```{python}
+from gmph.mechanics import euler_lagrange
+
+qf, pf = sp.Function("q")(t), sp.Function("p")(t)
+Hf = sp.Function("H")(qf, pf)
+print(euler_lagrange(pf * qf.diff(t) - Hf, [qf, pf], t))
+```
+
+Первое уравнение — $\dot p + \partial H/\partial q = 0$, второе — $-\dot q + \partial H/\partial p = 0$.
+Этот «лагранжиан» линеен по скоростям и, значит, вырожден, — но
+уравнения получаются правильные, первого порядка.
+
+## Вырожденные лагранжианы
+
+Если $\det\partial^2L/\partial\dot q\partial\dot q = 0$, импульсы не независимы: между ними есть
+соотношения — **связи** (по Дираку). Простейший пример — частица
+нулевой массы в магнитном поле, $L = \frac ec\mathbf A\cdot\mathbf v - e\varphi$: тогда
+$\mathbf p = \frac ec\mathbf A(\mathbf r)$, и импульс — функция координат. Фазовое пространство
+сжимается до подмногообразия, а симплектическая форма на нём — это
+$\frac ec\,\mathcal B$ (сравните с «магнитной» формой из статьи о гамильтоновых
+полях). Так устроено, например, дрейфовое движение ведущего центра в
+сильном поле. Калибровочные теории (электродинамика, теория Янга–Миллса)
+тоже вырождены; их гамильтонова форма — тема 3-го курса.
+
+## Итоги
+
+- Преобразование Лежандра заменяет выпуклую функцию её касательными:
+  $g(p) = pv - f(v)$, $p = f'(v)$; оно обратимо (инволютивно). Та же операция
+  связывает термодинамические потенциалы.
+- Послойная производная $\mathbb FL: TQ \to T^*Q$, $p = \partial L/\partial\dot q$; для невырожденного $L$
+  гамильтониан $H = p\dot q - L$; для натуральной системы $H = \frac12M^{-1}(p, p) + U$.
+- Уравнения Лагранжа на $TQ$ эквивалентны гамильтонову полю на $(T^*Q, \dd p\wedge\dd q)$.
+- Уравнения Гамильтона — уравнения Эйлера–Лагранжа для действия
+  $\int(p\,\dd q - H\,\dd t)$ при независимых вариациях $q$ и $p$.
+- Заряд: $H = (\mathbf p - \frac ec\mathbf A)^2/2m + e\varphi$; свободная релятивистская частица:
+  $H = \sqrt{p^2c^2 + m^2c^4}$.
+
+## Упражнения
+
+1. Найдите преобразование Лежандра функции $f(v) = |v|^a/a$ ($a > 1$) и
+   проверьте, что получается $|p|^b/b$ с $\frac1a + \frac1b = 1$.
+2. Запишите гамильтониан частицы в сферических координатах в потенциале $U(r)$.
+3. Лагранжиан заряда в однородном поле в симметричной калибровке:
+   $L = \frac m2(\dot x^2 + \dot y^2) + \frac{eB}{2c}(x\dot y - y\dot x)$. Найдите $H$.
+4. Найдите скорость $\dot x = \partial H/\partial p$ для $H = \sqrt{p^2c^2 + m^2c^4}$ и выразите
+   её через энергию.
+5. Покажите, что для натуральной системы $H = T + U$, используя теорему Эйлера
+   об однородных функциях.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $p = |v|^{a-1}\operatorname{sign}v$, $|v| = |p|^{1/(a-1)}$;
+   $g = |p|^{a/(a-1)}\bigl(1 - \frac1a\bigr) = |p|^b/b$ с $b = \frac{a}{a-1}$. Например, при
+   $a = 3$: $g = \frac23|p|^{3/2}$.
+2. $H = \dfrac{1}{2m}\left(p_r^2 + \dfrac{p_\theta^2}{r^2} + \dfrac{p_\varphi^2}{r^2\sin^2\theta}\right) + U(r)$.
+3. $p_x = m\dot x - \frac{eB}{2c}y$, $p_y = m\dot y + \frac{eB}{2c}x$;
+   $H = \dfrac{1}{2m}\left[\left(p_x + \dfrac{eBy}{2c}\right)^2 + \left(p_y - \dfrac{eBx}{2c}\right)^2\right]$.
+4. $\dot x = \dfrac{pc^2}{\sqrt{p^2c^2 + m^2c^4}} = \dfrac{pc^2}{E}$; $|\dot x| < c$ при любом $p$.
+5. $T$ — однородная функция степени 2 по $\dot q$, поэтому $\dot q^i\partial T/\partial\dot q^i = 2T$,
+   и $H = p\dot q - L = 2T - (T - U) = T + U$.
+:::

@@ -77,3 +77,23 @@ def first_order_system(L, coords, t, params=None):
         return np.concatenate([np.asarray(y[n:], dtype=float), np.asarray(acc(time, y), dtype=float)])
 
     return rhs
+
+
+def hamiltonian(L, coords, t, q_symbols, p_symbols):
+    """Преобразование Лежандра: H(q, p, t) = pᵢq̇ⁱ − L, где q̇ выражены из pᵢ = ∂L/∂q̇ⁱ.
+
+    ``q_symbols``, ``p_symbols`` — символы координат и импульсов фазового
+    пространства, через которые записывается ответ. Лагранжиан должен быть
+    невырожденным (det ∂²L/∂q̇∂q̇ ≠ 0), иначе скорости не выражаются через импульсы.
+    """
+    n = len(coords)
+    vs = sp.symbols(f"v0:{n}")
+    to_symbols = dict(zip([q.diff(t) for q in coords], vs))
+    L_qv = L.subs(to_symbols).subs(dict(zip(coords, q_symbols)))
+    equations = [sp.Eq(p, sp.diff(L_qv, v)) for p, v in zip(p_symbols, vs)]
+    solutions = sp.solve(equations, vs, dict=True)
+    if not solutions:
+        raise ValueError("скорости не выражаются через импульсы: лагранжиан вырожден")
+    velocity = solutions[0]
+    H = sum(p * v for p, v in zip(p_symbols, vs)) - L_qv
+    return sp.simplify(H.subs(velocity))
