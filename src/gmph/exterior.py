@@ -78,6 +78,18 @@ def pullback(form, old_coords, images, new_coords):
     return add(*[scale(sp.sympify(c).subs(subs), wedge(*[dx[i - 1] for i in I])) for I, c in form.items()])
 
 
+def integrate_form(form, coords, images, params, bounds):
+    """Интеграл k-формы по параметризованной поверхности: ∫_Σ ω = ∫_D φ*ω.
+
+    ``images`` — φ(u) через параметры ``params`` (их порядок задаёт
+    ориентацию), ``bounds`` — пределы для ``sympy.integrate``:
+    [(u¹, a, b), …], внутренний интеграл первым.
+    """
+    pulled = pullback(form, coords, images, params)
+    top = tuple(range(1, len(params) + 1))
+    return sp.simplify(sp.integrate(pulled.get(top, 0), *bounds))
+
+
 def poincare_potential(form, coords):
     """Гомотопический оператор Пуанкаре для звёздной области с центром в нуле.
 

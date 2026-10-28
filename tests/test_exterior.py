@@ -112,3 +112,15 @@ def test_poincare_potential():
     total = add(d(poincare_potential(omega, xs), xs), poincare_potential(d(omega, xs), xs))
     assert add(total, scale(-1, omega)) == {}
     assert poincare_potential({(): 5}, xs) == {}
+
+
+def test_integrate_form_orientation():
+    from gmph.exterior import integrate_form
+    x, y, t = sp.symbols("x y t", real=True)
+    rotation = {(1,): -y, (2,): x}
+    forward = integrate_form(rotation, (x, y), (sp.cos(t), sp.sin(t)), (t,), [(t, 0, 2 * sp.pi)])
+    backward = integrate_form(rotation, (x, y), (sp.cos(t), -sp.sin(t)), (t,), [(t, 0, 2 * sp.pi)])
+    assert forward == 2 * sp.pi and backward == -2 * sp.pi
+    u, v = sp.symbols("u v", real=True)
+    assert integrate_form({(1, 2): 1}, (x, y), (u, v), (u, v), [(u, 0, 2), (v, 0, 3)]) == 6
+    assert integrate_form({(1, 2): 1}, (x, y), (u, v), (v, u), [(v, 0, 3), (u, 0, 2)]) == -6

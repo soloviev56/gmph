@@ -1,0 +1,336 @@
+---
+title: "Обобщённая теорема Стокса"
+topic: stokes
+order: 11
+description: "Теорема ∫∂Ω ω = ∫Ω dω; ориентация края по правилу «внешняя нормаль первой»; формулы Ньютона–Лейбница, Грина, Стокса и Гаусса–Остроградского как частные случаи; доказательство для куба; цепи и ∂² = 0 как двойственность к d² = 0; площадь через контурный интеграл; теорема Гаусса для кулоновского поля; закон Фарадея в интегральной форме"
+---
+
+В курсе анализа четыре теоремы выглядят разными: формула
+Ньютона–Лейбница, формула Грина на плоскости, теорема Стокса о циркуляции и
+теорема Гаусса–Остроградского о потоке. Каждая говорит, что интеграл
+«производной» по области равен интегралу по её границе. На языке форм это
+одна теорема:
+$$
+\int_{\partial\Omega}\omega = \int_\Omega\dd\omega .
+$$
+Слева $\omega$ — $(k-1)$-форма на крае $\partial\Omega$, справа её [внешний
+дифференциал](/math/forms/exterior-derivative.qmd) на $k$-мерной области
+$\Omega$. Из неё же следуют интегральные законы физики: теорема Гаусса в
+электростатике, закон Фарадея, законы сохранения.
+
+Нужны [интегрирование форм](/math/forms/integration.qmd) и [внешний
+дифференциал](/math/forms/exterior-derivative.qmd).
+
+## Край и его ориентация
+
+Область $\Omega$ в $k$-мерном многообразии с гладкой (или кусочно-гладкой)
+границей — это **многообразие с краем**: вблизи края оно выглядит как
+полупространство $u^1 \le 0$, и край задаётся уравнением $u^1 = 0$. Край —
+многообразие размерности $k-1$ без собственного края.
+
+::: {#def-boundary-orientation}
+**Индуцированная ориентация края.** Базис $(e_2, \dots, e_k)$ касательного
+пространства края положителен, если базис $(n, e_2, \dots, e_k)$ положителен
+в $\Omega$, где $n$ — вектор, направленный **наружу** из $\Omega$
+(«внешняя нормаль первой»).
+:::
+
+Для плоской области это значит: обходим границу так, чтобы область
+оставалась слева. Внешняя граница кольца обходится против часовой стрелки,
+внутренняя — по часовой. Для области в $\R^3$ край ориентирован внешней
+нормалью. Для отрезка $[a, b] \subset \R$ край — две точки, и наружу из $b$
+смотрит $+\partial_x$, из $a$ — $-\partial_x$: точка $b$ входит со знаком «+», $a$ —
+со знаком «−».
+
+```{python}
+#| label: fig-annulus
+#| fig-cap: "Индуцированная ориентация края кольца 1 ≤ r ≤ 2: область остаётся слева от направления обхода. Серые стрелки — внешние нормали."
+import numpy as np
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots(figsize=(4.6, 4.6))
+s = np.linspace(0, 2 * np.pi, 400)
+ax.fill(np.r_[2 * np.cos(s), np.cos(s[::-1])], np.r_[2 * np.sin(s), np.sin(s[::-1])],
+        color="tab:blue", alpha=0.18, lw=0)
+for R, direction, color in [(2, 1, "tab:blue"), (1, -1, "tab:red")]:
+    ax.plot(R * np.cos(s), R * np.sin(s), color=color, lw=1.8)
+    for a in np.linspace(0, 2 * np.pi, 6, endpoint=False) + 0.3:
+        p = R * np.array([np.cos(a), np.sin(a)])
+        tangent = direction * np.array([-np.sin(a), np.cos(a)])
+        ax.annotate("", p + 0.25 * tangent, p - 0.05 * tangent,
+                    arrowprops=dict(arrowstyle="-|>", color=color, lw=1.6))
+        normal = np.array([np.cos(a), np.sin(a)]) * (1 if R == 2 else -1)
+        ax.annotate("", p + 0.35 * normal, p, arrowprops=dict(arrowstyle="->", color="0.5"))
+ax.text(0, 1.45, "Ω", ha="center", fontsize=14)
+ax.text(2.5, -2.45, "внешний край", color="tab:blue", ha="right")
+ax.text(0, 0, "внутренний\nкрай", color="tab:red", fontsize=9, ha="center", va="center")
+ax.set_aspect("equal")
+ax.set_xlim(-2.6, 2.6)
+ax.set_ylim(-2.6, 2.6)
+ax.set_xlabel("x")
+ax.set_ylabel("y")
+plt.show()
+```
+
+## Теорема
+
+::: {#thm-stokes}
+**Обобщённая теорема Стокса.** Пусть $\Omega$ — компактное ориентированное
+$k$-мерное многообразие с краем $\partial\Omega$ (с индуцированной
+ориентацией), $\omega$ — гладкая $(k-1)$-форма на $\Omega$. Тогда
+$$
+\int_{\partial\Omega}\omega = \int_\Omega\dd\omega .
+$$
+:::
+
+Частные случаи (в $\R^3$ с евклидовой метрикой, словарь — в статье
+[«Векторный анализ на языке форм»](/math/forms/vector-calculus-forms.qmd)):
+
+| $k$ | $\omega$ | $\dd\omega$ | формула |
+|---|---|---|---|
+| 1 | $f$ | $f'\,\dd x$ | Ньютона–Лейбница: $f(b) - f(a) = \int_a^b f'\,\dd x$ |
+| 2 | $P\,\dd x + Q\,\dd y$ | $(Q_x - P_y)\,\dd x\wedge\dd y$ | Грина |
+| 2 | $\mathbf A\cdot\dd\mathbf r$ | $\operatorname{rot}\mathbf A\cdot\dd\mathbf S$ | Стокса: $\oint\mathbf A\cdot\dd\mathbf r = \int\operatorname{rot}\mathbf A\cdot\dd\mathbf S$ |
+| 3 | $\mathbf B\cdot\dd\mathbf S$ | $\operatorname{div}\mathbf B\;\dd V$ | Гаусса–Остроградского |
+
+Проверим формулу Грина на единичном круге и формулу Стокса на верхней
+полусфере, край которой — экватор, пройденный против часовой стрелки
+(если смотреть сверху). Интегралы считает функция `integrate_form` из
+`gmph.exterior`: она переносит форму на область параметров и
+интегрирует, как в [предыдущей статье](/math/forms/integration.qmd).
+
+```{python}
+import sympy as sp
+from gmph.exterior import d, integrate_form, show
+
+x, y, z = X = sp.symbols("x y z", real=True)
+t = sp.Symbol("t", real=True)
+r, th, ph = sp.symbols("r theta phi", positive=True)
+
+omega = {(1,): x**2 * y - y**3, (2,): x * y**2 + x**3}
+circle = (sp.cos(t), sp.sin(t))
+disk = (r * sp.cos(ph), r * sp.sin(ph))                      # (r, φ) — положительная ориентация
+print("Грин: ∮ω =", integrate_form(omega, (x, y), circle, (t,), [(t, 0, 2 * sp.pi)]),
+      "  ∫dω =", integrate_form(d(omega, (x, y)), (x, y), disk, (r, ph), [(r, 0, 1), (ph, 0, 2 * sp.pi)]))
+
+A = {(1,): x * z, (2,): x + y**2, (3,): x * y * z}
+equator = (sp.cos(t), sp.sin(t), sp.Integer(0))
+hemisphere = (sp.sin(th) * sp.cos(ph), sp.sin(th) * sp.sin(ph), sp.cos(th))   # (θ, φ) — внешняя нормаль
+print("Стокс: ∮A·dr =", integrate_form(A, X, equator, (t,), [(t, 0, 2 * sp.pi)]),
+      "  ∫rot A·dS =", integrate_form(d(A, X), X, hemisphere, (th, ph), [(th, 0, sp.pi / 2), (ph, 0, 2 * sp.pi)]))
+```
+
+Ориентации согласованы. Параметризация $(\theta, \varphi)$ задаёт внешнюю
+нормаль $N$ сферы. В точке экватора $(1, 0, 0)$ вектор, выходящий из
+полусферы вдоль неё, — $n = -\mathbf e_z$, и тройка $(N, n, \mathbf e_y) = (\mathbf e_x, -\mathbf e_z, \mathbf e_y)$
+положительна. Значит, край обходится в направлении $\mathbf e_y$, то есть против
+часовой стрелки, — это привычное правило буравчика.
+
+## Доказательство для куба
+
+Теорему достаточно доказать для куба $I^k = [0, 1]^k$: всякую компактную
+область можно разрезать на (криволинейные) кубики, а интегралы по общим
+граням соседних кубиков сокращаются — они входят с противоположными
+ориентациями. Для куба всё сводится к формуле Ньютона–Лейбница. Возьмём
+слагаемое $\omega = f\,\dd x^2\wedge\dots\wedge\dd x^k$ (без $\dd x^1$). Тогда
+$\dd\omega = \partial_1 f\,\dd x^1\wedge\dots\wedge\dd x^k$ и
+$$
+\int_{I^k}\dd\omega = \int\!\Bigl[f\big|_{x^1=1} - f\big|_{x^1=0}\Bigr]\dd x^2\cdots\dd x^k .
+$$
+Справа — интегралы $\omega$ по двум граням $x^1 = 1$ и $x^1 = 0$ со знаками
+$+$ и $-$. На остальных гранях одна из $x^2, \dots, x^k$ постоянна, и $\omega$
+на них обращается в нуль.
+
+Знаки граней дают общее правило: грань $x^i = \varepsilon$ ($\varepsilon = 0, 1$)
+входит в край со знаком $(-1)^{i+\varepsilon}$, если параметризовать её
+оставшимися координатами в прежнем порядке. Запишем куб и его грани как
+**цепи** — формальные суммы граней с целыми коэффициентами. Грань кодируем
+кортежем: `'*'` на месте свободной координаты, 0 или 1 — на месте
+фиксированной.
+
+```{python}
+def boundary(chain):
+    """Край цепи: каждая грань с j-й свободной координатой = ε входит со знаком (−1)^(j+ε)."""
+    result = {}
+    for face, c in chain.items():
+        free = [i for i, s in enumerate(face) if s == "*"]
+        for j, i in enumerate(free, 1):
+            for eps in (0, 1):
+                f = face[:i] + (eps,) + face[i + 1:]
+                result[f] = result.get(f, 0) + c * (-1) ** (j + eps)
+    return {f: c for f, c in result.items() if c}
+
+cube = {("*", "*", "*"): 1}
+print("∂I³ =", boundary(cube))
+```
+
+Грань $x = 1$ входит с «+»: её параметры $(y, z)$, и $(\partial_x, \partial_y, \partial_z)$ —
+положительный базис с внешней нормалью $\partial_x$ первой. Грань $y = 1$
+входит с «−»: базис $(\partial_y, \partial_x, \partial_z)$ отрицателен. Теперь
+проверим теорему на кубе для 2-формы общего вида (с многочленными
+коэффициентами):
+
+```{python}
+s = sp.symbols("s1:4", real=True)
+
+def face_integral(form, face):
+    """∫ формы по грани, параметризованной свободными координатами по порядку."""
+    free = [i for i, c in enumerate(face) if c == "*"]
+    params = s[:len(free)]
+    images, k = [], 0
+    for c in face:
+        if c == "*":
+            images.append(params[k])
+            k += 1
+        else:
+            images.append(sp.Integer(c))
+    return integrate_form(form, X, tuple(images), params, [(p, 0, 1) for p in params])
+
+w = {(2, 3): x**2 * y, (1, 3): y * z**3, (1, 2): x * y * z}
+print("∫ по ∂I³ =", sum(c * face_integral(w, f) for f, c in boundary(cube).items()),
+      "  ∫ dω по I³ =", face_integral(d(w, X), ("*", "*", "*")))
+```
+
+## Двойственность: ∂² = 0 и d² = 0
+
+Край края пуст: у поверхности куба нет края, у замкнутой кривой нет
+концевых точек. Для цепей это видно непосредственно — каждое ребро куба
+входит в края двух соседних граней с противоположными знаками:
+
+```{python}
+print("∂∂I³ =", boundary(boundary(cube)))
+print("∂∂I⁴ =", boundary(boundary({("*",) * 4: 1})))
+```
+
+Теорема Стокса делает $\partial$ и $\dd$ **сопряжёнными**: если записать
+интеграл как спаривание $\langle\Omega, \omega\rangle = \int_\Omega\omega$, то
+$\langle\partial\Omega, \omega\rangle = \langle\Omega, \dd\omega\rangle$. Тогда
+$$
+\int_\Omega\dd\dd\omega = \int_{\partial\Omega}\dd\omega = \int_{\partial\partial\Omega}\omega = 0
+$$
+для любой области: $\partial^2 = 0$ и $\dd^2 = 0$ — одно и то же утверждение,
+увиденное с двух сторон. Эта двойственность — основа когомологий де Рама
+(3-й курс) и дискретного внешнего исчисления, где $\dd$ на сетке
+определяется как транспонированная матрица оператора $\partial$.
+
+Важное следствие: **интеграл точной формы по замкнутой поверхности
+(без края) равен нулю**, $\int_{S}\dd\alpha = \int_{\partial S}\alpha = 0$.
+Поэтому кулоновская 2-форма с потоком $4\pi$ через сферу не точна в
+$\R^3\setminus\{0\}$ (упражнение 4), а 1-форма $\dd\varphi$ с циркуляцией $2\pi$
+не точна на проколотой плоскости ([замкнутые и точные
+формы](/math/forms/closed-exact.qmd)).
+
+## Кольцо и вихрь
+
+Для кольца $1 \le r \le 2$ край — две окружности с противоположными
+ориентациями (рисунок @fig-annulus). Для замкнутой формы
+$\dd\varphi = (x\,\dd y - y\,\dd x)/(x^2 + y^2)$ справа нуль, значит,
+циркуляции по внешней и внутренней окружностям (обе против часовой
+стрелки) совпадают:
+
+```{python}
+vortex = {(1,): -y / (x**2 + y**2), (2,): x / (x**2 + y**2)}
+for R in (1, 2):
+    print(f"∮dφ по окружности r = {R}:", integrate_form(vortex, (x, y), (R * sp.cos(t), R * sp.sin(t)), (t,), [(t, 0, 2 * sp.pi)]))
+```
+
+Циркуляция замкнутой формы зависит не от контура, а только от того,
+сколько раз он обходит особую точку.
+
+## Площадь как контурный интеграл
+
+Для $\omega = \tfrac12(x\,\dd y - y\,\dd x)$ имеем $\dd\omega = \dd x\wedge\dd y$,
+и формула Грина даёт площадь области через интеграл по её границе:
+$$
+S = \frac12\oint_{\partial\Omega}(x\,\dd y - y\,\dd x).
+$$
+На этом работает **планиметр** — прибор, измеряющий площадь фигуры при
+обводе её контура. Площадь кардиоиды $r = 1 + \cos\varphi$:
+
+```{python}
+area_form = {(1,): -y / 2, (2,): x / 2}
+cardioid = ((1 + sp.cos(t)) * sp.cos(t), (1 + sp.cos(t)) * sp.sin(t))
+print("площадь кардиоиды =", integrate_form(area_form, (x, y), cardioid, (t,), [(t, 0, 2 * sp.pi)]))
+```
+
+## Физика: интегральные законы
+
+**Теорема Гаусса.** Кулоновская 2-форма
+$\Phi = q\,(x\,\dd y\wedge\dd z + y\,\dd z\wedge\dd x + z\,\dd x\wedge\dd y)/r^3$ замкнута
+при $r \ne 0$. Пусть замкнутая поверхность $S$ окружает заряд. Область
+между $S$ и маленькой сферой $S_\varepsilon$ имеет край $S - S_\varepsilon$, и по
+теореме Стокса $\int_S\Phi = \int_{S_\varepsilon}\Phi = 4\pi q$ — для любой
+поверхности. Проверим численно для эллипсоида с полуосями 1, 2 и 0,5:
+
+```{python}
+from scipy.integrate import dblquad
+
+semi = np.array([1.0, 2.0, 0.5])
+
+def flux_density(phi_, theta_):
+    """Подынтегральное выражение r·(φ_θ × φ_φ)/r³ для параметризации эллипсоида."""
+    p = semi * np.array([np.sin(theta_) * np.cos(phi_), np.sin(theta_) * np.sin(phi_), np.cos(theta_)])
+    p_th = semi * np.array([np.cos(theta_) * np.cos(phi_), np.cos(theta_) * np.sin(phi_), -np.sin(theta_)])
+    p_ph = semi * np.array([-np.sin(theta_) * np.sin(phi_), np.sin(theta_) * np.cos(phi_), 0.0])
+    return p @ np.cross(p_th, p_ph) / np.linalg.norm(p) ** 3
+
+flux, _ = dblquad(flux_density, 0, np.pi, 0, 2 * np.pi)
+print(f"поток через эллипсоид / (4π q) = {flux / (4 * np.pi):.12f}")
+```
+
+**Законы сохранения.** Если плотность заряда и ток удовлетворяют
+уравнению непрерывности $\partial_t\rho + \operatorname{div}\mathbf j = 0$, то заряд в
+неподвижном объёме $V$ меняется только за счёт потока через границу:
+$$
+\frac{\dd}{\dd t}\int_V\rho\,\dd V = -\int_V\operatorname{div}\mathbf j\,\dd V = -\oint_{\partial V}\mathbf j\cdot\dd\mathbf S .
+$$
+Так же из любого дифференциального закона сохранения получается
+интегральный.
+
+**Закон Фарадея.** Уравнение $\operatorname{rot}\mathbf E = -\frac1c\partial_t\mathbf B$
+(часть $\dd F = 0$) после интегрирования по неподвижной поверхности $S$ и
+теоремы Стокса даёт
+$$
+\oint_{\partial S}\mathbf E\cdot\dd\mathbf r = -\frac1c\,\frac{\dd}{\dd t}\int_S\mathbf B\cdot\dd\mathbf S :
+$$
+ЭДС в контуре равна скорости изменения магнитного потока через него
+(упражнение 5). Знак «минус» — правило Ленца, а согласование ориентаций
+контура и поверхности — то самое «внешняя нормаль первой».
+
+## Итоги
+
+- $\int_{\partial\Omega}\omega = \int_\Omega\dd\omega$ объединяет формулы
+  Ньютона–Лейбница, Грина, Стокса и Гаусса–Остроградского.
+- Край ориентирован по правилу «внешняя нормаль первой»; грань куба
+  $x^i = \varepsilon$ входит со знаком $(-1)^{i+\varepsilon}$.
+- Доказательство сводится к кубу, а для куба — к формуле
+  Ньютона–Лейбница по одной переменной.
+- $\partial^2 = 0$ и $\dd^2 = 0$ двойственны; интеграл точной формы по
+  замкнутой поверхности равен нулю.
+- Интегральные законы физики (Гаусс, Фарадей, сохранение заряда) —
+  дифференциальные законы плюс теорема Стокса.
+
+## Упражнения
+
+1. Найдите площадь, ограниченную астроидой $x = \cos^3 t$, $y = \sin^3 t$.
+2. Проверьте теорему Стокса для $\omega = x\,\dd y\wedge\dd z$ и единичного шара.
+3. Вычислите циркуляцию $\omega = -y^3\,\dd x + x^3\,\dd y$ по единичной окружности
+   через формулу Грина.
+4. Докажите, что кулоновская 2-форма $\Phi$ не точна в $\R^3\setminus\{0\}$, хотя
+   $\dd\Phi = 0$.
+5. Однородное поле $B_z(t) = B_0 t/\tau$ направлено вдоль оси $z$ внутри
+   длинного соленоида. Найдите вихревое электрическое поле $E_\varphi$ на
+   окружности радиуса $a$ (внутри соленоида) с центром на оси.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $S = \frac12\oint(x\,\dd y - y\,\dd x) = \frac{3\pi}{8}$.
+2. $\dd\omega = \dd x\wedge\dd y\wedge\dd z$, $\int_{\text{шар}}\dd\omega = \frac{4\pi}{3}$; на сфере
+   в параметризации $(\theta, \varphi)$ $\oint x\,\dd y\wedge\dd z = \frac{4\pi}{3}$.
+3. $\dd\omega = 3(x^2 + y^2)\,\dd x\wedge\dd y$, $\int_{\text{круг}} 3r^2\cdot r\,\dd r\,\dd\varphi = \frac{3\pi}{2}$.
+4. Если бы $\Phi = \dd\alpha$, то по теореме Стокса $\int_{S^2}\Phi = \int_{\partial S^2}\alpha = 0$,
+   так как у сферы нет края. Но $\int_{S^2}\Phi = 4\pi q \ne 0$.
+5. $2\pi a E_\varphi = -\frac1c\,\pi a^2\,\frac{B_0}{\tau}$, то есть
+   $E_\varphi = -\dfrac{aB_0}{2c\tau}$ (контур обходится против часовой стрелки,
+   если смотреть с конца оси $z$).
+:::
