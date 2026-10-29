@@ -97,3 +97,18 @@ def hamiltonian(L, coords, t, q_symbols, p_symbols):
     velocity = solutions[0]
     H = sum(p * v for p, v in zip(p_symbols, vs)) - L_qv
     return sp.simplify(H.subs(velocity))
+
+
+def lifted_derivative(L, xi, coords, t):
+    """Производная L вдоль касательного подъёма поля X = ξⁱ∂ᵢ на TQ.
+
+    Подъём X^c = ξⁱ ∂/∂qⁱ + (dξⁱ/dt) ∂/∂q̇ⁱ — генератор преобразований
+    q → q + sξ вместе с вызванным ими изменением скоростей. ``xi`` — список
+    компонент ξⁱ(q, t) в тех же функциях ``coords``.
+    """
+    return sum(c * L.diff(q) + sp.diff(c, t) * L.diff(q.diff(t)) for c, q in zip(xi, coords))
+
+
+def noether_charge(L, xi, coords, t, F=0):
+    """Нётеровский заряд I = pᵢξⁱ − F для симметрии X^c L = dF/dt."""
+    return sum(p * c for p, c in zip(momenta(L, coords, t), xi)) - F

@@ -1,0 +1,308 @@
+---
+title: "Теорема Нётер"
+topic: noether
+order: 5
+description: "Симметрия лагранжиана как поле на конфигурационном пространстве и его касательный подъём; теорема Нётер I = p_i ξ^i − F и её доказательство одним тождеством; импульс, момент, энергия; квазисимметрии: галилеевы бусты и центр масс, заряд в магнитном поле и центр ларморовской окружности; автоматический поиск симметрий и интегралов в SymPy; численная проверка в аксиально-симметричном поле; заряд как гамильтониан симметрии"
+---
+
+В статье [о законах Ньютона](/physics/mechanics/newton-mechanics.qmd) сохранение
+импульса, момента и энергии выводилось тремя разными выкладками. В
+[уравнениях Лагранжа](/physics/mechanics/lagrange-equations.qmd) появилось общее
+правило: импульс, сопряжённый циклической координате, сохраняется. Но
+циклическая координата есть не всегда: в декартовых координатах у
+частицы в центральном поле нет ни одной. Эмми Нётер (1918) сформулировала
+правило без координат: **каждой непрерывной симметрии лагранжиана
+соответствует сохраняющаяся величина**, и указала формулу для неё.
+
+Нужны [уравнения Лагранжа](/physics/mechanics/lagrange-equations.qmd) и [действия
+групп](/math/lie/group-actions.qmd).
+
+## Симметрия лагранжиана
+
+Пусть однопараметрическая группа преобразований $\varphi_s$ конфигурационного
+пространства $Q$ порождена векторным полем $X = \xi^i(q)\,\partial_i$ (фундаментальным
+полем [действия группы](/math/lie/group-actions.qmd)). Сдвиг точек тянет за собой
+скорости: кривая $q(t)$ переходит в $\varphi_s(q(t))$, и её скорость меняется на
+$s\,\dot\xi^i$, где $\dot\xi^i = \pd{\xi^i}{q^j}\dot q^j$.
+
+::: {#def-tangent-lift}
+**Касательный подъём** поля $X = \xi^i\partial_i$ — поле на $TQ$
+$$
+X^c = \xi^i\pd{}{q^i} + \dot\xi^i\pd{}{\dot q^i} .
+$$
+Преобразование — **симметрия** лагранжиана, если $X^cL = 0$, и
+**квазисимметрия**, если $X^cL = \frac{\dd F}{\dd t}$ для некоторой функции $F(q, t)$: тогда
+лагранжиан меняется на полную производную, и уравнения движения не
+меняются.
+:::
+
+::: {#thm-noether}
+**Теорема Нётер.** Если $X^cL = \dot F$, то на решениях уравнений Лагранжа
+сохраняется
+$$
+I = p_i\,\xi^i - F, \qquad p_i = \pd{L}{\dot q^i} .
+$$
+:::
+
+Геометрически $I$ — значение импульса-ковектора $p$ на векторе симметрии $X$.
+Доказательство — одно тождество, верное для любой кривой:
+$$
+\frac{\dd}{\dd t}(p_i\xi^i) = \dot p_i\,\xi^i + p_i\dot\xi^i
+= \xi^i\left(\frac{\dd}{\dd t}\pd{L}{\dot q^i} - \pd{L}{q^i}\right) + X^cL .
+$$
+На решениях скобка равна нулю, и $\dot I = X^cL - \dot F = 0$. Функции
+`lifted_derivative` и `noether_charge` из `gmph.mechanics` вычисляют $X^cL$ и $I$;
+проверим тождество для произвольных $L$ и $\xi$:
+
+```{python}
+import sympy as sp
+from gmph.mechanics import euler_lagrange, lifted_derivative, momenta, noether_charge
+
+t = sp.Symbol("t", real=True)
+m = sp.Symbol("m", positive=True)
+x, y = sp.Function("x")(t), sp.Function("y")(t)
+
+L_any = sp.Function("L")(x, y, x.diff(t), y.diff(t))
+xi_any = [sp.Function("a")(x, y), sp.Function("b")(x, y)]
+lhs = noether_charge(L_any, xi_any, [x, y], t).diff(t)
+rhs = (sum(c * e for c, e in zip(xi_any, euler_lagrange(L_any, [x, y], t)))
+       + lifted_derivative(L_any, xi_any, [x, y], t))
+print("dI/dt = ξ·(уравнения Лагранжа) + X^c L:", sp.simplify(lhs - rhs) == 0)
+```
+
+Если $X = \partial_1$ — сдвиг по координате $q^1$, то $X^c = \partial/\partial q^1$, условие
+симметрии означает, что $q^1$ циклическая, и $I = p_1$. Теорема Нётер — это
+утверждение о циклической координате, записанное без выбора координат:
+по теореме о выпрямлении поля из статьи [о потоках](/math/forms/flows.qmd) вблизи
+точки, где $X\neq 0$, всегда есть координаты с $X = \partial_1$.
+
+## Импульс, момент, энергия
+
+**Момент импульса.** Частица в центральном поле на плоскости в декартовых
+координатах: циклической координаты нет, но поворот
+$X = -y\,\partial_x + x\,\partial_y$ — симметрия:
+
+```{python}
+V = sp.Function("V")
+L = m / 2 * (x.diff(t)**2 + y.diff(t)**2) - V(sp.sqrt(x**2 + y**2))
+rotation = [-y, x]
+print("X^c L =", sp.simplify(lifted_derivative(L, rotation, [x, y], t)))
+print("I =", sp.expand(noether_charge(L, rotation, [x, y], t)))
+print("сдвиг вдоль x — симметрия?", sp.simplify(lifted_derivative(L, [1, 0], [x, y], t)) == 0)
+```
+
+Заряд поворота — $L_z = m(x\dot y - y\dot x)$. Сдвиг вдоль $x$ симметрией не
+является, и $p_x$ не сохраняется: центр притягивает.
+
+**Энергия.** Сдвиг по времени не двигает точки $Q$, поэтому в схему выше
+он не укладывается напрямую (нужно расширить $Q$ до $Q\times\R_t$). Ответ тот же:
+для функции энергии $E = \dot q^ip_i - L$ (функция `energy`) выполняется
+тождество
+$$
+\dot E = -\pd{L}{t} + \dot q^i\left(\frac{\dd}{\dd t}\pd{L}{\dot q^i} - \pd{L}{q^i}\right),
+$$
+так что на решениях $\dot E = -\partial L/\partial t$. Если $L$ не зависит от $t$ явно, энергия
+сохраняется. Проверим тождество для произвольной функции $L(q, \dot q, t)$
+(частная производная по $t$ берётся при фиксированных $q, \dot q$, поэтому $L$
+сначала задаём на символах, а потом подставляем кривую):
+
+```{python}
+from gmph.mechanics import energy
+
+qs, vs, tau = sp.symbols("q1 q2"), sp.symbols("v1 v2"), sp.Symbol("tau")
+L_sym = sp.Function("L")(*qs, *vs, tau)
+on_curve = {qs[0]: x, qs[1]: y, vs[0]: x.diff(t), vs[1]: y.diff(t), tau: t}
+L_t = L_sym.subs(on_curve)
+dL_dt_partial = L_sym.diff(tau).subs(on_curve)
+EL = euler_lagrange(L_t, [x, y], t)
+identity = energy(L_t, [x, y], t).diff(t) + dL_dt_partial - sum(q.diff(t) * e for q, e in zip((x, y), EL))
+print("dE/dt = −∂L/∂t + q̇ⁱ·(уравнения Лагранжа):", sp.simplify(identity) == 0)
+```
+
+## Квазисимметрии
+
+**Галилеевы бусты.** Переход в систему, движущуюся со скоростью $s$, сдвигает
+каждую частицу на $s\,t$: $\xi_a = t$ для всех частиц. Кинетическая энергия
+меняется — но на полную производную. Возьмём две частицы на прямой с
+взаимодействием $U(x_1 - x_2)$:
+
+```{python}
+m1, m2 = sp.symbols("m1 m2", positive=True)
+x1, x2 = sp.Function("x1")(t), sp.Function("x2")(t)
+U = sp.Function("U")
+L2 = m1 * x1.diff(t)**2 / 2 + m2 * x2.diff(t)**2 / 2 - U(x1 - x2)
+
+boost = [t, t]
+change = lifted_derivative(L2, boost, [x1, x2], t)
+F = m1 * x1 + m2 * x2
+print("X^c L =", sp.simplify(change), "= dF/dt при F = m₁x₁ + m₂x₂:", sp.simplify(change - F.diff(t)) == 0)
+G = noether_charge(L2, boost, [x1, x2], t, F)
+print("I =", sp.collect(sp.expand(G), t))
+```
+
+Сохраняется $I = Pt - MX$, где $P$ — полный импульс, $M = m_1 + m_2$, $X$ — центр масс:
+$X(t) = X(0) + Pt/M$. **Центр масс движется равномерно** — это нётеровский
+заряд галилеевой инвариантности. В трёхмерном пространстве таких зарядов
+три, и вместе с энергией, импульсом и моментом получается десять
+интегралов — по числу параметров группы Галилея.
+
+**Заряд в магнитном поле.** Лагранжиан частицы в однородном поле
+$\mathbf B = B\,\mathbf e_z$ в симметричной калибровке $\mathbf A = \frac B2(-y, x, 0)$:
+$L = \frac m2(\dot x^2 + \dot y^2) + \frac ec\mathbf A\cdot\dot{\mathbf r}$. Сдвиг вдоль $x$ меняет
+$\mathbf A$ на градиент — это квазисимметрия:
+
+```{python}
+e, c, B = sp.symbols("e c B", positive=True)
+A = sp.Matrix([-B * y / 2, B * x / 2])
+v = sp.Matrix([x.diff(t), y.diff(t)])
+Lm = m / 2 * v.dot(v) + e / c * A.dot(v)
+
+shift_x = [1, 0]
+change = lifted_derivative(Lm, shift_x, [x, y], t)
+Fx = e * B * y / (2 * c)
+print("X^c L =", change, "= dF/dt:", sp.simplify(change - Fx.diff(t)) == 0)
+Ix = noether_charge(Lm, shift_x, [x, y], t, Fx)
+print("I_x =", sp.simplify(Ix))
+Iy = noether_charge(Lm, [0, 1], [x, y], t, -e * B * x / (2 * c))
+print("I_y =", sp.simplify(Iy))
+```
+
+Величины $I_x = m\dot x - \frac{eB}{c}y$ и $I_y = m\dot y + \frac{eB}{c}x$ сохраняются, хотя
+частица всё время поворачивает. Их смысл — координаты **центра
+ларморовской окружности**: $X_c = cI_y/eB$, $Y_c = -cI_x/eB$. Сдвиги
+однородного поля — симметрия, и центр орбиты — их интеграл. Заметьте,
+что *обобщённый* импульс $p_x = m\dot x - \frac{eB}{2c}y$ здесь не сохраняется:
+калибровка $\mathbf A$ не инвариантна относительно сдвига.
+
+## Поиск симметрий в SymPy
+
+Условие $X^cL = 0$ линейно по $\xi$. Если искать $\xi$ среди аффинных полей
+$\xi = Aq + b$, оно превращается в систему линейных уравнений на
+коэффициенты: $X^cL$ — многочлен от $q$ и $\dot q$, и все его коэффициенты должны
+обратиться в ноль. Найдём все такие симметрии частицы в аксиально-симметричном
+поле $V = \frac14(x^2 + y^2)^2$:
+
+```{python}
+X3 = [sp.Function(n)(t) for n in "xyz"]
+L3 = sum(q.diff(t)**2 for q in X3) / 2 - (X3[0]**2 + X3[1]**2)**2 / 4
+
+def affine_symmetries(L, coords):
+    """Все поля ξ = Aq + b с X^c L = 0 (A, b — постоянные)."""
+    n = len(coords)
+    A, b = sp.Matrix(n, n, sp.symbols(f"a0:{n * n}")), sp.Matrix(sp.symbols(f"b0:{n}"))
+    xi = A * sp.Matrix(coords) + b
+    qs, vs = sp.symbols(f"q0:{n}"), sp.symbols(f"v0:{n}")
+    expr = sp.expand(lifted_derivative(L, list(xi), coords, t))
+    expr = expr.subs({q.diff(t): s for q, s in zip(coords, vs)}).subs(dict(zip(coords, qs)))
+    solution = sp.solve(sp.Poly(expr, *qs, *vs).coeffs(), [*A, *b], dict=True)[0]
+    free = sorted(xi.subs(solution).free_symbols - set(coords) - {t}, key=str)
+    return [list(xi.subs(solution).subs({f: int(f == g) for f in free})) for g in free]
+
+for field in affine_symmetries(L3, X3):
+    I = sp.expand(noether_charge(L3, field, X3, t))
+    print(f"ξ = {field}:  I = {I}")
+```
+
+Нашлись поворот вокруг оси $z$ и сдвиг вдоль $z$, а с ними интегралы $L_z$ и $p_z$
+(масса здесь $m = 1$). Повороты вокруг $x$ и $y$ симметриями не являются.
+
+**Численная проверка.** Проинтегрируем движение в похожем поле
+$V = \frac12(x^2 + y^2) + 2z^2$ (оно тоже симметрично относительно поворотов вокруг
+оси $z$) и проследим за компонентами момента:
+
+```{python}
+#| label: fig-noether-check
+#| fig-cap: 'Компоненты момента импульса и энергия вдоль траектории в аксиально-симметричном поле V = (x² + y²)/2 + 2z² (m = 1). L_z и E сохраняются (горизонтальные линии), L_x и L_y — нет: повороты вокруг осей x и y не симметрии.'
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.integrate import solve_ivp
+
+def rhs(_, s):
+    r, vel = s[:3], s[3:]
+    return np.r_[vel, -r * np.array([1.0, 1.0, 4.0])]
+
+s0 = np.array([1.0, 0.0, 0.5, 0.0, 0.8, 0.3])
+sol = solve_ivp(rhs, (0, 20), s0, rtol=1e-10, atol=1e-12, dense_output=True)
+tt = np.linspace(0, 20, 1000)
+r, vel = sol.sol(tt)[:3], sol.sol(tt)[3:]
+Lvec = np.cross(r.T, vel.T).T
+E = 0.5 * (vel**2).sum(0) + 0.5 * (r[0]**2 + r[1]**2) + 2 * r[2]**2
+
+fig, ax = plt.subplots(figsize=(7, 3.6))
+for comp, name in zip(Lvec, ["$L_x$", "$L_y$", "$L_z$"]):
+    ax.plot(tt, comp, label=name)
+ax.plot(tt, E, "k--", label="$E$")
+ax.set_xlabel("t")
+ax.legend(ncol=4, loc="lower center", bbox_to_anchor=(0.5, 1.0), frameon=False)
+plt.tight_layout()
+plt.show()
+print(f"разброс L_z: {np.ptp(Lvec[2]):.1e},  E: {np.ptp(E):.1e},  L_x: {np.ptp(Lvec[0]):.2f}")
+```
+
+## Заряд порождает симметрию
+
+В гамильтоновой механике связь обратима. Заряд $I = p_i\xi^i(q)$ — функция на
+фазовом пространстве, и её [гамильтоново поле](/math/symplectic/hamiltonian-fields.qmd)
+сдвигает координаты как раз по $\xi$: $\{q^i, I\} = \xi^i$. Условие
+$\{I, H\} = 0$ одновременно означает, что $I$ сохраняется и что поток $I$
+сохраняет $H$ ([скобка Пуассона](/math/symplectic/poisson-brackets.qmd)):
+
+```{python}
+from gmph.symplectic import canonical_omega, poisson
+
+qx, qy, px, py = Z = sp.symbols("x y p_x p_y", real=True)
+w = canonical_omega(2)
+Lz = qx * py - qy * px
+print("{x, L_z} =", poisson(qx, Lz, Z, w), ",  {y, L_z} =", poisson(qy, Lz, Z, w), "  — это ξ = (−y, x)")
+Hc = (px**2 + py**2) / (2 * m) + V(sp.sqrt(qx**2 + qy**2))
+print("{L_z, H} =", sp.simplify(poisson(Lz, Hc, Z, w)))
+```
+
+Этот взгляд — заряд как гамильтониан симметрии — обобщается до
+**отображения момента** симплектической геометрии (3-й курс), а в теории
+поля теорема Нётер даёт сохраняющиеся токи и тензор
+энергии-импульса.
+
+## Итоги
+
+- Симметрия — поле $X = \xi^i\partial_i$ на $Q$ с $X^cL = 0$ (или $= \dot F$ для квазисимметрии),
+  где $X^c$ — касательный подъём на $TQ$.
+- Заряд $I = p_i\xi^i - F$ сохраняется; доказательство — тождество
+  $\frac{\dd}{\dd t}(p\cdot\xi) = \xi\cdot(\text{уравнения Лагранжа}) + X^cL$.
+- Сдвиги → импульс, повороты → момент, сдвиг по времени → энергия,
+  галилеевы бусты → равномерное движение центра масс.
+- В магнитном поле сдвиги — квазисимметрии, их заряды — центр
+  ларморовской окружности.
+- Симметрии можно искать автоматически: $X^cL = 0$ — линейная система на
+  коэффициенты $\xi$.
+- В гамильтоновой картине заряд порождает симметрию: $\{q^i, I\} = \xi^i$.
+
+## Упражнения
+
+1. Для свободной частицы в $\R^3$ найдите заряд поворота вокруг оси
+   $\mathbf n$ (поле $\xi = \mathbf n\times\mathbf r$).
+2. Частица движется в поле $V(x - y)$ на плоскости. Какая симметрия
+   есть у лагранжиана и какой интеграл ей соответствует?
+3. Покажите, что для $L = \frac m2\dot x^2 - \frac{k}{x^2}$ растяжение
+   $x\to e^sx$, $t\to e^{2s}t$ даёт интеграл $D = m x\dot x - 2Et$. (Указание:
+   проверьте $\dot D = 0$ прямым дифференцированием в силу уравнения движения.)
+4. Частица в однородном поле тяжести $L = \frac m2(\dot x^2 + \dot z^2) - mgz$.
+   Является ли сдвиг $z\to z + s$ квазисимметрией? Какой интеграл получается?
+5. Для заряда в магнитном поле проверьте, что $I_x$ и $I_y$ из статьи
+   сохраняются, прямо подставив решение
+   $x = X_c + R\cos\omega t$, $y = Y_c - R\sin\omega t$ с $\omega = eB/mc$.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $I = \mathbf p\cdot(\mathbf n\times\mathbf r) = \mathbf n\cdot(\mathbf r\times\mathbf p) = \mathbf n\cdot\mathbf L$ — проекция момента на ось.
+2. Сдвиг вдоль $(1, 1)$: $\xi = (1, 1)$ сохраняет $x - y$. Интеграл
+   $I = p_x + p_y = m(\dot x + \dot y)$.
+3. $\dot D = m\dot x^2 + mx\ddot x - 2E$. Уравнение движения $m\ddot x = 2k/x^3$ даёт
+   $mx\ddot x = 2k/x^2$, а $E = \frac m2\dot x^2 + \frac{k}{x^2}$, поэтому
+   $\dot D = m\dot x^2 + \frac{2k}{x^2} - m\dot x^2 - \frac{2k}{x^2} = 0$.
+4. Да: $X^cL = -mg = \frac{\dd}{\dd t}(-mgt)$, $F = -mgt$. Интеграл
+   $I = m\dot z + mgt$ — начальная вертикальная скорость, $\dot z(t) = \dot z(0) - gt$.
+5. $\dot x = -R\omega\sin\omega t$, $\dot y = -R\omega\cos\omega t$. Тогда
+   $I_x = m\dot x - \frac{eB}{c}y = -mR\omega\sin\omega t - \frac{eB}{c}Y_c + \frac{eB}{c}R\sin\omega t = -\frac{eB}{c}Y_c$,
+   $I_y = m\dot y + \frac{eB}{c}x = \frac{eB}{c}X_c$ — постоянные, и $X_c = cI_y/eB$, $Y_c = -cI_x/eB$.
+:::

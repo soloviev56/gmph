@@ -73,3 +73,33 @@ def test_legendre_transform():
     L_charge = m * x.diff(t)**2 / 2 + e / c * A(x) * x.diff(t) - e * phi_el(x)
     H_charge = hamiltonian(L_charge, [x], t, [X], [P])
     assert sp.simplify(H_charge - ((P - e * A(X) / c)**2 / (2 * m) + e * phi_el(X))) == 0
+
+
+def test_noether_identity_and_charges():
+    from gmph.mechanics import lifted_derivative, noether_charge
+
+    x, y = sp.Function("x")(t), sp.Function("y")(t)
+    V = sp.Function("V")
+    L = m / 2 * (x.diff(t)**2 + y.diff(t)**2) - V(x**2 + y**2)
+    rotation = [-y, x]
+    assert sp.simplify(lifted_derivative(L, rotation, [x, y], t)) == 0
+    Lz = noether_charge(L, rotation, [x, y], t)
+    assert sp.simplify(Lz - m * (x * y.diff(t) - y * x.diff(t))) == 0
+    # тождество dI/dt = ξⁱ·(d/dt ∂L/∂q̇ⁱ − ∂L/∂qⁱ) + X^c L для произвольных L и ξ
+    Lg = sp.Function("Lg")(x, y, x.diff(t), y.diff(t))
+    xi = [sp.Function("a")(x, y, t), sp.Function("b")(x, y, t)]
+    lhs = noether_charge(Lg, xi, [x, y], t).diff(t)
+    rhs = (sum(c * e for c, e in zip(xi, euler_lagrange(Lg, [x, y], t)))
+           + lifted_derivative(Lg, xi, [x, y], t))
+    assert sp.simplify(lhs - rhs) == 0
+
+
+def test_galilean_boost_is_quasi_symmetry():
+    from gmph.mechanics import lifted_derivative, noether_charge
+
+    x = sp.Function("x")(t)
+    L = m * x.diff(t)**2 / 2
+    xi = [t]                                              # x → x + s t
+    F = m * x                                             # X^c L = m ẋ = d(m x)/dt
+    assert sp.simplify(lifted_derivative(L, xi, [x], t) - F.diff(t)) == 0
+    assert sp.simplify(noether_charge(L, xi, [x], t, F) - m * (x.diff(t) * t - x)) == 0
