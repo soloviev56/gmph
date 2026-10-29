@@ -240,6 +240,24 @@ def test_symplectic_matrix_form():
     assert all(zdot[i] == H.diff(ps[i]) and zdot[n + i] == -H.diff(qs[i]) for i in range(n))
 
 
+def test_spin_symplectic_form():
+    from gmph.symplectic import hamiltonian_field, poisson
+
+    th, ph = sp.symbols("theta phi", real=True)
+    S, gamma = sp.symbols("S gamma", positive=True)
+    omega_spin = {(1, 2): -S * sp.sin(th)}            # ω = dS_z∧dφ в координатах (θ, φ)
+    Svec = sp.Matrix([S * sp.sin(th) * sp.cos(ph), S * sp.sin(th) * sp.sin(ph), S * sp.cos(th)])
+    pb = lambda f, g: poisson(f, g, (th, ph), omega_spin)
+    for i in range(3):                                # {S_x, S_y} = S_z и циклически
+        assert sp.simplify(pb(Svec[i], Svec[(i + 1) % 3]) - Svec[(i + 2) % 3]) == 0
+    Bvec = sp.Matrix(sp.symbols("B_x B_y B_z", real=True))
+    X = hamiltonian_field(-gamma * Bvec.dot(Svec), (th, ph), omega_spin)
+    Sdot = Svec.jacobian([th, ph]) * sp.Matrix(X)
+    assert sp.simplify(Sdot - gamma * Svec.cross(Bvec)) == sp.zeros(3, 1)
+    Bz = sp.Symbol("B", positive=True)
+    assert hamiltonian_field(-gamma * Bz * Svec[2], (th, ph), omega_spin) == [0, -gamma * Bz]
+
+
 # --- Электростатика формами: dℰ = 0, d𝒟 = 4πρ vol, 𝒟 = ⋆ℰ, ℰ = −dφ ----------
 
 def test_electrostatics_forms():

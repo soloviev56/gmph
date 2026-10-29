@@ -86,6 +86,14 @@ subtitle: "Обозначения и соглашения о знаках, ед�
   \Omega = \begin{pmatrix}0 & -1\\ 1 & 0\end{pmatrix},\qquad \Omega^{-1} = -\Omega = \Omega^{\mathsf T},$$
   уравнения Гамильтона $\dot z = \Omega^{-1}\nabla H$, а линейное преобразование
   $A$ симплектическое, если $A^{\mathsf T}\Omega A = \Omega$.
+- Классический спин фиксированной длины $S$ — сфера с каноническими
+  координатами $q = \varphi$, $p = S_z = S\cos\theta$:
+  $$\omega = \dd S_z\wedge\dd\varphi = -S\sin\theta\,\dd\theta\wedge\dd\varphi$$
+  (ориентация сферы внутренней нормалью). Тогда $\{S_x, S_y\} = S_z$ (и
+  циклически), как у момента импульса $\{L_x, L_y\} = L_z$, а гамильтониан
+  $H = -\gamma\,\mathbf B\cdot\mathbf S$ даёт ларморову прецессию
+  $\dot{\mathbf S} = \gamma\,\mathbf S\times\mathbf B$ (при $\mathbf B = B\mathbf e_z$:
+  $\dot\varphi = -\gamma B$).
 
 ## Комплексные пространства
 
