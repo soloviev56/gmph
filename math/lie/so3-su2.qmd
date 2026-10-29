@@ -1,0 +1,324 @@
+---
+title: "Вращения — SO(3) и SU(2)"
+topic: so3-su2
+order: 5
+description: "Параметризации вращений: ось и угол (формула Родрига), углы Эйлера и их вырождение; кватернионы и SU(2) как сфера S³; двулистное накрытие SU(2) → SO(3) через матрицы Паули; композиция поворотов кватернионами; топология SO(3) = ℝP³: петля поворота на 2π не стягивается, на 4π — стягивается (трюк с поясом Дирака); знак спинора при повороте на 2π"
+---
+
+Поворот твёрдого тела, ориентация спутника, вращение спина — всё это
+элементы группы $SO(3)$. Группа трёхмерна, но устроена сложнее, чем
+$\R^3$: любой способ задать поворот тремя числами где-то вырождается, а
+петля «поворот на $360^\circ$» не стягивается в точку. Обе особенности
+снимаются, если перейти к **группе $SU(2)$** — сфере $S^3$ единичных
+кватернионов, которая дважды накрывает $SO(3)$. Квантовая механика
+выбирает именно $SU(2)$: спинор при повороте на $2\pi$ меняет знак.
+
+Нужны [алгебры Ли](/math/lie/lie-algebras.qmd): там показано, что
+$\mathfrak{so}(3)\cong\mathfrak{su}(2)$. Здесь выясним, чем различаются сами группы.
+
+## Ось и угол: формула Родрига
+
+Каждый поворот $R\in SO(3)$ — поворот на угол $\theta\in[0, \pi]$ вокруг некоторой оси $\mathbf n$
+(теорема Эйлера: у $R$ есть собственное значение $1$). С генераторами
+$(J_k)_{ij} = -\varepsilon_{kij}$ из [конвенций](/conventions.qmd) поворот — экспонента
+$R(\theta, \mathbf n) = e^{\theta N}$, $N = n^kJ_k$, а $N\mathbf v = \mathbf n\times\mathbf v$. Так как $N^3 = -N$, ряд
+для экспоненты сворачивается:
+$$
+R(\theta, \mathbf n) = 1 + \sin\theta\,N + (1 - \cos\theta)\,N^2
+\qquad\text{(формула Родрига)} .
+$$
+
+```{python}
+import sympy as sp
+
+theta = sp.Symbol("theta", real=True)
+n1, n2, n3 = sp.symbols("n1 n2 n3", real=True)
+J = [sp.Matrix(3, 3, lambda i, j: -sp.LeviCivita(k, i, j)) for k in range(3)]   # (J_k)_ij = −ε_kij
+N = n1 * J[0] + n2 * J[1] + n3 * J[2]
+on_sphere = {n3: sp.sqrt(1 - n1**2 - n2**2)}
+
+v = sp.Matrix(sp.symbols("v1:4"))
+print("N v = n × v:", sp.simplify(N * v - sp.Matrix([n1, n2, n3]).cross(v)) == sp.zeros(3, 1))
+print("N³ = −N при |n| = 1:", sp.simplify((N**3 + N).subs(on_sphere)) == sp.zeros(3))
+
+def rodrigues(theta, N):
+    return sp.eye(3) + sp.sin(theta) * N + (1 - sp.cos(theta)) * N**2
+
+Nz = J[2]
+print("e^{θJ_z} = формула Родрига:", sp.simplify(sp.exp(theta * Nz) - rodrigues(theta, Nz)) == sp.zeros(3))
+```
+
+Обратная задача — найти ось и угол по матрице — тоже явная:
+$\operatorname{tr}R = 1 + 2\cos\theta$, а антисимметричная часть $\frac12(R - R^{\mathsf T}) = \sin\theta\,N$
+даёт ось. При $\theta = \pi$ антисимметричная часть обращается в ноль, и
+ось приходится искать как собственный вектор. Это первый признак
+того, что параметры «ось + угол» на $SO(3)$ не являются глобальной картой:
+повороты на $\pi$ вокруг $\mathbf n$ и $-\mathbf n$ совпадают.
+
+**Шар с отождествлением.** Сопоставим повороту вектор $\theta\mathbf n$. Повороты
+заполняют шар радиуса $\pi$, причём диаметрально противоположные точки
+границы $\pi\mathbf n$ и $-\pi\mathbf n$ — один и тот же поворот. Шар с такой склейкой — это
+проективное пространство $\R P^3$. Значит, $SO(3)\cong\R P^3$.
+
+## Углы Эйлера и их вырождение
+
+В механике твёрдого тела поворот задают тремя углами Эйлера: по
+Ландау–Лифшицу $R = R_z(\varphi)\,R_x(\theta)\,R_z(\psi)$ — поворот на $\psi$ вокруг оси $z$,
+затем на $\theta$ вокруг $x$, затем на $\varphi$ снова вокруг $z$. Угловая скорость тела
+линейна по $\dot\varphi, \dot\theta, \dot\psi$: $\dot RR^{-1} = \omega^kJ_k$. Найдём матрицу этой
+связи и её определитель:
+
+```{python}
+t = sp.Symbol("t", real=True)
+ph, th, ps = (sp.Function(n)(t) for n in ("varphi", "theta", "psi"))
+
+def Rz(a):
+    return rodrigues(a, J[2])
+
+def Rx(a):
+    return rodrigues(a, J[0])
+
+R = Rz(ph) * Rx(th) * Rz(ps)
+Omega = (R.diff(t) * R.T).applyfunc(sp.trigsimp)               # = ω^k J_k
+omega = sp.Matrix([Omega[2, 1], Omega[0, 2], Omega[1, 0]])
+rates = [ph.diff(t), th.diff(t), ps.diff(t)]
+W = omega.jacobian(rates).applyfunc(sp.trigsimp)
+print("ω (в неподвижных осях) =", list(omega))
+print("det ∂ω/∂(φ̇, θ̇, ψ̇) =", sp.simplify(W.det()))
+```
+
+Определитель $-\sin\theta$ обращается в ноль при $\theta = 0, \pi$: оси первого и третьего
+поворотов совпадают, и от $\varphi$ и $\psi$ зависит только сумма $\varphi + \psi$. Вблизи
+таких поворотов малое изменение ориентации требует огромных скоростей
+изменения углов — это вырождение (**gimbal lock**) губило ориентацию
+гироскопических платформ. Оно неизбежно: никакие три координаты не
+покрывают $SO(3)$ без особенностей, потому что $\R P^3$ не гомеоморфно
+области в $\R^3$.
+
+## Кватернионы и SU(2)
+
+**Кватернион** $q = a + b\,\mathbf i + c\,\mathbf j + d\,\mathbf k$ с правилами
+$\mathbf i^2 = \mathbf j^2 = \mathbf k^2 = \mathbf{ijk} = -1$. Сопряжённый $\bar q = a - b\mathbf i - c\mathbf j - d\mathbf k$,
+норма $|q|^2 = q\bar q = a^2 + b^2 + c^2 + d^2$ мультипликативна. Единичные кватернионы
+образуют группу — трёхмерную сферу $S^3\subset\R^4$.
+
+Кватернионы реализуются комплексными матрицами $2\times2$:
+$\mathbf i, \mathbf j, \mathbf k\ \mapsto\ -i\sigma_x,\ -i\sigma_y,\ -i\sigma_z$ (это $2s_k$, где $s_k = -i\sigma_k/2$ — базис
+$\mathfrak{su}(2)$ из статьи [об алгебрах Ли](/math/lie/lie-algebras.qmd)). Тогда
+$$
+q \mapsto U = \begin{pmatrix} a - id & -c - ib\\ c - ib & a + id\end{pmatrix},
+\qquad \det U = |q|^2,
+$$
+и единичные кватернионы — это в точности $SU(2)$:
+
+```{python}
+pauli = [sp.Matrix([[0, 1], [1, 0]]), sp.Matrix([[0, -sp.I], [sp.I, 0]]), sp.Matrix([[1, 0], [0, -1]])]
+qi, qj, qk = (-sp.I * sigma for sigma in pauli)
+one = sp.eye(2)
+print("i² = j² = k² = ijk = −1:", qi**2 == -one and qj**2 == -one and qk**2 == -one and qi * qj * qk == -one)
+
+a, b, c, d = sp.symbols("a b c d", real=True)
+U = a * one + b * qi + c * qj + d * qk
+print("U =", U.tolist())
+print("det U =", sp.expand(U.det()), ",  U U† =", sp.simplify(U * U.H).tolist())
+```
+
+$UU^\dagger = |q|^2\cdot 1$, так что при $|q| = 1$ матрица унитарна с определителем $1$. Обратно,
+любая матрица $SU(2)$ имеет такой вид. Итак, **$SU(2) = S^3$** — односвязное
+многообразие.
+
+## Двулистное накрытие
+
+Матрицы $SU(2)$ действуют на эрмитовых бесследовых матрицах
+$X = \mathbf x\cdot\boldsymbol\sigma$ сопряжением $X\mapsto UXU^\dagger$. Это действие сохраняет
+$\det X = -|\mathbf x|^2$, то есть задаёт ортогональное преобразование $\mathbf x\mapsto R(U)\,\mathbf x$:
+$$
+R(U)_{ij} = \tfrac12\operatorname{tr}\left(\sigma_i\,U\sigma_jU^\dagger\right) .
+$$
+Проверим, что $U = e^{\theta s_k}$ переходит в поворот $e^{\theta J_k}$ на тот же угол:
+
+```{python}
+s = [-sp.I / 2 * sigma for sigma in pauli]
+
+def rotation_of(U):
+    return sp.Matrix(3, 3, lambda i, j: sp.simplify(sp.trace(pauli[i] * U * pauli[j] * U.H) / 2))
+
+for k in range(3):
+    Uk = sp.exp(theta * s[k]).applyfunc(sp.simplify)
+    print(f"R(e^(θ s_{'xyz'[k]})) = e^(θ J_{'xyz'[k]}):", sp.simplify(rotation_of(Uk) - sp.exp(theta * J[k])) == sp.zeros(3))
+print("e^(θ s_z) =", sp.exp(theta * s[2]).applyfunc(sp.simplify).tolist())
+```
+
+Поворот на угол $\theta$ вокруг оси $\mathbf n$ — это
+$$
+U(\theta, \mathbf n) = e^{\theta\,\mathbf n\cdot\mathbf s} = \cos\tfrac\theta2 - i\sin\tfrac\theta2\,\mathbf n\cdot\boldsymbol\sigma,
+\qquad q = \cos\tfrac\theta2 + \sin\tfrac\theta2\,(n_x\mathbf i + n_y\mathbf j + n_z\mathbf k) .
+$$
+В формулах **половинный угол**. При $\theta = 2\pi$ получаем $U = -1$, а поворот
+$R = 1$. Отображение $U\mapsto R(U)$ — гомоморфизм $SU(2)\to SO(3)$ с ядром $\{\pm1\}$:
+$U$ и $-U$ дают один поворот. Это **двулистное накрытие**, и
+$SO(3)\cong SU(2)/\{\pm1\} = S^3/\{\pm1\} = \R P^3$ — сфера с отождествлёнными
+противоположными точками, тот же шар со склейкой, что и выше.
+
+**Композиция поворотов.** Повернуть вектор кватернионом можно без матриц:
+$\mathbf v\mapsto q\mathbf vq^{-1}$, где $\mathbf v = v_x\mathbf i + v_y\mathbf j + v_z\mathbf k$ (это то же сопряжение
+$UXU^\dagger$). Произведение кватернионов — композиция поворотов. Кватернион
+хранит 4 числа вместо 9, и после округлений его достаточно
+перенормировать, тогда как матрицу приходится заново ортогонализировать.
+Поэтому кватернионами пользуются в навигации спутников и в компьютерной
+графике. Проверим численно, что композиция кватернионов совпадает с
+произведением матриц Родрига:
+
+```{python}
+import numpy as np
+from scipy.linalg import expm
+
+def quat(angle, axis):
+    axis = np.asarray(axis, dtype=float) / np.linalg.norm(axis)
+    return np.r_[np.cos(angle / 2), np.sin(angle / 2) * axis]
+
+def qmul(p, q):
+    a1, v1, a2, v2 = p[0], p[1:], q[0], q[1:]
+    return np.r_[a1 * a2 - v1 @ v2, a1 * v2 + a2 * v1 + np.cross(v1, v2)]
+
+def qrotate(q, vec):
+    conj = q * np.r_[1, -1, -1, -1]
+    return qmul(qmul(q, np.r_[0, vec]), conj)[1:]
+
+Jn = [np.array(Jk, dtype=float) for Jk in J]
+def matrix(angle, axis):
+    axis = np.asarray(axis, dtype=float) / np.linalg.norm(axis)
+    return expm(angle * sum(a * Jk for a, Jk in zip(axis, Jn)))
+
+q1, q2 = quat(0.7, [1, 2, 0]), quat(2.1, [0, -1, 3])
+vec = np.array([0.3, -1.2, 0.5])
+print("q₁q₂ v (q₁q₂)⁻¹ = R₁R₂ v:", np.allclose(qrotate(qmul(q1, q2), vec), matrix(0.7, [1, 2, 0]) @ matrix(2.1, [0, -1, 3]) @ vec))
+q12 = qmul(q1, q2)
+print(f"итоговый поворот: угол {np.degrees(2 * np.arccos(abs(q12[0]))):.2f}°, ось {np.round(q12[1:] / np.linalg.norm(q12[1:]) * np.sign(q12[0]), 4)}")
+```
+
+## Топология: поворот на 2π и на 4π
+
+Рассмотрим петлю в $SO(3)$ — поворот вокруг оси $z$ на угол от $0$ до $2\pi$.
+Поднимем её в $SU(2)$: $U(t) = e^{t s_z}$ при $t\in[0, 2\pi]$ идёт от $1$ к $U(2\pi) = -1$. Поднятие не
+замкнуто. Если бы петлю в $SO(3)$ можно было стянуть в точку,
+деформация поднялась бы в $SU(2)$, и конец поднятия, который может лежать
+только в дискретном множестве $\{\pm1\}$, остался бы $-1$ — а у постоянной петли
+поднятие заканчивается в $1$. Значит, **петля поворота на $2\pi$ не
+стягивается**.
+
+Поворот на $4\pi$ поднимается в замкнутую петлю $e^{ts_z}$, $t\in[0, 4\pi]$ — большую
+окружность на сфере $S^3$. А на сфере любая петля стягивается. Явная
+деформация: окружности радиуса $\rho$ на $S^3$, проходящие через $1$,
+$$
+q_\rho(\phi) = (1 - \rho + \rho\cos\phi) + \sqrt{1 - (1 - \rho + \rho\cos\phi)^2 - \rho^2\sin^2\phi}\ \mathbf i + \rho\sin\phi\ \mathbf k,
+\qquad \phi\in[0, 2\pi],
+$$
+при $\rho = 1$ дают большую окружность $\cos\phi + \sin\phi\,\mathbf k$ (поворот на $4\pi$
+вокруг $z$), при $\rho\to0$ — постоянную петлю. Их образы в $SO(3)$ — непрерывное
+семейство петель поворотов, стягивающее поворот на $4\pi$ в тождественный.
+Это и есть **трюк Дирака с поясом**: чашку на ладони можно повернуть
+на $720^\circ$ и вернуть руку в исходное положение, а на $360^\circ$ — нельзя.
+
+```{python}
+#| label: fig-belt-trick
+#| fig-cap: 'Стягивание петли «поворот на 4π вокруг оси z» в SO(3). Для нескольких ρ показан угол поворота R(q_ρ(φ)) вдоль петли (слева) и путь, который описывает вдоль петли образ единичного вектора e_x (справа). При ρ = 1 вектор e_x дважды обходит экватор, при уменьшении ρ петли сжимаются к тождественному повороту.'
+import matplotlib.pyplot as plt
+
+def belt_loop(rho, phi):
+    w = 1 - rho + rho * np.cos(phi)
+    zc = rho * np.sin(phi)
+    xc = np.sqrt(np.clip(1 - w**2 - zc**2, 0, None))
+    return np.stack([w, xc, np.zeros_like(phi), zc], axis=-1)
+
+phi = np.linspace(0, 2 * np.pi, 400)
+fig = plt.figure(figsize=(9.5, 4.2))
+ax1 = fig.add_subplot(1, 2, 1)
+ax2 = fig.add_subplot(1, 2, 2, projection="3d")
+colors = plt.cm.viridis(np.linspace(0, 0.85, 5))
+for rho, col in zip([1.0, 0.75, 0.5, 0.25, 0.05], colors):
+    qs = belt_loop(rho, phi)
+    angle = 2 * np.degrees(np.arccos(np.clip(np.abs(qs[:, 0]), 0, 1)))
+    ex = np.array([qrotate(q, [1.0, 0, 0]) for q in qs])
+    ax1.plot(np.degrees(phi), angle, color=col, label=f"ρ = {rho}")
+    ax2.plot(*ex.T, color=col, lw=1.5)
+ax1.set(xlabel="параметр петли φ, °", ylabel="угол поворота, °", xticks=[0, 90, 180, 270, 360])
+ax1.legend(fontsize=8)
+u, v = np.meshgrid(np.linspace(0, 2 * np.pi, 25), np.linspace(0, np.pi, 13))
+ax2.plot_wireframe(np.cos(u) * np.sin(v), np.sin(u) * np.sin(v), np.cos(v), color="0.85", lw=0.4)
+ax2.set(xlim=(-1, 1), ylim=(-1, 1), zlim=(-1, 1), xlabel="x", ylabel="y", zlabel="z",
+        xticks=[-1, 0, 1], yticks=[-1, 0, 1], zticks=[-1, 0, 1], box_aspect=(1, 1, 1))
+ax2.view_init(elev=25, azim=-60)
+plt.tight_layout()
+plt.show()
+
+closed = all(np.allclose(qrotate(belt_loop(r, np.array([0.0]))[0], [1, 0, 0]), qrotate(belt_loop(r, np.array([2 * np.pi]))[0], [1, 0, 0])) for r in (1, 0.5, 0.05))
+print("все петли замкнуты:", closed, "| |q| = 1:", np.allclose(np.linalg.norm(belt_loop(0.6, phi), axis=1), 1))
+```
+
+Группа $\pi_1(SO(3)) = \mathbb Z_2$: есть ровно два класса петель — стягиваемые и
+гомотопные повороту на $2\pi$.
+
+## Физика: спинор меняет знак
+
+Состояние спина $1/2$ — вектор $\psi\in\mathbb C^2$, и поворот действует на него матрицей
+$U\in SU(2)$, а не $R\in SO(3)$. Спин в магнитном поле $\mathbf B = B\mathbf e_z$ прецессирует:
+$\psi(t) = e^{\omega t\,s_z}\psi(0)$ с ларморовой частотой $\omega$ (знак зависит от знака
+гиромагнитного отношения). Через время $t = 2\pi/\omega$ средний спин
+$\langle\boldsymbol\sigma\rangle$ возвращается в исходное положение, но сам $\psi$ меняет знак:
+
+```{python}
+psi0 = sp.Matrix([sp.cos(sp.pi / 8), sp.sin(sp.pi / 8)])          # (cos π/8, sin π/8): спин в плоскости xz
+spin = lambda psi: [sp.simplify((psi.H * sigma * psi)[0]) for sigma in pauli]
+for angle in (0, 2 * sp.pi, 4 * sp.pi):
+    psi = sp.exp(angle * s[2]) * psi0
+    print(f"θ = {angle}: ψ = {list(psi)}, ⟨σ⟩ = {spin(psi)}")
+```
+
+Глобальный знак волновой функции ненаблюдаем, но относительный —
+наблюдаем. В опытах с нейтронной интерферометрией (Раух и др., Вернер и
+др., 1975) пучок нейтронов разделяли на два, один из них проходил через
+область с магнитным полем и прецессировал, затем пучки сводили.
+Интерференционная картина повторялась с периодом $4\pi$ по углу прецессии, а
+не $2\pi$. Так двулистность $SU(2)\to SO(3)$ видна в эксперименте.
+
+## Итоги
+
+- Поворот — ось и угол, $R = e^{\theta N} = 1 + \sin\theta\,N + (1 - \cos\theta)N^2$;
+  $SO(3)$ — шар радиуса $\pi$ со склеенными противоположными точками
+  границы, $\R P^3$.
+- Углы Эйлера вырождаются при $\theta = 0, \pi$ ($\det = -\sin\theta$); глобальных трёх координат на
+  $SO(3)$ нет.
+- Единичные кватернионы $=SU(2) = S^3$; $\mathbf i, \mathbf j, \mathbf k\leftrightarrow -i\sigma_{x,y,z}$.
+- $U\mapsto R(U)$, $R_{ij} = \frac12\operatorname{tr}(\sigma_iU\sigma_jU^\dagger)$ — двулистное накрытие с ядром $\pm1$;
+  в $U(\theta, \mathbf n)$ — половинные углы.
+- $\pi_1(SO(3)) = \mathbb Z_2$: поворот на $2\pi$ не стягивается, на $4\pi$ — стягивается.
+- Спинор при повороте на $2\pi$ меняет знак; это наблюдается в нейтронной интерферометрии.
+
+## Упражнения
+
+1. Найдите ось и угол поворота
+   $R = \begin{pmatrix}0 & 0 & 1\\ 1 & 0 & 0\\ 0 & 1 & 0\end{pmatrix}$.
+2. Найдите кватернион поворота на $90^\circ$ вокруг оси $x$ и с его помощью
+   поверните вектор $\mathbf e_y$.
+3. Перемножьте кватернионы поворотов на $90^\circ$ вокруг $x$ и затем на $90^\circ$
+   вокруг $y$ (то есть $q_yq_x$). Найдите ось и угол итогового поворота.
+4. Покажите, что $R(-U) = R(U)$, и найдите $U$, соответствующие повороту на $\pi$
+   вокруг оси $z$.
+5. Какие матрицы $U\in SU(2)$ коммутируют со всеми элементами $SU(2)$? А какие
+   $R\in SO(3)$ коммутируют со всеми поворотами? Как это согласуется с
+   накрытием?
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $\operatorname{tr}R = 0 = 1 + 2\cos\theta$, $\theta = 120^\circ$; ось $\mathbf n = (1, 1, 1)/\sqrt3$ ($R$
+   циклически переставляет оси: $\mathbf e_x\to\mathbf e_y\to\mathbf e_z\to\mathbf e_x$).
+2. $q = \cos45^\circ + \sin45^\circ\,\mathbf i = (1 + \mathbf i)/\sqrt2$; $q\,\mathbf j\,\bar q = \mathbf k$, то есть
+   $\mathbf e_y\mapsto\mathbf e_z$.
+3. $q_yq_x = \frac12(1 + \mathbf j)(1 + \mathbf i) = \frac12(1 + \mathbf i + \mathbf j - \mathbf k)$. Угол: $\cos\frac\theta2 = \frac12$,
+   $\theta = 120^\circ$; ось $(1, 1, -1)/\sqrt3$.
+4. $R$ квадратична по $U$, поэтому знак сокращается. Повороту на $\pi$ вокруг
+   $z$ отвечают $U = \pm e^{\pi s_z} = \mp i\sigma_z = \pm\operatorname{diag}(-i, i)$.
+5. Центр $SU(2)$ — $\{\pm1\}$, центр $SO(3)$ тривиален. Ядро накрытия $\{\pm1\}$
+   лежит в центре, и при факторизации центр $SU(2)$ переходит в единицу.
+:::
