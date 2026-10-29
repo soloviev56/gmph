@@ -1,0 +1,311 @@
+---
+title: "Задача Кеплера"
+topic: kepler
+order: 8
+description: "Задача двух тел и приведённая масса; плоское движение и эффективный потенциал; уравнение орбиты Бине и конические сечения; законы Кеплера с проверкой (год, комета Галлея); вектор Лапласа–Рунге–Ленца, эксцентриситет и замкнутость орбит; орбиты одной энергии с общей большой осью; годограф скорости — окружность; скрытая симметрия SO(4), её казимиры и уровни атома водорода по Паули"
+---
+
+Задача Кеплера — движение двух тел, притягивающихся по закону $1/r^2$, —
+главный пример точно решаемой механической системы. Она объясняет
+движение планет и комет, а в квантовом варианте — спектр атома
+водорода. В ней работают все инструменты курса:
+[теорема Нётер](/physics/mechanics/noether.qmd) даёт сохранение энергии и момента и
+сводит задачу к одномерной, а [скобки Пуассона](/math/symplectic/poisson-brackets.qmd)
+открывают дополнительный интеграл — вектор Лапласа–Рунге–Ленца — и
+скрытую четырёхмерную симметрию. Именно она делает орбиты замкнутыми, а
+уровни водорода — вырожденными по моменту.
+
+## Две частицы → одна
+
+Лагранжиан двух тел
+$L = \frac{m_1}2\dot{\mathbf r}_1^2 + \frac{m_2}2\dot{\mathbf r}_2^2 + \frac{k}{|\mathbf r_1 - \mathbf r_2|}$ ($k = Gm_1m_2$ для
+тяготения, $k = -e_1e_2$ для зарядов) инвариантен относительно сдвигов и
+галилеевых бустов; по [теореме Нётер](/physics/mechanics/noether.qmd) центр масс
+$\mathbf R = (m_1\mathbf r_1 + m_2\mathbf r_2)/M$ движется равномерно. В переменных $\mathbf R$ и
+$\mathbf r = \mathbf r_1 - \mathbf r_2$ лагранжиан распадается:
+
+```{python}
+import sympy as sp
+
+t = sp.Symbol("t", real=True)
+m1, m2, k = sp.symbols("m1 m2 k", positive=True)
+Rx, rx = sp.Function("R")(t), sp.Function("r")(t)                 # одна компонента: остальные так же
+M, mu = m1 + m2, m1 * m2 / (m1 + m2)
+x1, x2 = Rx + m2 / M * rx, Rx - m1 / M * rx                       # r₁ = R + (m₂/M) r, r₂ = R − (m₁/M) r
+T = m1 * x1.diff(t)**2 / 2 + m2 * x2.diff(t)**2 / 2
+print("T − (M Ṙ²/2 + μ ṙ²/2) =", sp.simplify(T - (M * Rx.diff(t)**2 + mu * rx.diff(t)**2) / 2))
+```
+
+Остаётся одна частица с **приведённой массой** $\mu = \frac{m_1m_2}{m_1 + m_2}$ в поле
+$U(r) = -k/r$. Для Солнца и Земли $\mu$ отличается от массы Земли на $3\cdot10^{-6}$, для
+протона и электрона — на $5\cdot10^{-4}$ (этот сдвиг виден в спектрах водорода и
+дейтерия).
+
+## Эффективный потенциал
+
+Поле центрально, поэтому сохраняется момент $\mathbf L = \mu\,\mathbf r\times\dot{\mathbf r}$ (повороты —
+симметрия). Движение лежит в плоскости, перпендикулярной $\mathbf L$, и в
+полярных координатах этой плоскости
+$$
+E = \frac\mu2\dot r^2 + \underbrace{\frac{L^2}{2\mu r^2} - \frac kr}_{U_{\text{эфф}}(r)}, \qquad L = \mu r^2\dot\varphi .
+$$
+Радиальное движение — одномерное движение в эффективном потенциале.
+Центробежный барьер $L^2/2\mu r^2$ не пускает частицу с $L\neq0$ к центру. При $E < 0$
+движение финитно (эллипс), при $E\ge0$ частица уходит на бесконечность.
+
+```{python}
+#| label: fig-effective-potential
+#| fig-cap: 'Эффективный потенциал U_эфф(r) = L²/2μr² − k/r при μ = k = L = 1 (сплошная) и его минимум — круговая орбита r₀ = L²/μk, E₀ = −μk²/2L² (точка). Горизонтальные линии — уровни энергии: при E < 0 радиус колеблется между точками поворота (перигелий и афелий), при E > 0 частица уходит на бесконечность.'
+import numpy as np
+import matplotlib.pyplot as plt
+
+r = np.linspace(0.3, 8, 500)
+U_eff = 1 / (2 * r**2) - 1 / r
+fig, ax = plt.subplots(figsize=(6.5, 3.8))
+ax.plot(r, U_eff, color="k", label="U_эфф")
+ax.plot(r, -1 / r, ":", color="0.5", label="−k/r")
+ax.plot(r, 1 / (2 * r**2), "--", color="0.5", label="L²/2μr²")
+ax.plot([1], [-0.5], "o", color="tab:red")
+for E, col in [(-0.3, "tab:blue"), (0.15, "tab:green")]:
+    roots = np.roots([E, 1, -0.5])                     # E r² + k r − L²/2μ = 0
+    roots = roots[np.isreal(roots) & (roots.real > 0)].real
+    r_lo, r_hi = roots.min(), (roots.max() if len(roots) > 1 else 8)
+    ax.hlines(E, r_lo, r_hi, color=col, lw=2, label=f"E = {E}")
+ax.axhline(0, color="k", lw=0.5)
+ax.set(xlim=(0, 8), ylim=(-1.2, 1), xlabel="r", ylabel="энергия")
+ax.legend(loc="upper right", fontsize=9)
+plt.tight_layout()
+plt.show()
+```
+
+## Уравнение орбиты
+
+Удобная переменная — $u = 1/r$ как функция угла $\varphi$. Так как $\dot\varphi = L u^2/\mu$,
+производная по времени выражается через производную по углу, и
+радиальное уравнение $\mu\ddot r = L^2/\mu r^3 - k/r^2$ превращается в **уравнение Бине**
+$$
+u'' + u = \frac{\mu k}{L^2} .
+$$
+Это уравнение осциллятора с постоянной силой; решение
+$u = \frac{\mu k}{L^2}(1 + e\cos\varphi)$, то есть
+$$
+r = \frac{p}{1 + e\cos\varphi}, \qquad p = \frac{L^2}{\mu k}, \qquad e = \sqrt{1 + \frac{2EL^2}{\mu k^2}} .
+$$
+Орбита — коническое сечение с фокусом в центре: эллипс при $e < 1$
+($E < 0$), парабола при $e = 1$, гипербола при $e > 1$. Проверим и уравнение Бине,
+и связь $e$ с энергией:
+
+```{python}
+phi = sp.Symbol("varphi", real=True)
+mu_, L, E = sp.symbols("mu L E", real=True)
+p, e = sp.symbols("p e", positive=True)
+u = sp.Function("u")(phi)
+
+# радиальное уравнение через u(φ): ṙ = −(L/μ) u', r̈ = −(L/μ)² u² u''
+r_dd = -(L / mu_)**2 * u**2 * u.diff(phi, 2)
+binet = sp.simplify((mu_ * r_dd - (L**2 / (mu_ / u**3) - k * u**2)) / (-(L**2) * u**2 / mu_))
+print("уравнение Бине: u'' + u − μk/L² =", sp.expand(binet), "= 0")
+
+orbit = (1 + e * sp.cos(phi)) / p
+print("решение: u'' + u − μk/L² =", sp.simplify(orbit.diff(phi, 2) + orbit - mu_ * k / L**2).subs(p, L**2 / (mu_ * k)))
+
+# энергия на орбите через u(φ): E = (L²/2μ)(u'² + u²) − k u
+energy_on_orbit = sp.simplify((L**2 / (2 * mu_) * (orbit.diff(phi)**2 + orbit**2) - k * orbit).subs(p, L**2 / (mu_ * k)))
+print("E на орбите =", sp.factor(energy_on_orbit), " → e² = 1 + 2EL²/μk²")
+```
+
+Энергия не зависит от $\varphi$, как и положено, и равна $\frac{\mu k^2}{2L^2}(e^2 - 1)$.
+
+## Законы Кеплера
+
+1. **Орбиты — эллипсы с Солнцем в фокусе** — доказано выше.
+2. **Секториальная скорость постоянна**: $\frac{\dd S}{\dd t} = \frac12r^2\dot\varphi = \frac{L}{2\mu}$ — это
+   сохранение момента, справедливое в любом центральном поле.
+3. **$T^2\propto a^3$.** Площадь эллипса $\pi ab$, делённая на секториальную скорость,
+   даёт период. С $a = p/(1 - e^2) = k/2|E|$ и $b = a\sqrt{1 - e^2}$:
+   $$
+   T = \frac{2\pi ab\,\mu}{L} = 2\pi\sqrt{\frac{\mu a^3}{k}} .
+   $$
+   Для планеты $\mu/k = 1/G(m_\odot + m)\approx 1/Gm_\odot$, и отношение $T^2/a^3$ одно для всех планет.
+
+**Большая полуось зависит только от энергии**: $a = k/2|E|$. Все орбиты одной
+энергии имеют одну большую ось и один период, а момент определяет лишь
+эксцентриситет:
+
+```{python}
+#| label: fig-same-energy
+#| fig-cap: 'Орбиты с одной энергией E = −1/2 (μ = k = 1) и разными моментами L. Все они — эллипсы с фокусом в начале координат (точка) и одной большой полуосью a = k/2|E| = 1. При L → 0 эллипс вырождается в отрезок (падение на центр), при L = 1 — окружность.'
+from scipy.integrate import solve_ivp
+
+def kepler_rhs(_, s):
+    pos, vel = s[:2], s[2:]
+    return np.r_[vel, -pos / np.linalg.norm(pos)**3]
+
+fig, ax = plt.subplots(figsize=(6, 5))
+E0 = -0.5
+for L0, col in zip([1.0, 0.8, 0.6, 0.4, 0.2], plt.cm.viridis(np.linspace(0, 0.85, 5))):
+    e0 = np.sqrt(1 + 2 * E0 * L0**2)
+    r_peri = L0**2 / (1 + e0)
+    v_peri = L0 / r_peri
+    T0 = 2 * np.pi                                      # 2π √(a³μ/k) при a = 1
+    sol = solve_ivp(kepler_rhs, (0, T0), [r_peri, 0, 0, v_peri], rtol=1e-10, atol=1e-12, max_step=0.01)
+    ax.plot(*sol.y[:2], color=col, label=f"L = {L0}, e = {e0:.2f}")
+    print(f"L = {L0}: e = {e0:.3f}, большая полуось по траектории = {(sol.y[0].max() - sol.y[0].min()) / 2:.4f},"
+          f" отклонение от начальной точки через T = 2π: {np.abs(sol.y[:2, -1] - sol.y[:2, 0]).max():.0e}")
+ax.plot([0], [0], "o", color="tab:orange")
+ax.set(aspect="equal", xlim=(-2.2, 1.2), ylim=(-1.4, 1.4))
+ax.legend(fontsize=8, loc="upper left")
+plt.tight_layout()
+plt.show()
+```
+
+**Числа.** Для Земли $a = 1$ а. е. и $Gm_\odot = 1{,}327\cdot10^{20}$ м³/с²; для кометы Галлея
+$a\approx17{,}8$ а. е., $e\approx0{,}967$:
+
+```{python}
+GM_sun, AU = 1.32712440018e20, 1.495978707e11
+
+def period_days(a_au):
+    return 2 * np.pi * np.sqrt((a_au * AU)**3 / GM_sun) / 86400
+
+print(f"Земля: T = {period_days(1.0):.2f} сут")
+print(f"комета Галлея: T = {period_days(17.8) / 365.25:.1f} лет, "
+      f"перигелий {17.8 * (1 - 0.967):.3f} а. е., афелий {17.8 * (1 + 0.967):.1f} а. е.")
+```
+
+Период Земли получился $365{,}26$ суток — это звёздный год (поправка на
+массу Земли $\sqrt{1 + m/m_\odot}$ меняет его меньше чем на минуту). Перигелий
+кометы Галлея — внутри орбиты Венеры, афелий — за орбитой Нептуна.
+
+## Вектор Лапласа–Рунге–Ленца
+
+В статье о [скобках Пуассона](/math/symplectic/poisson-brackets.qmd) проверено, что
+вектор
+$$
+\mathbf A = \mathbf p\times\mathbf L - \mu k\,\frac{\mathbf r}{r}
+$$
+сохраняется. Его смысл виден из двух тождеств:
+
+```{python}
+from gmph.symplectic import canonical_omega, poisson
+
+x, y, z, px, py, pz = Z = sp.symbols("x y z p_x p_y p_z", real=True)
+m_ = sp.Symbol("mu", positive=True)
+rv, pv = sp.Matrix([x, y, z]), sp.Matrix([px, py, pz])
+rr = sp.sqrt(x**2 + y**2 + z**2)
+H = pv.dot(pv) / (2 * m_) - k / rr
+Lv = rv.cross(pv)
+A = pv.cross(Lv) - m_ * k * rv / rr
+
+print("L·A =", sp.simplify(Lv.dot(A)))
+print("A² − (μ²k² + 2μH L²) =", sp.simplify(A.dot(A) - (m_**2 * k**2 + 2 * m_ * H * Lv.dot(Lv))))
+print("A·r − (L² − μk r) =", sp.simplify(A.dot(rv) - (Lv.dot(Lv) - m_ * k * rr)))
+```
+
+$\mathbf A$ лежит в плоскости орбиты, его длина $|\mathbf A| = \mu k\sqrt{1 + 2EL^2/\mu k^2} = \mu ke$. А
+скалярное произведение $\mathbf A\cdot\mathbf r = Ar\cos\varphi = L^2 - \mu kr$ — это уравнение
+орбиты $r = p/(1 + e\cos\varphi)$, где угол $\varphi$ отсчитывается от $\mathbf A$. Значит, $\mathbf A$ направлен
+в перигелий, и орбита получилась **без интегрирования** — из одних
+законов сохранения. Неподвижность $\mathbf A$ и есть замкнутость орбит: перигелий
+не поворачивается.
+
+По теореме Бертрана замкнутые финитные орбиты при всех начальных
+условиях бывают только в двух центральных полях: $-k/r$ и $kr^2$. Любая
+поправка к закону $1/r^2$ — от сплюснутости Солнца, других планет, ОТО —
+нарушает сохранение $\mathbf A$, и перигелий прецессирует (рисунок в статье о
+скобках Пуассона). Прецессия перигелия Меркурия на $43''$ в столетие,
+не объяснённая планетными возмущениями, стала первым подтверждением ОТО.
+
+## Скрытая симметрия SO(4)
+
+Интегралов $\mathbf L$ и $\mathbf A$ шесть, но связей между ними две ($\mathbf L\cdot\mathbf A = 0$ и
+выражение $A^2$ через $H$ и $L^2$), так что вместе с энергией независимых
+интегралов пять — максимально возможное число для шестимерного фазового
+пространства (задача **сверхинтегрируема**). На поверхности $H = E < 0$
+перенормируем $\mathbf M = \mathbf A/\sqrt{-2\mu E}$ и найдём скобки:
+
+```{python}
+pb = lambda f, g: poisson(f, g, Z, canonical_omega(3))
+E_ = sp.Symbol("E", negative=True)
+Mv = A / sp.sqrt(-2 * m_ * E_)
+
+print("{L_x, L_y} − L_z =", sp.simplify(pb(Lv[0], Lv[1]) - Lv[2]))
+print("{L_x, M_y} − M_z =", sp.simplify(pb(Lv[0], Mv[1]) - Mv[2]))
+MxMy = pb(Mv[0], Mv[1])
+print("{M_x, M_y} − (H/E)·L_z =", sp.simplify(MxMy - H / E_ * Lv[2]))
+```
+
+Скобка $\{M_x, M_y\} = \frac{H}{E}L_z$ равна $L_z$ на поверхности энергии. Итак,
+$$
+\{L_i, L_j\} = \varepsilon_{ijk}L_k, \quad \{L_i, M_j\} = \varepsilon_{ijk}M_k, \quad \{M_i, M_j\} = \varepsilon_{ijk}L_k :
+$$
+это алгебра $\mathfrak{so}(4)$ — алгебра вращений четырёхмерного пространства. В
+комбинациях $\mathbf J_\pm = \frac12(\mathbf L\pm\mathbf M)$ она распадается на две независимые копии $\mathfrak{so}(3)$:
+$\{J_{\pm i}, J_{\pm j}\} = \varepsilon_{ijk}J_{\pm k}$, $\{J_{+i}, J_{-j}\} = 0$. Её функции Казимира
+$$
+\mathbf J_+^2 - \mathbf J_-^2 = \mathbf L\cdot\mathbf M = 0, \qquad
+\mathbf J_+^2 + \mathbf J_-^2 = \tfrac12(L^2 + M^2) = -\frac{\mu k^2}{4E} .
+$$
+
+**Водород по Паули (1926).** В квантовой механике $\mathbf J_\pm$ — два независимых
+момента, $\mathbf J_\pm^2 = \hbar^2j(j + 1)$ с одинаковым $j = 0, \frac12, 1, \dots$ (так как $\mathbf J_+^2 = \mathbf J_-^2$).
+Квантовая версия второго казимира с поправкой Паули
+$2(\mathbf J_+^2 + \mathbf J_-^2) + \hbar^2 = -\mu k^2/2E$ даёт
+$$
+E_n = -\frac{\mu k^2}{2\hbar^2n^2}, \qquad n = 2j + 1 = 1, 2, 3, \dots
+$$
+— формулу Бора, а кратность уровня $(2j + 1)^2 = n^2$ — размерность
+представления $SO(4)$. Все $l = 0, \dots, n - 1$ с одной энергией — это и есть
+«случайное» вырождение водорода, оказавшееся не случайным.
+
+```{python}
+hbar = sp.Symbol("hbar", positive=True)
+j = sp.Symbol("j", nonnegative=True)
+casimir = 2 * 2 * hbar**2 * j * (j + 1) + hbar**2                 # 2(J₊² + J₋²) + ħ²
+E_level = sp.factor(-m_ * k**2 / (2 * casimir))
+print("E =", E_level, "→ при n = 2j + 1:", sp.factor(E_level.subs(j, (sp.Symbol("n") - 1) / 2)))
+print("кратность (2j+1)² для n = 1…4:", [(2 * jj + 1)**2 for jj in (0, sp.Rational(1, 2), 1, sp.Rational(3, 2))])
+```
+
+## Итоги
+
+- Задача двух тел сводится к одному телу с приведённой массой $\mu$ в поле
+  $-k/r$; сохранение $\mathbf L$ делает движение плоским и сводит его к
+  одномерному в $U_{\text{эфф}} = L^2/2\mu r^2 - k/r$.
+- Уравнение Бине $u'' + u = \mu k/L^2$; орбиты — конические сечения
+  $r = p/(1 + e\cos\varphi)$, $e^2 = 1 + 2EL^2/\mu k^2$.
+- Законы Кеплера; $a = k/2|E|$ и $T = 2\pi\sqrt{\mu a^3/k}$ зависят только от энергии.
+- Вектор $\mathbf A$ направлен в перигелий, $|\mathbf A| = \mu ke$; его сохранение — замкнутость
+  орбит.
+- $\mathbf L$ и $\mathbf M = \mathbf A/\sqrt{-2\mu E}$ образуют $\mathfrak{so}(4)$; квантование казимиров даёт
+  $E_n\propto -1/n^2$ и вырождение $n^2$.
+
+## Упражнения
+
+1. Найдите радиус и период круговой орбиты при заданном $L$; проверьте, что
+   они согласуются с минимумом $U_{\text{эфф}}$ и третьим законом Кеплера.
+2. Спутник на круговой орбите радиуса $r_0$ получает импульс, увеличивающий
+   скорость в $\lambda$ раз (вдоль скорости). При каком $\lambda$ он уйдёт на
+   бесконечность? Чему равен эксцентриситет новой орбиты при $\lambda = 1{,}1$?
+3. Покажите, что скорость на кеплеровой орбите
+   $\mathbf v(\varphi) = \frac{k}{L}\left(-\sin\varphi,\ e + \cos\varphi\right)$ — годограф скорости — окружность.
+   Найдите её центр и радиус.
+4. Найдите отношение скоростей кометы Галлея в перигелии и афелии.
+5. Докажите, что $\mathbf A$ сохраняется, продифференцировав
+   $\mathbf A = \mathbf p\times\mathbf L - \mu k\,\mathbf r/r$ по времени в силу уравнения $\dot{\mathbf p} = -k\mathbf r/r^3$.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $r_0 = L^2/\mu k$ (минимум $U_{\text{эфф}}$, $e = 0$), $E_0 = -\mu k^2/2L^2$,
+   $T = 2\pi\mu r_0^2/L = 2\pi\sqrt{\mu r_0^3/k}$ — совпадает с третьим законом при $a = r_0$.
+2. Круговая скорость $v_0 = \sqrt{k/\mu r_0}$, вторая космическая $\sqrt2\,v_0$: нужно
+   $\lambda\ge\sqrt2$. Точка толчка становится перигелием, $r_0 = p/(1 + e)$, $p = \lambda^2r_0$, откуда
+   $e = \lambda^2 - 1 = 0{,}21$ при $\lambda = 1{,}1$.
+3. $v_x = -\frac kL\sin\varphi$, $v_y = \frac kL(e + \cos\varphi)$: окружность радиуса $k/L$ с центром
+   $(0, ek/L)$. При $e > 1$ центр лежит вне начала координат дальше радиуса —
+   годограф проходит только дугу (гипербола).
+4. По сохранению момента $v_pr_p = v_ar_a$: $v_p/v_a = r_a/r_p = (1 + e)/(1 - e) = 1{,}967/0{,}033\approx 59{,}6$.
+5. $\dot{\mathbf A} = \dot{\mathbf p}\times\mathbf L - \mu k\frac{\dd}{\dd t}\frac{\mathbf r}{r}$. Первое слагаемое:
+   $-\frac{k}{r^3}\mathbf r\times(\mathbf r\times\mu\dot{\mathbf r}) = -\frac{\mu k}{r^3}\left(\mathbf r(\mathbf r\cdot\dot{\mathbf r}) - r^2\dot{\mathbf r}\right)$; второе:
+   $-\mu k\left(\frac{\dot{\mathbf r}}{r} - \frac{\mathbf r(\mathbf r\cdot\dot{\mathbf r})}{r^3}\right)$. Сумма равна нулю.
+:::
