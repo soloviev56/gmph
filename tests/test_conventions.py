@@ -289,3 +289,25 @@ def test_magnetostatics_forms():
     assert d(B_form, X) == {}
     A_form = {(3,): -sp.pi * j0 / c * (x**2 + y**2)}                  # A = A_z e_z
     assert d(A_form, X) == B_form
+
+
+# --- Преобразование Фурье: f̃(k) = ∫ f e^{−ikx} dx, по времени e^{+iωt} ---------
+
+def test_fourier_conventions():
+    from gmph.fourier import fourier, fourier_time, inverse_fourier, inverse_fourier_time
+
+    x, k, t, w = sp.symbols("x k t omega", real=True)
+    a = sp.Symbol("a", positive=True)
+    gauss = sp.exp(-x**2 / 2)
+    G = fourier(gauss, x, k)
+    assert sp.simplify(G - sp.sqrt(2 * sp.pi) * sp.exp(-k**2 / 2)) == 0
+    assert sp.simplify(inverse_fourier(G, k, x) - gauss) == 0
+    shifted = sp.exp(-(x - a)**2 / 2)                       # сдвиг на +a даёт множитель e^{−ika}
+    assert sp.simplify(fourier(shifted, x, k) - sp.exp(-sp.I * k * a) * G) == 0
+    assert sp.simplify(fourier(gauss.diff(x), x, k) - sp.I * k * G) == 0
+    # по времени: затухающее колебание θ(t) e^{−at} → 1/(a − iω), и обратно
+    decay = sp.exp(-a * t) * sp.Heaviside(t)
+    Fw = fourier_time(decay, t, w)
+    assert sp.simplify(Fw - 1 / (a - sp.I * w)) == 0
+    assert sp.simplify(fourier_time(sp.exp(-t**2 / 2).diff(t), t, w) + sp.I * w * fourier_time(sp.exp(-t**2 / 2), t, w)) == 0
+    assert sp.simplify(inverse_fourier_time(sp.sqrt(2 * sp.pi) * sp.exp(-w**2 / 2), w, t) - sp.exp(-t**2 / 2)) == 0

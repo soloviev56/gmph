@@ -188,6 +188,23 @@ subtitle: "Обозначения и соглашения о знаках, ед�
 - Энтропия: $\delta Q = T\,\dd S$ для квазистатических процессов, отсюда
   $\dd U = T\,\dd S - p\,\dd V$, как у Ландау и Лифшица (т. V).
 
+## Преобразование Фурье
+
+- По координатам: множитель $2\pi$ — в интеграле по $k$,
+  $$\tilde f(\mathbf k) = \int f(\mathbf r)\,e^{-i\mathbf k\cdot\mathbf r}\,\dd^n r, \qquad
+  f(\mathbf r) = \int \tilde f(\mathbf k)\,e^{i\mathbf k\cdot\mathbf r}\,\frac{\dd^n k}{(2\pi)^n} .$$
+  Тогда $\widetilde{\partial_j f} = ik_j\tilde f$, $\widetilde{f * g} = \tilde f\,\tilde g$,
+  $\int |f|^2\dd^n r = \int |\tilde f|^2\,\dd^n k/(2\pi)^n$.
+- По времени — с противоположным знаком в экспоненте:
+  $\tilde f(\omega) = \int f(t)\,e^{i\omega t}\,\dd t$, $f(t) = \int\tilde f(\omega)\,e^{-i\omega t}\,\dd\omega/2\pi$, так что
+  $\widetilde{\dot f} = -i\omega\tilde f$. Плоская волна $e^{i(\mathbf k\cdot\mathbf r - \omega t)} = e^{-ik_\mu x^\mu}$
+  при $k^\mu = (\omega/c, \mathbf k)$ и сигнатуре $(+,-,-,-)$.
+- Ряд Фурье функции периода $L$: $f(x) = \sum_n c_n e^{2\pi inx/L}$,
+  $c_n = \frac1L\int_0^L f(x)\,e^{-2\pi inx/L}\,\dd x$.
+- В SymPy `fourier_transform` использует ядро $e^{-2\pi ikx}$; функции `fourier`,
+  `inverse_fourier`, `fourier_time`, `inverse_fourier_time` из `gmph.fourier` переводят
+  его в соглашения пособия.
+
 ## Обозначения в формулах
 
 | Запись | Смысл |

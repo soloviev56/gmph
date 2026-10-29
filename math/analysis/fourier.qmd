@@ -1,0 +1,284 @@
+---
+title: "Ряды и преобразование Фурье"
+topic: fourier
+order: 3
+description: "Гармоники e^{ikx} как собственные функции сдвигов (характеры группы); ряд Фурье, ортогональность и формула для коэффициентов; явление Гиббса (рисунок) и скорость убывания коэффициентов в зависимости от гладкости; равенство Парсеваля и ζ(2) = π²/6; преобразование Фурье в соглашениях пособия и модуль gmph.fourier; производная, сдвиг, свёртка, Парсеваль; соотношение неопределённостей Δx·Δk ≥ 1/2; лоренцев контур спектральной линии затухающего осциллятора"
+---
+
+Струна, мембрана, теплопроводящий стержень, квантовая частица в ящике —
+в каждой из этих задач решение раскладывают по гармоникам $e^{ikx}$. Причина
+геометрическая: уравнения не меняются при **сдвигах** $x\mapsto x + a$, а
+гармоники — функции, которые при сдвиге лишь умножаются на число:
+$e^{ik(x + a)} = e^{ika}\,e^{ikx}$. Это одномерные представления (характеры) группы
+сдвигов $\R$ или окружности $U(1)$. Любой оператор, коммутирующий со сдвигами
+(производная, лапласиан, свёртка), в базисе гармоник диагонален.
+Разложение Фурье — частный случай общей идеи: **симметрия
+диагонализует задачу**. Для поворотов ту же роль играют сферические
+функции, для группы Лоренца — плоские волны в пространстве-времени.
+
+Предварительных тем не требуется; полезно помнить скалярное
+произведение из статьи о [комплексных пространствах](/math/algebra/complex-spaces.qmd).
+Знаки и множители $2\pi$ — по [конвенциям](/conventions.qmd).
+
+## Ряд Фурье
+
+::: {#def-fourier-series}
+**Ряд Фурье** функции $f$ периода $L$:
+$$
+f(x) = \sum_{n=-\infty}^{\infty} c_n\,e^{2\pi inx/L}, \qquad
+c_n = \frac1L\int_0^L f(x)\,e^{-2\pi inx/L}\,\dd x .
+$$
+:::
+
+Формула для коэффициентов — это ортогональность гармоник относительно
+эрмитова скалярного произведения $\langle f | g\rangle = \frac1L\int_0^L\bar f g\,\dd x$:
+$\langle e_m | e_n\rangle = \delta_{mn}$ для $e_n = e^{2\pi inx/L}$, и $c_n = \langle e_n | f\rangle$ — координата $f$ в
+ортонормированном базисе, как в конечномерном случае. Для вещественной
+$f$ коэффициенты удовлетворяют $c_{-n} = \bar c_n$, и ряд можно переписать через
+косинусы и синусы. Функция `series_coefficient` из `gmph.fourier` вычисляет $c_n$:
+
+```{python}
+import sympy as sp
+from gmph.fourier import series_coefficient
+
+x = sp.Symbol("x", real=True)
+n, m = sp.symbols("n m", integer=True)
+L = 2 * sp.pi
+
+print("⟨e_m|e_n⟩ при m ≠ n:", sp.simplify(sp.integrate(sp.exp(sp.I * (n - m) * x), (x, -sp.pi, sp.pi)).subs({n: 3, m: 1})) / L,
+      ", при m = n:", sp.integrate(sp.exp(0 * x), (x, -sp.pi, sp.pi)) / L)
+
+square = sp.Piecewise((-1, x < 0), (1, True))                 # ступенька на (−π, π)
+c_square = [sp.simplify(series_coefficient(square, x, k, L, start=-sp.pi)) for k in range(1, 6)]
+c_saw = [sp.simplify(series_coefficient(x, x, k, L, start=-sp.pi)) for k in range(1, 6)]
+c_tri = [sp.simplify(series_coefficient(sp.Abs(x), x, k, L, start=-sp.pi)) for k in range(1, 6)]
+print("ступенька sign x:  c₁…c₅ =", c_square)
+print("пила x:            c₁…c₅ =", c_saw)
+print("треугольник |x|:   c₁…c₅ =", c_tri)
+```
+
+Для ступеньки $\operatorname{sign}x$ на $(-\pi, \pi)$ ненулевые коэффициенты $c_n = -\frac{2i}{\pi n}$ при
+нечётных $n$, то есть
+$$
+\operatorname{sign}x = \frac4\pi\left(\sin x + \frac{\sin3x}3 + \frac{\sin5x}5 + \dots\right).
+$$
+
+**Гладкость и убывание коэффициентов.** Скачок функции даёт $c_n\sim1/n$ (ступенька,
+пила), излом — $c_n\sim1/n^2$ (треугольник). Каждая непрерывная производная
+добавляет множитель $1/n$: интегрирование по частям переносит производную
+на функцию. У аналитической функции коэффициенты убывают экспоненциально.
+Поэтому гладкие периодические функции очень эффективно приближаются
+несколькими гармониками — на этом основаны спектральные методы.
+
+```{python}
+import numpy as np
+
+def abs_coefficients(func, N=4096):
+    """|c_n| численно: равномерная сетка на (−π, π) и быстрое преобразование Фурье.
+
+    Сдвиг сетки на −π даёт лишь фазовый множитель e^{iπn}, на модуль он не влияет.
+    """
+    xs = -np.pi + 2 * np.pi * np.arange(N) / N
+    return np.abs(np.fft.fft(func(xs))) / N
+
+for name, func in [("ступенька", np.sign), ("треугольник", np.abs), ("e^{cos x}", lambda s: np.exp(np.cos(s)))]:
+    c = abs_coefficients(func)
+    print(f"{name:12}: |c_n| при n = 5, 15, 45: {c[5]:.2e}, {c[15]:.2e}, {c[45]:.2e}")
+```
+
+При утроении $n$ коэффициенты ступеньки убывают в 3 раза, треугольника — в 9 раз,
+а у $e^{\cos x}$ к $n = 15$ уже достигают машинного нуля.
+
+## Явление Гиббса
+
+Частичные суммы ряда для разрывной функции сходятся к ней в каждой
+точке непрерывности (и к среднему значению в точке скачка), но вблизи
+скачка **перелетают** через значение функции. Перелёт не исчезает с ростом
+числа гармоник — он лишь сужается.
+
+```{python}
+#| label: fig-gibbs
+#| fig-cap: 'Частичные суммы ряда Фурье ступеньки sign x с 5, 20 и 80 гармониками (нечётные n ≤ 2N − 1). Вблизи скачка сумма перелетает примерно на 9% величины скачка (пунктир на уровне 1,179); с ростом числа гармоник перелёт сужается, но не уменьшается.'
+import matplotlib.pyplot as plt
+
+def square_partial(xs, N):
+    k = 2 * np.arange(N) + 1
+    return 4 / np.pi * np.sum(np.sin(np.outer(xs, k)) / k, axis=1)
+
+xs = np.linspace(-np.pi, np.pi, 4001)
+fig, ax = plt.subplots(figsize=(7, 3.8))
+ax.plot(xs, np.sign(xs), color="k", lw=1)
+for N, col in [(5, "tab:blue"), (20, "tab:orange"), (80, "tab:green")]:
+    ax.plot(xs, square_partial(xs, N), color=col, lw=1, label=f"{N} гармоник")
+    print(f"N = {N:3}: максимум частичной суммы {square_partial(xs, N).max():.4f}")
+overshoot = float(2 / sp.pi * sp.Si(sp.pi))
+ax.axhline(overshoot, color="0.4", ls="--", lw=0.8)
+ax.set(xlim=(-np.pi, np.pi), ylim=(-1.4, 1.4), xlabel="x")
+ax.legend(fontsize=8, loc="lower right")
+plt.tight_layout()
+plt.show()
+print(f"предел максимума (2/π)·Si(π) = {overshoot:.4f}; перелёт = {(overshoot - 1) / 2:.4f} от скачка 2")
+```
+
+Высота перелёта стремится к $\frac2\pi\operatorname{Si}(\pi)\approx1{,}179$, где $\operatorname{Si}$ — интегральный синус:
+около $9\%$ величины скачка. Это важно на практике: обрезанный спектр
+сигнала со скачком «звенит» у фронтов, а численные методы, использующие
+гармоники, дают паразитные осцилляции у разрывов.
+
+## Равенство Парсеваля
+
+Для ортонормированного базиса квадрат нормы равен сумме квадратов
+координат:
+$$
+\frac1L\int_0^L|f|^2\,\dd x = \sum_n|c_n|^2 .
+$$
+Применим это к пиле $f(x) = x$ на $(-\pi, \pi)$, где $|c_n| = 1/|n|$:
+
+```{python}
+k = sp.Symbol("k", integer=True, positive=True)
+lhs = sp.integrate(x**2, (x, -sp.pi, sp.pi)) / L
+rhs_sum = 2 * sp.Sum(1 / k**2, (k, 1, sp.oo))
+print("(1/2π)∫x² dx =", lhs, ";  Σ|c_n|² = 2 Σ 1/n²")
+print("значит Σ 1/n² =", sp.simplify(lhs / 2), "; SymPy:", sp.Sum(1 / k**2, (k, 1, sp.oo)).doit())
+```
+
+Получилась знаменитая сумма Эйлера $\zeta(2) = \pi^2/6$. С физической точки зрения
+Парсеваль — это закон сохранения: энергия колебания равна сумме энергий
+мод.
+
+## Преобразование Фурье
+
+При $L\to\infty$ сумма по $n$ переходит в интеграл по волновому числу $k = 2\pi n/L$.
+
+::: {#def-fourier-transform}
+**Преобразование Фурье** (соглашение [конвенций](/conventions.qmd)):
+$$
+\tilde f(k) = \int_{-\infty}^{\infty} f(x)\,e^{-ikx}\,\dd x, \qquad
+f(x) = \int_{-\infty}^{\infty}\tilde f(k)\,e^{ikx}\,\frac{\dd k}{2\pi} .
+$$
+:::
+
+SymPy использует другое ядро, $e^{-2\pi ikx}$, поэтому в пособии вызываются
+функции `fourier` и `inverse_fourier` из `gmph.fourier`. Основные свойства:
+
+| $f(x)$ | $\tilde f(k)$ |
+|---|---|
+| $f'(x)$ | $ik\,\tilde f(k)$ |
+| $f(x - a)$ | $e^{-ika}\tilde f(k)$ |
+| $f(x)\,e^{ik_0x}$ | $\tilde f(k - k_0)$ |
+| $f(\lambda x)$ | $\tilde f(k/\lambda)/|\lambda|$ |
+| $(f * g)(x) = \int f(y)\,g(x - y)\,\dd y$ | $\tilde f(k)\,\tilde g(k)$ |
+
+```{python}
+from gmph.fourier import fourier, inverse_fourier
+
+kk = sp.Symbol("k", real=True)
+a, s = sp.symbols("a sigma", positive=True)
+gauss = sp.exp(-x**2 / (2 * s**2))
+G = sp.simplify(fourier(gauss, x, kk))
+print("гауссиана ширины σ →", G)
+print("обратное преобразование возвращает её:", sp.simplify(inverse_fourier(G, kk, x) - gauss) == 0)
+print("производная → ik f̃:", sp.simplify(fourier(gauss.diff(x), x, kk) - sp.I * kk * G) == 0)
+print("сдвиг → e^{−ika} f̃:", sp.simplify(fourier(gauss.subs(x, x - a), x, kk) - sp.exp(-sp.I * kk * a) * G) == 0)
+
+y = sp.Symbol("y", real=True)
+g2 = sp.exp(-a * sp.Abs(x))
+conv = sp.integrate(gauss.subs({x: y, s: 1}) * sp.exp(-(x - y)**2), (y, -sp.oo, sp.oo))
+print("свёртка → произведение:", sp.simplify(fourier(conv, x, kk) - fourier(gauss.subs(s, 1), x, kk) * fourier(sp.exp(-x**2), x, kk)) == 0)
+print("e^{−a|x|} →", sp.simplify(fourier(g2, x, kk)))
+```
+
+Гауссиана переходит в гауссиану, а ширины обратны: $\sigma$ по $x$ и $1/\sigma$ по $k$.
+Производная становится умножением на $ik$, поэтому линейные уравнения с
+постоянными коэффициентами превращаются в алгебраические — главное
+применение преобразования Фурье. Парсеваль в непрерывном случае:
+$\int|f|^2\,\dd x = \int|\tilde f|^2\,\dd k/2\pi$.
+
+**Соотношение неопределённостей.** Пусть $|f|^2$ и $|\tilde f|^2$ нормированы как
+распределения вероятностей. Тогда для их дисперсий
+$$
+\Delta x\cdot\Delta k\ \ge\ \frac12 ,
+$$
+и равенство достигается только на гауссианах. Это теорема о
+преобразовании Фурье, а не физический закон. В квантовой механике
+$p = \hbar k$, и она становится соотношением Гейзенберга $\Delta x\,\Delta p\ge\hbar/2$.
+Проверим для гауссианы и для $e^{-|x|}$:
+
+```{python}
+def spread(density, var):
+    """Стандартное отклонение по нормированной плотности |·|² (среднее равно 0 по симметрии)."""
+    norm = sp.integrate(density, (var, -sp.oo, sp.oo))
+    return sp.sqrt(sp.integrate(var**2 * density, (var, -sp.oo, sp.oo)) / norm)
+
+for name, f in [("гауссиана", sp.exp(-x**2 / 2)), ("e^{−|x|}", sp.exp(-sp.Abs(x)))]:
+    F = sp.simplify(fourier(f, x, kk))
+    product = sp.simplify(spread(f**2, x) * spread(sp.Abs(F)**2, kk))
+    print(f"{name:10}: Δx·Δk = {product} ≈ {float(product):.4f}")
+```
+
+## Физика: ширина спектральной линии
+
+Возбуждённый атом излучает затухающее колебание
+$E(t) = e^{-\gamma t/2}e^{-i\omega_0t}$ при $t > 0$ (амплитуда затухает вдвое медленнее энергии).
+Его спектр — преобразование Фурье по времени, со знаком $e^{+i\omega t}$ ([конвенции](/conventions.qmd)):
+
+```{python}
+from gmph.fourier import fourier_time
+
+t, w = sp.symbols("t omega", real=True)
+w0, gam = sp.symbols("omega_0 gamma", positive=True)
+signal = sp.exp(-gam * t / 2) * sp.exp(-sp.I * w0 * t) * sp.Heaviside(t)
+spectrum = sp.simplify(fourier_time(signal, t, w))
+power = sp.simplify(spectrum * sp.conjugate(spectrum))
+print("Ẽ(ω) =", spectrum)
+print("|Ẽ(ω)|² =", sp.factor(power))
+half = sp.solve(sp.Eq(power, power.subs(w, w0) / 2), w)
+print("полуширина на половине высоты: ω =", half, "→ полная ширина", sp.simplify(half[1] - half[0]))
+```
+
+Спектральная линия имеет **лоренцеву форму**
+$|\tilde E|^2 = 1/\left((\omega - \omega_0)^2 + \gamma^2/4\right)$ с полной шириной $\gamma$ на половине высоты.
+Время жизни уровня $\tau = 1/\gamma$ и ширина линии связаны соотношением $\Delta\omega\cdot\tau = 1$ —
+энергетическая форма соотношения неопределённостей. Тот же контур — у
+резонансной кривой осциллятора с трением и у резонансов в рассеянии
+частиц (формула Брейта–Вигнера).
+
+## Итоги
+
+- Гармоники $e^{ikx}$ — собственные функции сдвигов; разложение Фурье
+  диагонализует операторы, коммутирующие со сдвигами.
+- Ряд Фурье: $c_n = \frac1L\int f e^{-2\pi inx/L}\,\dd x$ — координаты в ортонормированном базисе;
+  скорость убывания $c_n$ отражает гладкость; у скачка — явление Гиббса (9%).
+- Парсеваль: норма равна сумме квадратов коэффициентов ($\zeta(2) = \pi^2/6$).
+- $\tilde f(k) = \int fe^{-ikx}\,\dd x$, $f = \int\tilde fe^{ikx}\,\dd k/2\pi$; производная → $ik$, свёртка → произведение.
+- $\Delta x\,\Delta k\ge\frac12$, равенство на гауссианах; время жизни и ширина линии: $\Delta\omega\,\tau = 1$.
+
+## Упражнения
+
+1. Найдите ряд Фурье функции $|x|$ на $(-\pi, \pi)$ и, подставив $x = 0$, вычислите
+   $\sum_{k\ge0}\frac1{(2k + 1)^2}$.
+2. Найдите преобразование Фурье прямоугольного импульса: $f = 1$ при $|x| < a$,
+   иначе $0$. Где первый нуль $\tilde f(k)$? (Это дифракция Фраунгофера на щели.)
+3. Докажите, что $\widetilde{f(\lambda x)} = \tilde f(k/\lambda)/|\lambda|$, и объясните, почему «сжатие» по $x$
+   «растягивает» спектр.
+4. Решите уравнение $-u'' + a^2u = e^{-x^2/2}$ на прямой с помощью преобразования
+   Фурье (ответ — в виде интеграла по $k$) и проверьте, что $\tilde u(k)$ убывает быстрее
+   правой части.
+5. Атомный переход с временем жизни $\tau = 16$ нс (линия водорода $2p\to1s$, $\lambda = 121{,}6$ нм).
+   Найдите естественную ширину линии в герцах и относительную ширину
+   $\Delta\nu/\nu$.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $c_0 = \pi/2$, $c_n = -\frac{2}{\pi n^2}$ при нечётных $n$, $0$ при чётных $n\ne0$:
+   $|x| = \frac\pi2 - \frac4\pi\left(\cos x + \frac{\cos3x}{9} + \dots\right)$. При $x = 0$:
+   $\sum\frac1{(2k + 1)^2} = \frac{\pi^2}8$.
+2. $\tilde f(k) = \int_{-a}^a e^{-ikx}\,\dd x = \frac{2\sin ka}{k}$; первый нуль при $k = \pi/a$.
+   Интенсивность $\propto\sin^2(ka)/k^2$ — дифракционная картина от щели ширины $2a$.
+3. Замена $y = \lambda x$: $\int f(\lambda x)e^{-ikx}\,\dd x = \frac1{|\lambda|}\int f(y)e^{-i(k/\lambda)y}\,\dd y$. Если функция
+   сжата ($\lambda > 1$), её спектр растянут в $\lambda$ раз.
+4. $(k^2 + a^2)\tilde u = \sqrt{2\pi}e^{-k^2/2}$, $u(x) = \int\frac{\sqrt{2\pi}e^{-k^2/2}}{k^2 + a^2}e^{ikx}\frac{\dd k}{2\pi}$;
+   $\tilde u$ содержит дополнительный множитель $1/(k^2 + a^2)$ — решение глаже правой части.
+5. $\Delta\omega = 1/\tau = 6{,}25\cdot10^7$ с⁻¹, $\Delta\nu = \Delta\omega/2\pi\approx9{,}9$ МГц; $\nu = c/\lambda\approx2{,}47\cdot10^{15}$ Гц,
+   $\Delta\nu/\nu\approx4\cdot10^{-9}$.
+:::
