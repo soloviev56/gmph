@@ -1,0 +1,267 @@
+---
+title: "Обобщённые функции"
+topic: distributions
+order: 4
+description: "Точечный заряд и δ-функция; обобщённая функция как линейный функционал на пробных функциях; δ-образные последовательности (рисунок); производная обобщённой функции: θ′ = δ, |x|″ = 2δ, диполь как −δ′; δ(f(x)); преобразование Фурье δ и единицы; формула Сохоцкого 1/(x ∓ i0) = P(1/x) ± iπδ; фундаментальные решения: Δ(1/r) = −4πδ³, одномерный оператор d²/dx² − a²; потенциал точечного заряда в гауссовых единицах"
+---
+
+Плотность точечного заряда равна нулю всюду, кроме одной точки, а её
+интеграл равен заряду. Обычных функций с таким свойством нет. Тем не
+менее физики с 1920-х годов пишут $\rho(\mathbf r) = q\,\delta^3(\mathbf r)$ и уверенно
+вычисляют. Строгий смысл этим вычислениям дала теория **обобщённых
+функций** (Соболев, 1936; Шварц, 1945). Обобщённая функция задаётся не
+значениями в точках, а тем, как она действует на гладкие «пробные»
+функции. Так устроено и физическое измерение: прибор не измеряет поле
+в точке, а усредняет его по малой области с некоторым весом.
+
+Нужны [ряды и преобразование Фурье](/math/analysis/fourier.qmd).
+
+## Определение
+
+::: {#def-distribution}
+**Пробные функции** $\mathcal D$ — бесконечно гладкие функции с компактным
+носителем (или, для преобразования Фурье, быстро убывающие вместе со всеми
+производными). **Обобщённая функция** $T$ — линейный непрерывный функционал
+$\varphi\mapsto\langle T, \varphi\rangle$ на пробных функциях.
+:::
+
+Обычная локально интегрируемая функция $f$ задаёт обобщённую функцию
+$\langle f, \varphi\rangle = \int f\varphi\,\dd x$. Но функционалов больше, чем функций.
+Главный пример —
+$$
+\langle\delta_a, \varphi\rangle = \varphi(a)
+$$
+— **δ-функция Дирака** в точке $a$. Привычная запись $\int\delta(x - a)\,\varphi(x)\,\dd x = \varphi(a)$ —
+лишь обозначение для этого функционала. В SymPy она реализована как
+`DiracDelta`:
+
+```{python}
+import sympy as sp
+
+x = sp.Symbol("x", real=True)
+a = sp.Symbol("a", real=True)
+phi = sp.Function("varphi")
+print("∫ δ(x − a) φ(x) dx =", sp.integrate(sp.DiracDelta(x - a) * phi(x), (x, -sp.oo, sp.oo)))
+print("∫ δ(x) cos x dx =", sp.integrate(sp.DiracDelta(x) * sp.cos(x), (x, -sp.oo, sp.oo)))
+```
+
+**δ как предел.** Последовательность обычных функций $\delta_\varepsilon$ сходится к $\delta$, если
+$\int\delta_\varepsilon\varphi\,\dd x\to\varphi(0)$ для каждой пробной функции. Таких последовательностей
+много: узкие гауссианы, лоренцианы $\frac{\varepsilon}{\pi(x^2 + \varepsilon^2)}$, а также
+$\frac{\sin(x/\varepsilon)}{\pi x}$ — эта последовательность вообще не стремится к нулю вне начала
+координат, а лишь всё быстрее осциллирует.
+
+```{python}
+#| label: fig-delta-sequences
+#| fig-cap: 'Три δ-образные последовательности при ε = 0,3 и 0,1: гауссианы, лоренцианы и sin(x/ε)/πx. Площадь под каждой кривой равна 1. Третья последовательность вне нуля не стремится к нулю, а осциллирует всё быстрее; её интегралы с гладкими функциями всё равно сходятся к φ(0).'
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.integrate import quad
+
+families = {
+    "гауссиана": lambda s, e: np.exp(-s**2 / (2 * e**2)) / (np.sqrt(2 * np.pi) * e),
+    "лоренциана": lambda s, e: e / (np.pi * (s**2 + e**2)),
+    "sin(x/ε)/πx": lambda s, e: np.sinc(s / (np.pi * e)) / (np.pi * e),   # np.sinc(u) = sin(πu)/(πu)
+}
+xs = np.linspace(-3, 3, 3001)
+fig, axes = plt.subplots(1, 3, figsize=(10, 3), sharey=True)
+for ax, (name, fam) in zip(axes, families.items()):
+    for eps, col in [(0.3, "tab:blue"), (0.1, "tab:red")]:
+        ax.plot(xs, fam(xs, eps), color=col, lw=1, label=f"ε = {eps}")
+    ax.set(title=name, xlabel="x", ylim=(-1.2, 4.2))
+axes[0].legend(fontsize=8)
+plt.tight_layout()
+plt.show()
+
+test = lambda s: np.exp(-s**2) * np.cos(s) + 0.5      # φ(0) = 1,5
+
+def against_test(f):
+    """∫ f φ dx: отдельно узкая центральная часть и хвосты, чтобы quad не пропустил пик."""
+    return sum(quad(lambda s: f(s) * test(s), lo, hi, limit=2000)[0] for lo, hi in [(-60, -1), (-1, 1), (1, 60)])
+
+for name, fam in families.items():
+    vals = [against_test(lambda s: fam(s, e)) for e in (0.3, 0.1, 0.01)]
+    print(f"{name:12}: ∫δ_ε φ dx при ε = 0,3; 0,1; 0,01 → {vals[0]:.4f}, {vals[1]:.4f}, {vals[2]:.4f}  (φ(0) = 1,5)")
+```
+
+## Производная обобщённой функции
+
+Для гладкой $f$ интегрирование по частям даёт $\langle f', \varphi\rangle = -\langle f, \varphi'\rangle$ (граничных
+членов нет — пробные функции финитны). Это равенство берут как
+**определение** производной любой обобщённой функции:
+$$
+\langle T', \varphi\rangle = -\langle T, \varphi'\rangle .
+$$
+Поэтому у любой обобщённой функции есть производные всех порядков.
+Скачок даёт δ-функцию:
+
+- $\theta'(x) = \delta(x)$: $\langle\theta', \varphi\rangle = -\int_0^\infty\varphi'\,\dd x = \varphi(0)$;
+- $|x|' = \operatorname{sign}x$, $|x|'' = 2\delta(x)$ — излом даёт δ во второй производной;
+- $\langle\delta', \varphi\rangle = -\varphi'(0)$ — **диполь**: два заряда $\pm q$ на расстоянии $d$ при
+  $qd = p$ фиксированном дают плотность $-p\,\delta'(x)$.
+
+```{python}
+test_phi = sp.exp(-x**2) * (1 + x + x**3)                     # пробная функция: φ(0) = 1, φ′(0) = 1
+
+def pair(T, f):
+    return sp.integrate(T * f, (x, -sp.oo, sp.oo))
+
+def derivative_pair(T, f, order=1):
+    """⟨T⁽ⁿ⁾, φ⟩ = (−1)ⁿ ⟨T, φ⁽ⁿ⁾⟩ — определение производной."""
+    return (-1)**order * pair(T, f.diff(x, order))
+
+print("⟨θ′, φ⟩ =", derivative_pair(sp.Heaviside(x), test_phi), "= φ(0)")
+print("⟨|x|″, φ⟩ =", sp.simplify(derivative_pair(sp.Abs(x), test_phi, 2)), "= 2φ(0)")
+print("⟨δ′, φ⟩ =", derivative_pair(sp.DiracDelta(x), test_phi), "= −φ′(0)")
+
+q, d = sp.symbols("q d", positive=True)
+dipole = q * (test_phi.subs(x, d / 2) - test_phi.subs(x, -d / 2))   # заряды ±q в точках ±d/2
+print("предел пары зарядов при qd = p:", sp.limit((dipole / (q * d)), d, 0), "· p  = −⟨δ′, φ⟩·p")
+```
+
+**Замена переменной.** Если $f$ имеет простые нули $x_i$, то
+$$
+\delta(f(x)) = \sum_i\frac{\delta(x - x_i)}{|f'(x_i)|} .
+$$
+Например, $\delta(x^2 - 4) = \frac14\left(\delta(x - 2) + \delta(x + 2)\right)$. Эта формула нужна в релятивистской
+кинематике: мера $\delta(p^2 - m^2c^2)\,\theta(p^0)\,\dd^4p$ на массовом гиперболоиде сводится к
+$\dd^3p/2p^0$ — лоренц-инвариантному элементу объёма.
+
+```{python}
+print("∫ δ(x² − 4) eˣ dx =", sp.integrate(sp.DiracDelta(x**2 - 4) * sp.exp(x), (x, -sp.oo, sp.oo)), "= (e² + e⁻²)/4")
+p0, m, c = sp.symbols("p0 m c", positive=True)
+pp = sp.Symbol("p", positive=True)
+on_shell = sp.integrate(sp.DiracDelta(p0**2 - pp**2 - m**2 * c**2), (p0, 0, sp.oo))
+print("∫ δ(p₀² − p² − m²c²) dp₀ (p₀ > 0) =", sp.simplify(on_shell), "= 1/(2p⁰)")
+```
+
+## Преобразование Фурье
+
+Преобразование Фурье обобщённой функции определяется тем же приёмом:
+$\langle\tilde T, \varphi\rangle = \langle T, \tilde\varphi\rangle$. Получается
+$$
+\tilde\delta(k) = 1, \qquad \tilde 1 = 2\pi\,\delta(k), \qquad \int e^{-ikx}\,\dd x = 2\pi\delta(k) .
+$$
+Последняя формула — «полнота» системы гармоник; её постоянно используют в
+квантовой механике и теории поля. Проверим её через предел: обрежем
+интеграл на $|x| < N$ и посмотрим, как ведёт себя получившаяся функция $k$:
+
+```{python}
+from gmph.fourier import fourier, inverse_fourier
+
+k = sp.Symbol("k", real=True)
+N = sp.Symbol("N", positive=True)
+print("δ̃(k) =", fourier(sp.DiracDelta(x), x, k), ";  обратное от 2πδ(k):", inverse_fourier(2 * sp.pi * sp.DiracDelta(k), k, x))
+truncated = sp.simplify(sp.integrate(sp.exp(-sp.I * k * x), (x, -N, N)).rewrite(sp.sin))
+print("∫_{−N}^{N} e^{−ikx} dx =", truncated)
+smooth = sp.exp(-k**2) * (2 + k)
+for n_ in (2, 10, 50):
+    val = quad(sp.lambdify(k, truncated.subs(N, n_) * smooth), -40, 40, limit=4000, points=[0])[0]
+    print(f"  N = {n_:2}: ∫ (…)·φ(k) dk = {val:.6f}   (2πφ(0) = {4 * np.pi:.6f})")
+```
+
+Функция $2\sin(Nk)/k$ — третья δ-образная последовательность с рисунка
+(с $\varepsilon = 1/N$, умноженная на $2\pi$).
+
+**Формула Сохоцкого.** В физике часто встречается $1/(x - i0)$ — предел
+$1/(x - i\varepsilon)$ при $\varepsilon\to+0$ (запаздывающие функции Грина, причинность):
+$$
+\frac1{x\mp i0} = \mathrm P\frac1x \pm i\pi\delta(x),
+$$
+где $\mathrm P$ — главное значение интеграла. Проверим численно на
+$\varphi(x) = e^{-x^2}(1 + x)$: здесь $\mathrm P\!\int\varphi/x\,\dd x = \sqrt\pi$, $\varphi(0) = 1$:
+
+```{python}
+phi_s = lambda s: np.exp(-s**2) * (1 + s)
+for eps in (0.1, 0.01, 0.001):
+    re = quad(lambda s: phi_s(s) * s / (s**2 + eps**2), -20, 20, points=[0], limit=2000)[0]
+    im = quad(lambda s: phi_s(s) * eps / (s**2 + eps**2), -20, 20, points=[0], limit=2000)[0]
+    print(f"ε = {eps}: ∫ φ/(x − iε) dx = {re:.5f} + {im:.5f}i")
+print(f"предел: √π + iπφ(0) = {np.sqrt(np.pi):.5f} + {np.pi:.5f}i")
+```
+
+Мнимая часть — это лоренциана $\varepsilon/(x^2 + \varepsilon^2) \to \pi\delta(x)$ из рисунка выше.
+
+## Фундаментальные решения
+
+Обобщённые функции позволяют решать линейные уравнения с источником.
+**Фундаментальное решение** оператора $\mathcal L$ — обобщённая функция $G$ с
+$\mathcal L\,G = \delta$. Тогда решение уравнения $\mathcal L u = f$ с произвольной правой
+частью — свёртка $u = G * f$: источник раскладывается на точечные, и их
+отклики складываются.
+
+**Одномерный пример.** Для $\mathcal L = \frac{\dd^2}{\dd x^2} - a^2$ решение, убывающее на
+бесконечности, — $G(x) = -\frac{e^{-a|x|}}{2a}$. Вне нуля $G'' = a^2G$, а излом в нуле даёт $\delta$.
+Проверим по определению, $\langle G, \varphi'' - a^2\varphi\rangle = \varphi(0)$, и через преобразование
+Фурье, $\tilde G = -1/(k^2 + a^2)$:
+
+```{python}
+a_ = sp.Symbol("a", positive=True)
+G = -sp.exp(-a_ * sp.Abs(x)) / (2 * a_)
+weak = sp.simplify(pair(G, test_phi.diff(x, 2) - a_**2 * test_phi))
+print("⟨G, φ″ − a²φ⟩ =", weak, "= φ(0)")
+print("G̃(k) =", sp.simplify(fourier(G, x, k)))
+```
+
+**Лапласиан в трёх измерениях.**
+$$
+\Delta\frac1r = -4\pi\,\delta^3(\mathbf r) .
+$$
+Вне начала координат $1/r$ гармонична, а поток её градиента через любую
+сферу равен $-4\pi$ — это и есть δ-функция. Проверим через регуляризацию
+$1/\sqrt{r^2 + \varepsilon^2}$: её лапласиан — гладкая функция, которая при $\varepsilon\to0$ сжимается к
+нулю, а интеграл по пространству остаётся равным $-4\pi$:
+
+```{python}
+r, eps = sp.symbols("r epsilon", positive=True)
+reg = 1 / sp.sqrt(r**2 + eps**2)
+lap = sp.simplify(sp.diff(r**2 * sp.diff(reg, r), r) / r**2)        # радиальная часть лапласиана
+print("Δ(1/√(r²+ε²)) =", lap)
+print("∫ Δ(…) d³r =", sp.integrate(lap * 4 * sp.pi * r**2, (r, 0, sp.oo)))
+inside = sp.integrate(lap * 4 * sp.pi * r**2, (r, 0, 10 * eps))
+print(f"доля интеграла внутри r < 10ε: {float(inside / (-4 * sp.pi)):.4f}")
+```
+
+**Физика: потенциал точечного заряда.** В гауссовых единицах уравнение
+электростатики $\dd\mathcal D = 4\pi\rho\,\mathrm{vol}$ ([конвенции](/conventions.qmd), статья
+[«Электростатика»](/physics/electrodynamics/electrostatics.qmd)) в пустоте сводится к
+уравнению Пуассона $\Delta\varphi = -4\pi\rho$. Для точечного заряда $\rho = q\,\delta^3(\mathbf r)$ формула
+выше сразу даёт $\varphi = q/r$, а для произвольного распределения — свёртку
+$$
+\varphi(\mathbf r) = \int\frac{\rho(\mathbf r')}{|\mathbf r - \mathbf r'|}\,\dd^3r' .
+$$
+Функция $1/(4\pi|\mathbf r - \mathbf r'|)$ — функция Грина уравнения Пуассона (тема «Функции
+Грина»).
+
+## Итоги
+
+- Обобщённая функция — линейный функционал на пробных функциях;
+  $\langle\delta_a, \varphi\rangle = \varphi(a)$; δ — предел гауссиан, лоренциан, $\sin(x/\varepsilon)/\pi x$.
+- Производная по определению $\langle T', \varphi\rangle = -\langle T, \varphi'\rangle$: $\theta' = \delta$, $|x|'' = 2\delta$, диполь
+  $-p\delta'$.
+- $\delta(f(x)) = \sum\delta(x - x_i)/|f'(x_i)|$; $\delta(p^2 - m^2c^2)$ даёт меру $\dd^3p/2p^0$.
+- $\tilde\delta = 1$, $\int e^{-ikx}\,\dd x = 2\pi\delta(k)$; $1/(x\mp i0) = \mathrm P\frac1x\pm i\pi\delta(x)$.
+- Фундаментальное решение: $\mathcal LG = \delta$, решение $u = G * f$; $\Delta\frac1r = -4\pi\delta^3$,
+  потенциал заряда $q/r$.
+
+## Упражнения
+
+1. Вычислите $\int\delta(\sin x)\,e^{-x^2}\,\dd x$.
+2. Найдите вторую производную функции $f(x) = x\,\theta(x)$ (линейная «рампа»).
+3. Покажите, что $x\,\delta'(x) = -\delta(x)$ (подействуйте на пробную функцию).
+4. Найдите фундаментальное решение оператора $\frac{\dd}{\dd t} + \gamma$ с нулём при $t < 0$ и
+   с его помощью запишите решение уравнения $\dot v + \gamma v = f(t)/m$.
+5. Используя $\Delta\frac1r = -4\pi\delta^3$, найдите $\Delta\frac{e^{-\kappa r}}{r}$ (потенциал Юкавы, экранированный
+   кулоновский потенциал).
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. Нули $\sin x$ — точки $x_n = \pi n$, $|\cos\pi n| = 1$: $\sum_n e^{-\pi^2n^2}\approx1 + 2e^{-\pi^2}\approx1{,}000103$.
+2. $f' = \theta(x)$, $f'' = \delta(x)$.
+3. $\langle x\delta', \varphi\rangle = \langle\delta', x\varphi\rangle = -(x\varphi)'|_0 = -\varphi(0)$.
+4. $G(t) = \theta(t)e^{-\gamma t}$: $\dot G + \gamma G = \delta(t)$. Решение
+   $v(t) = \int_{-\infty}^t e^{-\gamma(t - t')}f(t')\,\dd t'/m$ — отклик на прошлые толчки,
+   затухающий со временем.
+5. Вне нуля $\Delta\frac{e^{-\kappa r}}r = \kappa^2\frac{e^{-\kappa r}}r$, а у нуля функция ведёт себя как $1/r$:
+   $\left(\Delta - \kappa^2\right)\frac{e^{-\kappa r}}{r} = -4\pi\delta^3(\mathbf r)$.
+:::
