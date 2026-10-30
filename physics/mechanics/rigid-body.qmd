@@ -1,0 +1,335 @@
+---
+title: "Твёрдое тело"
+topic: rigid-body
+order: 11
+description: "Конфигурационное пространство SO(3) × ℝ³; угловая скорость в теле и в пространстве (R⁻¹Ṙ и ṘR⁻¹); тензор инерции, главные оси (спектральная теорема), теорема Штейнера; уравнения Эйлера IΩ̇ = IΩ × Ω из сохранения момента в пространстве; интегралы энергии и |L|²; теорема о промежуточной оси и эффект Джанибекова (рисунок); свободный симметричный волчок и чандлеровское качание Земли; тяжёлый симметричный волчок в углах Эйлера: циклические координаты, прецессия Mgl/I₃ω₃ и нутация (рисунок)"
+---
+
+Положение твёрдого тела задаётся положением центра масс и ориентацией —
+поворотом $R\in SO(3)$, переводящим оси, жёстко связанные с телом, в
+неподвижные оси пространства. Поэтому конфигурационное пространство
+твёрдого тела — $\R^3\times SO(3)$. Это первый пример в механике, где
+конфигурационное пространство — нетривиальная группа Ли, а не область
+$\R^n$. Отсюда и особенности: удобные переменные (угловая скорость) не
+являются производными каких-либо координат, уравнения движения
+(уравнения Эйлера) записываются в теле, а законы сохранения — в
+пространстве. В этой статье — тензор инерции, уравнения Эйлера, их
+интегралы, неустойчивость вращения вокруг средней оси и волчок.
+
+Нужны [уравнения Лагранжа](/physics/mechanics/lagrange-equations.qmd) и
+[вращения SO(3) и SU(2)](/math/lie/so3-su2.qmd): генераторы $J_k$ с $[J_x, J_y] = J_z$ и
+углы Эйлера по Ландау–Лифшицу $R = R_z(\varphi)R_x(\theta)R_z(\psi)$.
+
+## Угловая скорость
+
+Точка тела с постоянными координатами $\mathbf X$ в осях тела находится в
+пространстве в точке $\mathbf x = R(t)\mathbf X$ (центр масс в начале координат). Её
+скорость $\dot{\mathbf x} = \dot R\mathbf X$. Матрицы $R^{-1}\dot R$ и $\dot RR^{-1}$ антисимметричны (продифференцируйте
+$R^{\mathsf T}R = 1$), то есть лежат в алгебре Ли $\mathfrak{so}(3)$ и задаются векторами:
+$$
+R^{-1}\dot R = \Omega^kJ_k, \qquad \dot RR^{-1} = \omega^kJ_k, \qquad \boldsymbol\omega = R\,\boldsymbol\Omega .
+$$
+$\boldsymbol\omega$ — **угловая скорость в пространстве**, $\boldsymbol\Omega$ — та же угловая скорость в
+**осях тела**. Скорость точки: $\dot{\mathbf x} = \boldsymbol\omega\times\mathbf x$. Найдём $\boldsymbol\Omega$ через углы Эйлера:
+
+```{python}
+import sympy as sp
+
+t = sp.Symbol("t", real=True)
+ph, th, ps = (sp.Function(n)(t) for n in ("varphi", "theta", "psi"))
+
+def Rz(a):
+    return sp.Matrix([[sp.cos(a), -sp.sin(a), 0], [sp.sin(a), sp.cos(a), 0], [0, 0, 1]])
+
+def Rx(a):
+    return sp.Matrix([[1, 0, 0], [0, sp.cos(a), -sp.sin(a)], [0, sp.sin(a), sp.cos(a)]])
+
+def vee(W):
+    """Вектор антисимметричной матрицы: W = Ω^k J_k."""
+    return sp.Matrix([W[2, 1], W[0, 2], W[1, 0]])
+
+R = Rz(ph) * Rx(th) * Rz(ps)
+W_body = sp.simplify(R.T * R.diff(t))
+print("R⁻¹Ṙ антисимметрична:", sp.simplify(W_body + W_body.T) == sp.zeros(3))
+Omega = sp.simplify(vee(W_body))
+for k, name in enumerate("123"):
+    print(f"Ω_{name} =", Omega[k])
+```
+
+Это кинематические формулы Эйлера (ЛЛ, т. I, § 35). Угловая скорость — не
+производная каких-либо координат: формы $\Omega^k\,\dd t$ на $SO(3)$ не замкнуты. Это
+левоинвариантные 1-формы группы, и их «некоммутативность» приводит к
+уравнениям Эйлера.
+
+## Тензор инерции
+
+Кинетическая энергия вращения
+$T = \frac12\sum m|\boldsymbol\omega\times\mathbf x|^2 = \frac12\,\boldsymbol\Omega^{\mathsf T}I\,\boldsymbol\Omega$, где
+$$
+I = \sum m\left(|\mathbf X|^2\,\mathbb 1 - \mathbf X\mathbf X^{\mathsf T}\right)
+$$
+— **тензор инерции** в осях тела. Он постоянен (тело твёрдое),
+симметричен и положительно определён. По [спектральной
+теореме](/math/algebra/spectral-finite.qmd) у него есть ортонормированный
+базис собственных векторов — **главные оси инерции** — с главными моментами
+$I_1, I_2, I_3$. Для однородного бруска $a\times b\times c$ и для «уголка» из точечных масс:
+
+```{python}
+X1, X2, X3 = sp.symbols("X1 X2 X3", real=True)
+M, a, b, c = sp.symbols("M a b c", positive=True)
+Xv = sp.Matrix([X1, X2, X3])
+rho = M / (a * b * c)
+I_box = (rho * (Xv.dot(Xv) * sp.eye(3) - Xv * Xv.T)).applyfunc(
+    lambda e: sp.integrate(e, (X1, -a / 2, a / 2), (X2, -b / 2, b / 2), (X3, -c / 2, c / 2)))
+print("брусок:", sp.simplify(I_box))
+
+def inertia(points):
+    """Тензор инерции точечных масс [(m, (x, y, z)), …] относительно центра масс."""
+    total = sum(m for m, _ in points)
+    center = sum((m * sp.Matrix(p) for m, p in points), sp.zeros(3, 1)) / total
+    I = sp.zeros(3)
+    for m, p in points:
+        X = sp.Matrix(p) - center
+        I += m * (X.dot(X) * sp.eye(3) - X * X.T)
+    return I
+
+corner = [(1, (0, 0, 0)), (1, (1, 0, 0)), (1, (2, 0, 0)), (1, (0, 1, 0)), (1, (0, 2, 0))]
+I_corner = inertia(corner)
+print("уголок:", I_corner)
+for value, mult, vecs in I_corner.eigenvects():
+    print(f"  главный момент {value} (≈ {float(value):.3f}), ось {list(vecs[0].normalized())}")
+```
+
+Брусок: $I_1 = \frac M{12}(b^2 + c^2)$ и т. д. У «уголка» тензор инерции в исходных
+осях недиагонален. Главные оси — биссектриса угла, перпендикуляр к ней
+в плоскости и нормаль к плоскости. Момент относительно нормали равен
+сумме двух других, как у любой плоской фигуры.
+
+**Теорема Штейнера.** Относительно точки, смещённой от центра масс на
+$\mathbf d$, тензор инерции равен $I + M\left(|\mathbf d|^2\mathbb 1 - \mathbf d\mathbf d^{\mathsf T}\right)$ — так же устроен тензор
+инерции точки массы $M$:
+
+```{python}
+d = sp.Matrix(sp.symbols("d1:4", real=True))
+shifted = [(m, tuple(sp.Matrix(p) + d)) for m, p in corner]
+I_about_origin = sum(((m * (sp.Matrix(p).dot(sp.Matrix(p)) * sp.eye(3) - sp.Matrix(p) * sp.Matrix(p).T))
+                      for m, p in shifted), sp.zeros(3))
+total = sum(m for m, _ in corner)
+cm = sum((m * sp.Matrix(p) for m, p in shifted), sp.zeros(3, 1)) / total
+steiner = I_corner + total * (cm.dot(cm) * sp.eye(3) - cm * cm.T)
+print("теорема Штейнера:", sp.simplify(I_about_origin - steiner) == sp.zeros(3))
+```
+
+## Уравнения Эйлера
+
+Момент импульса в пространстве $\mathbf l = R\,I\boldsymbol\Omega$ без внешних моментов сохраняется.
+В осях тела $\mathbf L = I\boldsymbol\Omega$, и
+$$
+0 = \frac{\dd}{\dd t}(R\mathbf L) = R\left(\boldsymbol\Omega\times\mathbf L + \dot{\mathbf L}\right)
+\quad\Longrightarrow\quad I\dot{\boldsymbol\Omega} = (I\boldsymbol\Omega)\times\boldsymbol\Omega .
+$$
+Это **уравнения Эйлера**. В главных осях:
+$I_1\dot\Omega_1 = (I_2 - I_3)\,\Omega_2\Omega_3$ и циклически. Два интеграла: энергия $2T = \sum I_k\Omega_k^2$ и
+квадрат момента $|\mathbf L|^2 = \sum I_k^2\Omega_k^2$ (длина вектора не зависит от осей):
+
+```{python}
+I1, I2, I3 = sp.symbols("I1 I2 I3", positive=True)
+W1, W2, W3 = (sp.Function(f"Omega_{k}")(t) for k in "123")
+Om = sp.Matrix([W1, W2, W3])
+I_diag = sp.diag(I1, I2, I3)
+euler_rhs = I_diag.inv() * (I_diag * Om).cross(Om)          # Ω̇ из уравнений Эйлера
+on_shell = {Om[k].diff(t): euler_rhs[k] for k in range(3)}
+energy = (Om.T * I_diag * Om)[0] / 2
+L2 = (I_diag * Om).dot(I_diag * Om)
+print("dT/dt =", sp.simplify(energy.diff(t).subs(on_shell)), "; d|L|²/dt =", sp.simplify(L2.diff(t).subs(on_shell)))
+print("Ω̇₁ =", sp.simplify(euler_rhs[0]))
+```
+
+Геометрически траектория $\mathbf L(t)$ в теле лежит на пересечении сферы
+$|\mathbf L| = \mathrm{const}$ и эллипсоида энергии $\sum L_k^2/I_k = 2T$ (полодии).
+
+## Теорема о промежуточной оси
+
+Пусть $I_1 < I_2 < I_3$. Вращение вокруг любой главной оси — стационарное решение.
+Линеаризуем уравнения около $\boldsymbol\Omega = (0, \Omega_0, 0)$ и около вращений вокруг других осей:
+
+```{python}
+w0 = sp.Symbol("Omega_0", positive=True)
+state = sp.Matrix(sp.symbols("w1:4"))
+rhs = euler_rhs.subs(dict(zip([W1, W2, W3], state)))
+jac = rhs.jacobian(state)
+values = {I1: 1, I2: 2, I3: 3}
+for axis in range(3):
+    point = {state[k]: (w0 if k == axis else 0) for k in range(3)}
+    eig = jac.subs(point).subs(values).eigenvals()
+    print(f"вращение вокруг оси {axis + 1}: собственные значения {list(eig)}")
+```
+
+Около первой и третьей осей собственные значения мнимые: малые
+отклонения колеблются. Около средней оси одно из них вещественно и
+положительно: отклонение растёт экспоненциально. Это **теорема о
+промежуточной оси**. Её знает каждый, кто подбрасывал теннисную ракетку
+или книгу. Космонавт В. Джанибеков в 1985 г. увидел на орбите, как гайка,
+раскручиваясь вокруг средней оси, периодически переворачивается на $180^\circ$:
+
+```{python}
+#| label: fig-dzhanibekov
+#| fig-cap: 'Эффект Джанибекова: тело с I₁ : I₂ : I₃ = 1 : 2 : 3 закручено почти точно вокруг средней оси (Ω₂ = 1, Ω₁ = 0,01). Компонента Ω₂ периодически меняет знак — тело переворачивается, — а между переворотами вращение выглядит устойчивым.'
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.integrate import solve_ivp
+
+I_num = np.array([1.0, 2.0, 3.0])
+
+def euler_equations(time, w):
+    return [(I_num[1] - I_num[2]) / I_num[0] * w[1] * w[2],
+            (I_num[2] - I_num[0]) / I_num[1] * w[2] * w[0],
+            (I_num[0] - I_num[1]) / I_num[2] * w[0] * w[1]]
+
+sol = solve_ivp(euler_equations, (0, 60), [0.01, 1.0, 0.0], rtol=1e-10, atol=1e-12, dense_output=True)
+ts = np.linspace(0, 60, 3000)
+w = sol.sol(ts)
+fig, ax = plt.subplots(figsize=(7, 3.4))
+for k, col in enumerate(["tab:blue", "tab:orange", "tab:green"]):
+    ax.plot(ts, w[k], color=col, label=f"Ω_{k + 1}")
+ax.set(xlabel="t", ylabel="Ω (в осях тела)")
+ax.legend(fontsize=8, loc="lower left")
+plt.tight_layout()
+plt.show()
+
+flips = ts[np.where(np.diff(np.sign(w[1])) != 0)[0]]
+T_num = 0.5 * np.sum(I_num[:, None] * w**2, axis=0)
+L2_num = np.sum((I_num[:, None] * w)**2, axis=0)
+print("моменты переворотов (Ω₂ = 0):", np.round(flips, 2))
+print(f"разброс энергии {np.ptp(T_num):.1e}, разброс |L|² {np.ptp(L2_num):.1e}")
+```
+
+Переворот происходит примерно каждые 20,8 единицы времени, хотя
+начальное отклонение составляло всего 1%. Энергия и $|\mathbf L|^2$ сохраняются с
+точностью интегрирования.
+
+## Свободный симметричный волчок и качание Земли
+
+Если $I_1 = I_2$, то $\dot\Omega_3 = 0$, а $(\Omega_1, \Omega_2)$ вращается с частотой
+$\Omega_p = \frac{I_3 - I_1}{I_1}\Omega_3$: ось вращения описывает конус вокруг оси симметрии тела.
+Земля сплюснута: $(C - A)/A\approx0{,}00327$. Значит, полюс вращения должен
+обходить ось фигуры с периодом $\frac{A}{C - A}$ суток:
+
+```{python}
+flattening = 0.00327
+print(f"эйлеров период качания: {1 / flattening:.0f} суток")
+```
+
+Эйлер предсказал период около 306 суток. Чандлер в 1891 г. обнаружил качание
+полюса с периодом около 433 суток: Земля не абсолютно твёрдая, упругость
+мантии и океаны удлиняют период. Амплитуда качания — несколько метров
+на поверхности.
+
+## Тяжёлый симметричный волчок
+
+Волчок с неподвижной нижней точкой, масса $M$, расстояние от опоры до центра
+масс $l$, моменты инерции относительно опоры $I_1 = I_2$, $I_3$. С кинематическими
+формулами Эйлера
+$$
+L = \frac{I_1}2\left(\dot\theta^2 + \dot\varphi^2\sin^2\theta\right) + \frac{I_3}2\left(\dot\psi + \dot\varphi\cos\theta\right)^2 - Mgl\cos\theta .
+$$
+Координаты $\varphi$ и $\psi$ циклические: сохраняются $p_\varphi$ (проекция момента на
+вертикаль) и $p_\psi = I_3\Omega_3$. Проверим лагранжиан и проинтегрируем уравнения
+модулем `gmph.mechanics`:
+
+```{python}
+from gmph.mechanics import first_order_system, momenta, state_function
+
+I1s, I3s, Ms, g, l = sp.symbols("I_1 I_3 M g l", positive=True)
+T_top = sp.simplify((I1s * (Omega[0]**2 + Omega[1]**2) + I3s * Omega[2]**2) / 2)
+L_top = T_top - Ms * g * l * sp.cos(th)
+expected = I1s / 2 * (th.diff(t)**2 + ph.diff(t)**2 * sp.sin(th)**2) + I3s / 2 * (ps.diff(t) + ph.diff(t) * sp.cos(th))**2
+print("кинетическая энергия совпадает с формулой:", sp.simplify(T_top - expected) == 0)
+coords = [ph, th, ps]
+p = momenta(L_top, coords, t)
+print("p_φ =", sp.factor(p[0]), ";  p_ψ =", sp.factor(p[2]))
+
+params = {I1s: 1.0, I3s: 0.5, Ms: 1.0, g: 1.0, l: 1.0}
+rhs_top = first_order_system(L_top, coords, t, params)
+p_numeric = state_function(p, coords, t, params)
+
+def precession(spin, t_end=200.0):
+    sol = solve_ivp(rhs_top, (0, t_end), [0, 1.0, 0, 0, 0, spin], rtol=1e-10, atol=1e-10)
+    drift = [np.ptp([p_numeric(0, y)[k] for y in sol.y.T]) for k in (0, 2)]
+    return sol.y[0, -1] / sol.t[-1], drift
+
+for spin in (20.0, 40.0):
+    rate, drift = precession(spin)
+    print(f"ψ̇₀ = {spin:.0f}: средняя скорость прецессии {rate:.5f}, оценка Mgl/(I₃ω₃) = {1 / (0.5 * spin):.5f}; "
+          f"разброс p_φ, p_ψ: {drift[0]:.1e}, {drift[1]:.1e}")
+```
+
+Быстрый волчок медленно прецессирует со скоростью $\dot\varphi\approx Mgl/(I_3\omega_3)$, тем
+медленнее, чем быстрее он вращается. Отпущенный без начальной скорости
+прецессии, он ещё и **нутирует**: ось «кивает», и её конец описывает дуги с остриями
+(петли получаются, если оси сообщить начальную скорость против прецессии).
+
+```{python}
+#| label: fig-heavy-top
+#| fig-cap: 'Траектория конца оси тяжёлого симметричного волчка (проекция на горизонтальную плоскость; I₁ = 1, I₃ = 0,5, Mgl = 1, θ₀ = 1, ось отпущена без скорости). Пунктир — начальный наклон θ₀. Ось отпущена без скорости, поэтому её конец описывает дуги с остриями: в верхних точках он на мгновение останавливается (нутация на фоне медленной прецессии). При ψ̇₀ = 20 нутация мала, и остаётся почти равномерная прецессия по окружности.'
+fig, axes = plt.subplots(1, 2, figsize=(8, 4))
+for ax, spin, t_end in [(axes[0], 6.0, 20.0), (axes[1], 20.0, 40.0)]:
+    sol = solve_ivp(rhs_top, (0, t_end), [0, 1.0, 0, 0, 0, spin], rtol=1e-10, atol=1e-10, max_step=0.005)
+    phi_t, theta_t = sol.y[0], sol.y[1]
+    ax.plot(np.sin(theta_t) * np.cos(phi_t), np.sin(theta_t) * np.sin(phi_t), color="tab:blue", lw=0.8)
+    circle = np.linspace(0, 2 * np.pi, 200)
+    ax.plot(np.sin(1.0) * np.cos(circle), np.sin(1.0) * np.sin(circle), color="0.7", lw=0.6, ls="--")
+    ax.set(aspect="equal", title=f"ψ̇₀ = {spin:.0f}, t ≤ {t_end:.0f}")
+    ax.set_xticks([])
+    ax.set_yticks([])
+    print(f"ψ̇₀ = {spin:.0f}: θ меняется от {theta_t.min():.3f} до {theta_t.max():.3f}")
+plt.tight_layout()
+plt.show()
+```
+
+Ось опускается ниже начального наклона ($\theta$ растёт от $\theta_0$) и возвращается: размах
+нутации $0{,}22$ рад при $\dot\psi_0 = 6$ и $0{,}017$ рад при $\dot\psi_0 = 20$. У быстрого волчка он убывает
+как $1/\omega_3^2$: оценка $\Delta\theta\approx2I_1Mgl\sin\theta_0/(I_3\omega_3)^2$ даёт $0{,}017$ при $\omega_3 = 20$.
+
+## Итоги
+
+- Конфигурационное пространство твёрдого тела — $\R^3\times SO(3)$; угловые скорости
+  $\boldsymbol\Omega$ (в теле, $R^{-1}\dot R$) и $\boldsymbol\omega = R\boldsymbol\Omega$ (в пространстве, $\dot RR^{-1}$) — элементы $\mathfrak{so}(3)$.
+- $T = \frac12\boldsymbol\Omega^{\mathsf T}I\boldsymbol\Omega$; тензор инерции диагонализуется в главных осях; теорема
+  Штейнера.
+- Уравнения Эйлера $I\dot{\boldsymbol\Omega} = (I\boldsymbol\Omega)\times\boldsymbol\Omega$ — сохранение момента в пространстве,
+  записанное в теле; интегралы $T$ и $|\mathbf L|^2$.
+- Вращение вокруг средней оси неустойчиво (эффект Джанибекова);
+  свободный симметричный волчок прецессирует с частотой $\frac{I_3 - I_1}{I_1}\Omega_3$
+  (качание полюса Земли).
+- Тяжёлый волчок: $\varphi$, $\psi$ циклические, медленная прецессия $Mgl/(I_3\omega_3)$ и нутация.
+
+## Упражнения
+
+1. Найдите тензор инерции однородного шара и однородного цилиндра
+   (радиус $a$, высота $h$) относительно центра масс. При каком $h/a$ у цилиндра все
+   главные моменты равны?
+2. Покажите, что $\dot RR^{-1} = R\,(R^{-1}\dot R)\,R^{-1}$, и выведите отсюда $\boldsymbol\omega = R\boldsymbol\Omega$.
+3. Найдите частоту малых колебаний $\Omega_1$, $\Omega_3$ около вращения вокруг оси 3 с
+   угловой скоростью $\Omega_0$ и сравните с собственными значениями, найденными
+   в статье.
+4. Какой из главных осей кирпича $5\times10\times20$ см соответствует неустойчивое
+   вращение?
+5. Оцените скорость прецессии гироскопа: диск массы 0,2 кг, радиуса 3 см
+   вращается с частотой 50 об/с; ось горизонтальна, центр масс на расстоянии
+   5 см от точки опоры.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. Шар: $I = \frac25Ma^2\,\mathbb 1$. Цилиндр: $I_3 = \frac12Ma^2$ (ось симметрии),
+   $I_1 = I_2 = M\left(\frac{a^2}4 + \frac{h^2}{12}\right)$; равны при $h^2/12 = a^2/4$, то есть $h = \sqrt3\,a$.
+2. $\dot RR^{-1} = R(R^{-1}\dot R)R^{-1}$ тривиально; для антисимметричной матрицы
+   $R\,\hat{\boldsymbol\Omega}\,R^{-1} = \widehat{R\boldsymbol\Omega}$ (поворот сохраняет векторное произведение), отсюда $\boldsymbol\omega = R\boldsymbol\Omega$.
+3. Около $\boldsymbol\Omega = (0, 0, \Omega_0)$: $\ddot\Omega_1 = -\frac{(I_3 - I_2)(I_3 - I_1)}{I_1I_2}\Omega_0^2\,\Omega_1$; при $I = (1, 2, 3)$ частота
+   $\Omega_0\sqrt{1\cdot2/2} = \Omega_0$ — собственные значения $\pm i\Omega_0$, как в выводе выше.
+4. Моменты $I\propto b^2 + c^2$: для оси вдоль 5 см — $10^2 + 20^2 = 500$, вдоль 10 см —
+   $5^2 + 20^2 = 425$, вдоль 20 см — $5^2 + 10^2 = 125$. Средний момент — у оси вдоль
+   ребра 10 см: вращение вокруг неё неустойчиво.
+5. $I_3 = \frac12Ma^2 = 9\cdot10^{-5}$ кг·м², $\omega_3 = 2\pi\cdot50\approx314$ с⁻¹,
+   $\Omega_{\text{пр}} = \frac{Mgl}{I_3\omega_3} = \frac{0{,}2\cdot9{,}8\cdot0{,}05}{9\cdot10^{-5}\cdot314}\approx3{,}5$ с⁻¹ (период около 1,8 с).
+:::
