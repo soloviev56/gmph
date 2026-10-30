@@ -1,0 +1,276 @@
+---
+title: "Ковариантная производная"
+topic: covariant-derivative
+order: 1
+description: "Почему частные производные компонент векторного поля не тензор (постоянное поле в полярных координатах, рисунок); аффинная связность: аксиомы и символы Γ^i_{jk} (соглашение о порядке индексов добавлено в конвенции); ковариантная производная векторов, ковекторов и тензоров; закон преобразования символов связности и неоднородный член; плоская связность в полярных и сферических координатах (модуль gmph.riemann); разность связностей и кручение — тензоры; производная вдоль кривой и ускорение в криволинейных координатах"
+---
+
+Как сравнить векторы в разных точках? На плоскости в декартовых
+координатах ответ очевиден: вектор $(1, 0)$ в одной точке «равен» вектору
+$(1, 0)$ в другой. Но уже в полярных координатах постоянное поле $\partial_x$ имеет
+переменные компоненты: базис $\partial_r$, $\partial_\varphi$ поворачивается от точки к
+точке. На сфере не существует даже «декартовых» координат, а в общей
+теории относительности — глобальной инерциальной системы отсчёта. Чтобы
+дифференцировать векторные поля и писать уравнения движения в любых
+координатах, нужна дополнительная структура — **связность**. Она
+указывает, как сравнивать касательные пространства в соседних точках.
+В этой статье — определение, правила вычисления в координатах и
+первая физика: ускорение в криволинейных координатах.
+
+Нужны [касательные векторы](/math/forms/tangent-vectors.qmd) и
+[тензоры](/math/algebra/tensors.qmd). Порядок индексов в символах связности
+зафиксирован в [конвенциях](/conventions.qmd) (раздел «Связности», добавлен
+вместе с этой статьёй).
+
+## Проблема: частные производные — не тензор
+
+Компоненты векторного поля при замене координат $x\to y$ преобразуются как
+$V'^i = \pd{y^i}{x^a}V^a$. Продифференцируем:
+$$
+\pd{V'^i}{y^j} = \pd{y^i}{x^a}\pd{x^b}{y^j}\pd{V^a}{x^b} + \frac{\partial^2y^i}{\partial x^a\partial x^b}\pd{x^b}{y^j}V^a .
+$$
+Первое слагаемое — закон преобразования тензора типа $(1, 1)$, второе
+мешает. Оно исчезает только для линейных замен. Посмотрим на поле $\partial_x$,
+которое в декартовых координатах постоянно:
+
+```{python}
+import sympy as sp
+
+r, phi = sp.symbols("r phi", positive=True)
+polar = [r * sp.cos(phi), r * sp.sin(phi)]                 # x(r, φ), y(r, φ)
+J = sp.Matrix(2, 2, lambda a, j: sp.diff(polar[a], (r, phi)[j]))   # ∂x^a/∂y^j
+d_x_polar = sp.simplify(J.inv() * sp.Matrix([1, 0]))              # компоненты ∂_x в базисе ∂_r, ∂_φ
+print(f"∂_x = ({d_x_polar[0]}) ∂_r + ({d_x_polar[1]}) ∂_φ")
+print("частные производные компонент:", [[sp.simplify(sp.diff(c, v)) for v in (r, phi)] for c in d_x_polar])
+```
+
+Поле $\partial_x = \cos\varphi\,\partial_r - \frac{\sin\varphi}{r}\partial_\varphi$ «не меняется», а производные его компонент
+не равны нулю: меняется базис.
+
+```{python}
+#| label: fig-polar-frame
+#| fig-cap: 'Постоянное поле ∂_x (серые стрелки) и полярный базис ∂_r (синий), ∂_φ (красный, длина r) в нескольких точках. Компоненты одного и того же вектора в повёрнутом и растянутом базисе разные; ковариантная производная учитывает изменение базиса.'
+import numpy as np
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots(figsize=(5.5, 5.5))
+for rr in (0.6, 1.2):
+    for pp in np.linspace(0, 2 * np.pi, 8, endpoint=False) + np.pi / 8:
+        x0, y0 = rr * np.cos(pp), rr * np.sin(pp)
+        s = 0.35
+        ax.arrow(x0, y0, s, 0, color="0.6", width=0.006, head_width=0.05, length_includes_head=True)
+        ax.arrow(x0, y0, s * np.cos(pp), s * np.sin(pp), color="tab:blue", width=0.008, head_width=0.05,
+                 length_includes_head=True)
+        ax.arrow(x0, y0, -s * rr * np.sin(pp), s * rr * np.cos(pp), color="tab:red", width=0.008,
+                 head_width=0.05, length_includes_head=True)
+ts = np.linspace(0, 2 * np.pi, 200)
+for rr in (0.6, 1.2):
+    ax.plot(rr * np.cos(ts), rr * np.sin(ts), color="0.85", lw=0.8, zorder=0)
+ax.plot(0, 0, "k+", ms=8)
+for col, label in [("0.6", "∂_x"), ("tab:blue", "∂_r"), ("tab:red", "∂_φ")]:
+    ax.plot([], [], color=col, lw=2, label=label)
+ax.legend(fontsize=9, loc="upper right")
+ax.set(aspect="equal", xlim=(-1.8, 1.8), ylim=(-1.8, 1.8))
+ax.axis("off")
+plt.tight_layout()
+plt.show()
+```
+
+## Связность
+
+::: {#def-connection}
+**Аффинная связность** на многообразии $M$ — правило $\nabla$, которое паре
+векторных полей $X$, $Y$ сопоставляет поле $\nabla_XY$ (производная $Y$ вдоль $X$)
+так, что
+
+1. $\nabla_{fX + gZ}Y = f\nabla_XY + g\nabla_ZY$ для функций $f$, $g$ — линейность над функциями
+   по направлению;
+2. $\nabla_X(Y + Z) = \nabla_XY + \nabla_XZ$;
+3. $\nabla_X(fY) = (Xf)\,Y + f\,\nabla_XY$ — правило Лейбница.
+
+В координатах связность задаётся **символами** $\Gamma^i_{jk}$:
+$\nabla_{\partial_j}\partial_k = \Gamma^i_{jk}\,\partial_i$ (первый нижний индекс — направление дифференцирования,
+по [конвенциям](/conventions.qmd)).
+:::
+
+Из аксиом сразу получается формула в компонентах:
+$\nabla_XY = X^j\left(\partial_jY^i + \Gamma^i_{jk}Y^k\right)\partial_i$. Выражение в скобках —
+**ковариантная производная** $\nabla_jY^i$. Условие 1 означает, что $\nabla_XY$ в точке
+зависит только от значения $X$ в этой точке. Поэтому $\nabla Y$ — тензорное
+поле типа $(1, 1)$, в отличие от набора частных производных. Связность —
+дополнительная структура: на многообразии их бесконечно много, и
+никакая не выделена, пока нет метрики.
+
+**Тензоры.** На функциях $\nabla_Xf = Xf$. Требуя правила Лейбница для
+произведений и перестановочности со свёрткой, получаем по слагаемому на
+каждый индекс:
+$$
+\nabla_j\omega_k = \partial_j\omega_k - \Gamma^i_{jk}\,\omega_i, \qquad
+\nabla_jT^i{}_k = \partial_jT^i{}_k + \Gamma^i_{jm}T^m{}_k - \Gamma^m_{jk}T^i{}_m .
+$$
+(Знак минус для ковекторов: $\omega_kV^k$ — функция, и $\nabla_j(\omega_kV^k) = \partial_j(\omega_kV^k)$.)
+Функция `covariant_derivative` из `gmph.riemann` реализует эти формулы для
+тензора любого типа, `flat_connection` — символы евклидовой связности
+в криволинейных координатах.
+
+## Плоская связность в криволинейных координатах
+
+Евклидова связность: в декартовых координатах $\Gamma = 0$, то есть $\nabla_jV^i = \partial_jV^i$.
+Её символы в других координатах получаются из закона преобразования
+(ниже). Для полярных и сферических координат:
+
+```{python}
+from gmph.riemann import flat_connection, covariant_derivative, torsion
+
+def print_symbols(G, names):
+    n = len(names)
+    for i in range(n):
+        for j in range(n):
+            for k in range(j, n):
+                if G[i][j][k] != 0:
+                    sym = "" if j == k else f"  (= Γ^{names[i]}_{names[k]}{names[j]})"
+                    print(f"  Γ^{names[i]}_{names[j]}{names[k]} = {G[i][j][k]}{sym}")
+
+G_polar = flat_connection(polar, (r, phi))
+print("полярные:")
+print_symbols(G_polar, ["r", "φ"])
+
+theta = sp.Symbol("theta", positive=True)
+spherical = [r * sp.sin(theta) * sp.cos(phi), r * sp.sin(theta) * sp.sin(phi), r * sp.cos(theta)]
+print("сферические:")
+print_symbols(flat_connection(spherical, (r, theta, phi)), ["r", "θ", "φ"])
+```
+
+Проверим, что ковариантная производная постоянного поля $\partial_x$ в полярных
+координатах равна нулю, а частные производные — нет. Заодно возьмём
+1-форму $\dd x = \cos\varphi\,\dd r - r\sin\varphi\,\dd\varphi$ и метрику $\dd r^2 + r^2\dd\varphi^2$:
+
+```{python}
+print("∇_j V^i для V = ∂_x:", covariant_derivative(list(d_x_polar), "u", G_polar, (r, phi)).tolist())
+print("∇_j ω_k для ω = dx:", covariant_derivative([sp.cos(phi), -r * sp.sin(phi)], "d", G_polar, (r, phi)).tolist())
+print("∇_j g_kl для g = diag(1, r²):", covariant_derivative([[1, 0], [0, r**2]], "dd", G_polar, (r, phi)).tolist())
+```
+
+Все три — нули. Плоская связность сохраняет метрику ($\nabla g = 0$); это
+свойство вместе с симметрией $\Gamma^i_{jk} = \Gamma^i_{kj}$ выделит связность Леви-Чивиты
+на любом римановом многообразии.
+
+## Закон преобразования символов
+
+Символы связности при замене $x\to y$ меняются так:
+$$
+\Gamma'^i_{jk} = \pd{y^i}{x^a}\pd{x^b}{y^j}\pd{x^c}{y^k}\,\Gamma^a_{bc} + \pd{y^i}{x^a}\,\frac{\partial^2x^a}{\partial y^j\partial y^k} .
+$$
+Неоднородный член компенсирует лишнее слагаемое в производной
+компонент. Поэтому $\Gamma$ — **не тензор**: в одних координатах символы могут
+быть нулевыми, в других нет. Но **разность двух связностей** — тензор
+(неоднородные члены сокращаются), и антисимметричная часть
+$T^i_{jk} = \Gamma^i_{jk} - \Gamma^i_{kj}$ — **тензор кручения** — тоже. Проверим это на связности
+плоскости с кручением, $\Gamma^x_{xy} = a$ (остальные символы нулевые):
+
+```{python}
+a = sp.Symbol("a", real=True)
+xx, yy = sp.symbols("x y", real=True)
+
+def transform_connection(Gamma, x_of_y, y):
+    """Символы в новых координатах y по закону преобразования (Γ — функции x)."""
+    n = len(y)
+    J = sp.Matrix(n, n, lambda p, j: sp.diff(x_of_y[p], y[j]))            # ∂x^p/∂y^j
+    Ji = J.inv()                                                          # ∂y^i/∂x^p
+    old = [[[sp.sympify(Gamma[p][b][c]).subs(dict(zip((xx, yy), x_of_y))) for c in range(n)]
+            for b in range(n)] for p in range(n)]
+    return [[[sp.simplify(sum(Ji[i, p] * (sum(J[b, j] * J[c, k] * old[p][b][c] for b in range(n) for c in range(n))
+                                          + sp.diff(x_of_y[p], y[j], y[k])) for p in range(n)))
+              for k in range(n)] for j in range(n)] for i in range(n)]
+
+G_cart = [[[0, a], [0, 0]], [[0, 0], [0, 0]]]              # Γ^x_{xy} = a
+G_new = transform_connection(G_cart, polar, (r, phi))
+T_new = torsion(G_new)
+
+# кручение, перенесённое как тензор типа (1, 2)
+T_cart = torsion(G_cart)
+Ji = J.inv()
+T_as_tensor = [[[sp.simplify(sum(Ji[i, p] * J[b, j] * J[c, k] * T_cart[p][b][c]
+                                 for p in range(2) for b in range(2) for c in range(2)))
+                 for k in range(2)] for j in range(2)] for i in range(2)]
+print("кручение преобразуется как тензор:", all(sp.simplify(T_new[i][j][k] - T_as_tensor[i][j][k]) == 0
+                                             for i in range(2) for j in range(2) for k in range(2)))
+print("а символы — нет: Γ'^r_φφ =", sp.expand(G_new[0][1][1]), "(−r — неоднородный член; a = 0 даёт плоскую связность)")
+print("плоская связность получается из нулевой:", transform_connection([[[0] * 2] * 2] * 2, polar, (r, phi)) == G_polar)
+```
+
+Кручение измеряет, «замыкается» ли бесконечно малый параллелограмм из
+перенесённых векторов. В общей теории относительности связность
+симметрична (кручения нет). В теориях с кручением (Эйнштейна–Картана) оно
+связано со спином материи.
+
+## Физика: ускорение в криволинейных координатах
+
+Вдоль кривой $x(t)$ производная векторного поля $V(t)$, заданного на кривой, —
+$$
+\frac{DV^i}{dt} = \frac{dV^i}{dt} + \Gamma^i_{jk}\,\dot x^jV^k .
+$$
+Для скорости $V = \dot x$ это **ускорение** $a^i = \ddot x^i + \Gamma^i_{jk}\dot x^j\dot x^k$ — вектор, в отличие от
+набора вторых производных координат. Второй закон Ньютона в любых
+координатах: $m\,a^i = F^i$. В полярных координатах:
+
+```{python}
+t = sp.Symbol("t")
+R, PHI = sp.Function("r")(t), sp.Function("phi")(t)
+path = [R, PHI]
+vel = [R.diff(t), PHI.diff(t)]
+acc = [sp.expand(path[i].diff(t, 2) + sum(G_polar[i][j][k].subs({r: R, phi: PHI}) * vel[j] * vel[k]
+                                          for j in range(2) for k in range(2))) for i in range(2)]
+print("a^r =", acc[0])
+print("a^φ =", acc[1])
+print("физическая компонента r·a^φ =", sp.expand(R * acc[1]))
+```
+
+Получились знакомые формулы: $a^r = \ddot r - r\dot\varphi^2$ (центростремительный член) и
+$r\,a^\varphi = r\ddot\varphi + 2\dot r\dot\varphi$ (кориолисов член). Их не нужно выводить
+дифференцированием ортов: символы связности делают это автоматически.
+Движение свободной частицы — $a^i = 0$, то есть $\ddot x^i + \Gamma^i_{jk}\dot x^j\dot x^k = 0$ —
+**уравнение геодезических**, которому посвящена следующая статья. В
+общей теории относительности это уравнение движения в гравитационном
+поле, а символы $\Gamma$ играют роль сил тяготения и сил инерции.
+
+## Итоги
+
+- Частные производные компонент векторного поля — не тензор:
+  мешает изменение базиса.
+- Связность $\nabla$: линейна над функциями по направлению, удовлетворяет
+  правилу Лейбница; $\nabla_{\partial_j}\partial_k = \Gamma^i_{jk}\partial_i$.
+- $\nabla_jV^i = \partial_jV^i + \Gamma^i_{jk}V^k$, $\nabla_j\omega_k = \partial_j\omega_k - \Gamma^i_{jk}\omega_i$; по слагаемому на индекс.
+- Символы $\Gamma$ не тензор (неоднородный член), но разность связностей и
+  кручение $T^i_{jk} = \Gamma^i_{jk} - \Gamma^i_{kj}$ — тензоры.
+- Плоская связность в полярных координатах: $\Gamma^r_{\varphi\varphi} = -r$, $\Gamma^\varphi_{r\varphi} = 1/r$; ускорение
+  $a^i = \ddot x^i + \Gamma^i_{jk}\dot x^j\dot x^k$ даёт центростремительный и кориолисов члены.
+
+## Упражнения
+
+1. Найдите символы плоской связности в цилиндрических координатах
+   $(\rho, \varphi, z)$ и запишите компоненты ускорения.
+2. Выведите формулу $\nabla_j\omega_k = \partial_j\omega_k - \Gamma^i_{jk}\omega_i$ из правила Лейбница для функции
+   $\omega_kV^k$.
+3. Покажите, что для симметричной связности $\nabla_j\omega_k - \nabla_k\omega_j = \partial_j\omega_k - \partial_k\omega_j$. Что это
+   говорит о внешнем дифференциале?
+4. Проверьте, что $\nabla_j\delta^i_k = 0$ для любой связности.
+5. На плоскости задана связность с единственным ненулевым символом
+   $\Gamma^x_{yy} = 1$. Найдите кривые, у которых $a^i = 0$ («прямые» этой связности), с
+   начальной скоростью $(0, 1)$ в точке $(0, 0)$.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $\Gamma^\rho_{\varphi\varphi} = -\rho$, $\Gamma^\varphi_{\rho\varphi} = \Gamma^\varphi_{\varphi\rho} = 1/\rho$, остальные нули (координата $z$ декартова).
+   $a^\rho = \ddot\rho - \rho\dot\varphi^2$, $a^\varphi = \ddot\varphi + 2\dot\rho\dot\varphi/\rho$, $a^z = \ddot z$.
+2. $\partial_j(\omega_kV^k) = \nabla_j(\omega_kV^k) = (\nabla_j\omega_k)V^k + \omega_i(\partial_jV^i + \Gamma^i_{jk}V^k)$; сравнивая с
+   $(\partial_j\omega_k)V^k + \omega_i\partial_jV^i$, получаем $\nabla_j\omega_k = \partial_j\omega_k - \Gamma^i_{jk}\omega_i$.
+3. Разность $-\left(\Gamma^i_{jk} - \Gamma^i_{kj}\right)\omega_i = -T^i_{jk}\omega_i = 0$. Внешний дифференциал $\dd\omega$ можно
+   вычислять с любой симметричной связностью — он от связности не
+   зависит.
+4. $\nabla_j\delta^i_k = 0 + \Gamma^i_{jm}\delta^m_k - \Gamma^m_{jk}\delta^i_m = \Gamma^i_{jk} - \Gamma^i_{jk} = 0$.
+5. Уравнения $\ddot x + \dot y^2 = 0$, $\ddot y = 0$: $y = t$, $\ddot x = -1$, $x = -t^2/2$. «Прямая» этой
+   (плоской, без кручения) связности — парабола $x = -y^2/2$ в координатах $(x, y)$.
+   Это евклидова связность в непрямолинейных координатах: в координатах
+   $(x' = x + y^2/2,\ y)$ все её символы равны нулю, и та же кривая — прямая $x' = 0$.
+:::

@@ -328,6 +328,22 @@ def test_maxwell_forms_3plus1():
     assert sp.simplify(frak_J[(1, 3, 4)] + J[0] / c) == 0
 
 
+def test_connection_index_order():
+    from gmph.riemann import covariant_derivative, flat_connection
+
+    r, phi = sp.symbols("r phi", positive=True)
+    cart = sp.Matrix([r * sp.cos(phi), r * sp.sin(phi)])
+    G = flat_connection(list(cart), (r, phi))
+    # ∇_{∂_r} ∂_φ = Γ^i_{rφ} ∂_i: производная декартова образа ∂_φ по r
+    d_phi_cart = cart.diff(phi)
+    lhs = d_phi_cart.diff(r)
+    rhs = G[0][0][1] * cart.diff(r) + G[1][0][1] * d_phi_cart
+    assert sp.simplify(lhs - rhs) == sp.zeros(2, 1)
+    # ∇_j ω_k = ∂_j ω_k − Γ^i_{jk} ω_i: постоянная 1-форма dx параллельна
+    dx = [sp.cos(phi), -r * sp.sin(phi)]
+    assert covariant_derivative(dx, "d", G, (r, phi)) == sp.Array.zeros(2, 2)
+
+
 # --- Преобразование Фурье: f̃(k) = ∫ f e^{−ikx} dx, по времени e^{+iωt} ---------
 
 def test_fourier_conventions():
