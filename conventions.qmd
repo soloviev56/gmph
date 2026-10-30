@@ -160,6 +160,15 @@ subtitle: "Обозначения и соглашения о знаках, ед�
   $\dd\mathcal H = \frac{4\pi}{c}\,\mathcal J$; в пустоте $\mathcal B = \hodge\mathcal H$, в
   изотропном магнетике $\mathcal B = \mu\hodge\mathcal H$. Векторный потенциал:
   $\mathcal B = \dd\mathcal A$, $\mathcal A = \mathbf A\cdot\dd\mathbf r$.
+- Четырёхмерная сборка трёхмерных форм ($\mathrm{vol}_3 = \dd x\wedge\dd y\wedge\dd z$, $x^0 = ct$):
+  $$F = \dd x^0\wedge\mathcal E - \mathcal B, \qquad G = \mathcal D + \dd x^0\wedge\mathcal H, \qquad
+  \mathfrak J = \rho\,\mathrm{vol}_3 - \dd t\wedge\mathcal J .$$
+  Уравнения Максвелла: $\dd F = 0$, $\dd G = 4\pi\,\mathfrak J$; сохранение заряда $\dd\mathfrak J = 0$.
+  В пустоте $G = -\hodge F$, а 3-форма тока выражается через 1-форму
+  $j = j_\mu\dd x^\mu$ как $\hodge j = c\,\mathfrak J$, поэтому
+  $$\dd\hodge F = -\frac{4\pi}{c}\hodge j$$
+  (знак минус — следствие сигнатуры $(+,-,-,-)$ и определения $\hodge$; это то же
+  уравнение $\partial_\nu F^{\mu\nu} = -\frac{4\pi}{c}j^\mu$).
 
 Все знаки этого раздела проверяются автоматически в `tests/test_conventions.py`.
 

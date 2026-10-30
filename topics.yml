@@ -583,7 +583,7 @@ sections:
     title: Уравнения Максвелла на языке форм
     level: 3
     requires: [magnetostatics, minkowski, hodge-star]
-    about: F = dA, dF = 0, d⋆F = (4π/c)⋆j; сохранение заряда из d² = 0; расщепление на время и пространство.
+    about: F = dA, dF = 0, d⋆F = −(4π/c)⋆j; сохранение заряда из d² = 0; расщепление на время и пространство.
   - id: gauge-invariance-em
     title: Калибровочная инвариантность в электродинамике
     level: 3

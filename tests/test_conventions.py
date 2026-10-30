@@ -291,6 +291,43 @@ def test_magnetostatics_forms():
     assert d(A_form, X) == B_form
 
 
+def test_maxwell_forms_3plus1():
+    from gmph.exterior import add, d, hodge, scale, wedge
+
+    X = sp.symbols("x0:4", real=True)
+    c = sp.Symbol("c", positive=True)
+    eta = sp.diag(1, -1, -1, -1)
+
+    def fields(name):
+        return [sp.Function(f"{name}_{s}")(*X) for s in "xyz"]
+
+    def one(v):                       # v·dr; индексы 1…4 ↔ x⁰…x³
+        return {(2,): v[0], (3,): v[1], (4,): v[2]}
+
+    def two(v):                       # v·dS
+        return {(3, 4): v[0], (2, 4): -v[1], (2, 3): v[2]}
+
+    E, B, D, H, J = (fields(n) for n in "EBDHj")
+    rho = sp.Function("rho")(*X)
+    dx0 = {(1,): 1}
+    F = add(wedge(dx0, one(E)), scale(-1, two(B)))
+    # совпадает с компонентами F_{0i} = E^i, F_{12} = −B_z, …
+    assert F == {(1, 2): E[0], (1, 3): E[1], (1, 4): E[2], (2, 3): -B[2], (2, 4): B[1], (3, 4): -B[0]}
+    # в пустоте G = −⋆F
+    assert add(hodge(F, eta), two(E), wedge(dx0, one(B))) == {}
+    # ⋆j = c𝔍 при j_μ = (cρ, −j)
+    frak_J = add({(2, 3, 4): rho}, scale(-1 / c, wedge(dx0, two(J))))
+    j_lo = {(1,): c * rho, (2,): -J[0], (3,): -J[1], (4,): -J[2]}
+    assert add(hodge(j_lo, eta), scale(-c, frak_J)) == {}
+    # dG = 4π𝔍 ⇔ div D = 4πρ и rot H = (1/c)∂_t D + (4π/c) j
+    G = add(two(D), wedge(dx0, one(H)))
+    dG = d(G, X)
+    assert sp.simplify(dG[(2, 3, 4)] - sum(sp.diff(D[i], X[i + 1]) for i in range(3))) == 0
+    rot_H_x = sp.diff(H[2], X[2]) - sp.diff(H[1], X[3])
+    assert sp.simplify(dG[(1, 3, 4)] - (sp.diff(D[0], X[0]) - rot_H_x)) == 0
+    assert sp.simplify(frak_J[(1, 3, 4)] + J[0] / c) == 0
+
+
 # --- Преобразование Фурье: f̃(k) = ∫ f e^{−ikx} dx, по времени e^{+iωt} ---------
 
 def test_fourier_conventions():

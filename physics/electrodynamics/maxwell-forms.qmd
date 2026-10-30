@@ -1,0 +1,310 @@
+---
+title: "Уравнения Максвелла на языке форм"
+topic: maxwell-forms
+order: 3
+description: "Поле как 2-форма F = dA в пространстве-времени; dF = 0 — однородная пара (Фарадей и отсутствие монополей) как тождество d² = 0; расщепление F = dx⁰∧ℰ − ℬ и G = 𝒟 + dx⁰∧ℋ; уравнения dG = 4π𝔍 и в пустоте d⋆F = −(4π/c)⋆j (знак по конвенциям); сохранение заряда d𝔍 = 0 из d² = 0 и его интегральная форма; калибровочная свобода A → A − df; поле равномерно движущегося заряда как перенос формы F преобразованием Лоренца (рисунок); плоская волна"
+---
+
+Четыре уравнения Максвелла в векторной записи содержат два ротора, две
+дивергенции, производную по времени и множители $c$ и $4\pi$ в разных местах.
+На языке форм они превращаются в два уравнения,
+$$
+\dd F = 0, \qquad \dd G = 4\pi\,\mathfrak J ,
+$$
+плюс связь между $F$ и $G$ (в пустоте $G = -\hodge F$). У этой записи три
+преимущества. Она не зависит от координат: те же уравнения годятся в
+сферических координатах, во вращающейся системе отсчёта и в
+искривлённом пространстве-времени. Первое уравнение и сохранение заряда
+оказываются тождеством $\dd^2 = 0$, а не физическими законами. И видно, что
+из четырёх уравнений только связь $G\leftrightarrow F$ использует метрику; остальное —
+чистая топология, интегралы по поверхностям и объёмам.
+
+Нужны [магнитостатика](/physics/electrodynamics/magnetostatics.qmd),
+[пространство Минковского](/physics/relativity/minkowski.qmd) и [оператор
+Ходжа](/math/forms/hodge-star.qmd). Все знаки — по [конвенциям](/conventions.qmd)
+(раздел «Электродинамика»); в этой статье туда добавлен пункт о
+четырёхмерной сборке форм. Координаты $x^\mu = (ct, x, y, z)$, сигнатура $(+,-,-,-)$.
+
+## Поле как 2-форма
+
+::: {#def-field-form}
+**Электромагнитное поле** — 2-форма в пространстве-времени
+$$
+F = \tfrac12F_{\mu\nu}\,\dd x^\mu\wedge\dd x^\nu = \dd A, \qquad A = A_\mu\,\dd x^\mu = \varphi\,\dd x^0 - \mathbf A\cdot\dd\mathbf r ,
+$$
+с $F_{0i} = E^i$, $F_{12} = -B_z$ (и циклически).
+:::
+
+В статьях об [электростатике](/physics/electrodynamics/electrostatics.qmd) и
+[магнитостатике](/physics/electrodynamics/magnetostatics.qmd) напряжённость
+$\mathcal E = \mathbf E\cdot\dd\mathbf r$ была 1-формой, а индукция $\mathcal B = \mathbf B\cdot\dd\mathbf S$ — 2-формой. В
+пространстве-времени они собираются в одну форму:
+$$
+F = \dd x^0\wedge\mathcal E - \mathcal B .
+$$
+Проверим, что эта сборка воспроизводит компоненты из определения.
+Формы хранятся словарями модуля `gmph.exterior`, индексы $1, \dots, 4$
+отвечают $x^0, \dots, x^3$:
+
+```{python}
+import sympy as sp
+from gmph.exterior import add, d, hodge, pullback, scale, wedge
+
+X = sp.symbols("x0:4", real=True)
+x0, x1, x2, x3 = X
+c = sp.Symbol("c", positive=True)
+eta = sp.diag(1, -1, -1, -1)
+
+def fields(name):
+    return [sp.Function(f"{name}_{s}")(*X) for s in "xyz"]
+
+def one(v):                      # v·dr
+    return {(2,): v[0], (3,): v[1], (4,): v[2]}
+
+def two(v):                      # v·dS = v_x dy∧dz + v_y dz∧dx + v_z dx∧dy
+    return {(3, 4): v[0], (2, 4): -v[1], (2, 3): v[2]}
+
+dx0 = {(1,): 1}
+E, B = fields("E"), fields("B")
+F = add(wedge(dx0, one(E)), scale(-1, two(B)))
+print("F =", F)
+```
+
+Компоненты совпадают с конвенциями: при $\dd x^0\wedge\dd x^i$ стоит $E^i$, при
+$\dd x\wedge\dd y$ стоит $-B_z$.
+
+## Однородная пара: dF = 0
+
+Раз $F = \dd A$, то $\dd F = \dd\dd A = 0$ автоматически. Что это означает в
+трёхмерных терминах? Вычислим $\dd F$ для произвольных $\mathbf E$, $\mathbf B$:
+
+```{python}
+dF = d(F, X)
+for key, value in dF.items():
+    print(key, ":", value)
+```
+
+Компонента при $\dd x\wedge\dd y\wedge\dd z$ (ключ $(2, 3, 4)$) — это $-\operatorname{div}\mathbf B$, а три
+компоненты с $\dd x^0$ — компоненты $\operatorname{rot}\mathbf E + \frac1c\partial_t\mathbf B$ (со знаками $\mp$: например, при
+$\dd x^0\wedge\dd x\wedge\dd y$ стоит $-(\operatorname{rot}\mathbf E + \partial_0\mathbf B)_z$). Значит, $\dd F = 0$ — это
+$$
+\operatorname{div}\mathbf B = 0, \qquad \operatorname{rot}\mathbf E = -\frac1c\,\pd{\mathbf B}{t}
+$$
+(отсутствие монополей и закон Фарадея). В трёхмерной записи:
+$\dd F = -\dd x^0\wedge\left(\dd\mathcal E + \partial_0\mathcal B\right) - \dd\mathcal B$, где $\dd$ справа — пространственный
+дифференциал. Обратно, по лемме Пуанкаре в стягиваемой области из
+$\dd F = 0$ следует $F = \dd A$, так что однородная пара — это в точности
+утверждение о существовании 4-потенциала.
+
+**Калибровочная свобода.** Потенциал определён с точностью до точной формы:
+$A\to A - \dd f$ (по конвенциям $A_\mu\to A_\mu - \partial_\mu f$) не меняет $F$, потому что
+$\dd\dd f = 0$. Это и есть та калибровочная инвариантность, которой посвящена
+следующая статья.
+
+## Неоднородная пара: dG = 4π𝔍
+
+Индукция $\mathbf D$ и напряжённость $\mathbf H$ в [статике](/physics/electrodynamics/electrostatics.qmd)
+тоже были формами ($\mathcal D$ — 2-форма, $\mathcal H$ — 1-форма). Соберём их, а заряд и
+ток — в 3-форму:
+$$
+G = \mathcal D + \dd x^0\wedge\mathcal H, \qquad \mathfrak J = \rho\,\mathrm{vol}_3 - \dd t\wedge\mathcal J ,
+$$
+где $\mathrm{vol}_3 = \dd x\wedge\dd y\wedge\dd z$, а $\mathcal J = \mathbf j\cdot\dd\mathbf S$ — 2-форма тока.
+
+::: {#def-maxwell-forms}
+**Уравнения Максвелла**:
+$$
+\dd F = 0, \qquad \dd G = 4\pi\,\mathfrak J ,
+$$
+и **материальные уравнения**, связывающие $G$ с $F$. В пустоте $\mathcal D = \hodge\mathcal E$,
+$\mathcal H = \hodge\mathcal B$ (трёхмерный $\hodge$), что в четырёхмерной записи означает $G = -\hodge F$.
+:::
+
+Проверим, что $\dd G = 4\pi\mathfrak J$ содержит теорему Гаусса и закон Ампера–Максвелла:
+
+```{python}
+D, H, J = fields("D"), fields("H"), fields("j")
+rho = sp.Function("rho")(*X)
+G = add(two(D), wedge(dx0, one(H)))
+frak_J = add({(2, 3, 4): rho}, scale(-1 / c, wedge(dx0, two(J))))     # dt = dx⁰/c
+
+difference = add(d(G, X), scale(-4 * sp.pi, frak_J))
+for key, value in difference.items():
+    print(key, ":", sp.simplify(value), "= 0")
+```
+
+Компонента $(2, 3, 4)$ — $\operatorname{div}\mathbf D = 4\pi\rho$, компонента $(1, 3, 4)$ —
+$\partial_0D_x - (\operatorname{rot}\mathbf H)_x + \frac{4\pi}{c}j_x = 0$, то есть
+$\operatorname{rot}\mathbf H = \frac1c\partial_t\mathbf D + \frac{4\pi}c\mathbf j$. Остальные — то же для $y$, $z$.
+
+**Связь с $\hodge F$.** В пустоте $G = -\hodge F$, а 3-форма тока — это $\hodge j/c$ для
+1-формы $j = j_\mu\dd x^\mu$, $j_\mu = (c\rho, -\mathbf j)$:
+
+```{python}
+G_vacuum = add(two(E), wedge(dx0, one(B)))          # D → E, H → B
+print("G = −⋆F в пустоте:", add(hodge(F, eta), G_vacuum) == {})
+
+j_form = {(1,): c * rho, (2,): -J[0], (3,): -J[1], (4,): -J[2]}
+print("⋆j = c𝔍:", add(hodge(j_form, eta), scale(-c, frak_J)) == {})
+```
+
+Поэтому в пустоте неоднородная пара принимает вид
+$$
+\dd\hodge F = -\frac{4\pi}{c}\hodge j .
+$$
+Знак минус — следствие сигнатуры $(+,-,-,-)$ и нашего определения $\hodge$. В
+книгах с сигнатурой $(-,+,+,+)$ то же уравнение пишут без минуса. В
+компонентах это $\partial_\nu F^{\mu\nu} = -\frac{4\pi}{c}j^\mu$ из [конвенций](/conventions.qmd).
+
+## Сохранение заряда
+
+Применим $\dd$ к неоднородному уравнению: $4\pi\,\dd\mathfrak J = \dd\dd G = 0$. Заряд
+сохраняется **как следствие уравнений Максвелла**, причём независимо от
+материальных уравнений:
+
+```{python}
+print("d𝔍 =", d(frak_J, X))
+```
+
+Получилось $\frac1c(\partial_t\rho + \operatorname{div}\mathbf j)\,\dd x^0\wedge\mathrm{vol}_3$, то есть уравнение непрерывности. Его
+интегральная форма — [теорема Стокса](/math/forms/stokes.qmd) для четырёхмерной
+области $V\times[t_1, t_2]$: интеграл $\mathfrak J$ по её границе равен нулю, а граница
+состоит из двух «крышек» (заряд в $V$ в моменты $t_1$ и $t_2$) и «боковой
+стенки» (ток через $\partial V$ за это время). Изменение заряда равно втёкшему
+через границу — без всяких предположений о форме $V$.
+
+Наоборот, если бы ток не сохранялся, уравнения Максвелла были бы
+противоречивы. Именно это заставило Максвелла добавить ток смещения
+$\frac1c\partial_t\mathbf D$: без него $\dd G$ не был бы точной формой для нестационарных
+токов.
+
+## Физика: поле движущегося заряда
+
+Уравнения $\dd F = 0$ и $\dd\hodge F = -\frac{4\pi}{c}\hodge j$ не зависят от координат: внешний
+дифференциал коммутирует с переносом форм, а $\hodge$ сохраняется
+изометриями. Поэтому преобразование Лоренца переводит решения в
+решения, и поле движущегося заряда — это просто перенос кулоновского поля.
+
+Заряд $q$ покоится в начале координат системы $y^\mu$: $A = \frac{q}{r}\,\dd y^0$. В
+лабораторной системе $x^\mu$ он движется вдоль оси $x$ со скоростью $\beta c$, и
+$y^0 = \gamma(x^0 - \beta x^1)$, $y^1 = \gamma(x^1 - \beta x^0)$. Перенесём $F$:
+
+```{python}
+Y = sp.symbols("y0:4", real=True)
+q, beta = sp.symbols("q beta", positive=True)
+gamma = 1 / sp.sqrt(1 - beta**2)
+r_rest = sp.sqrt(Y[1]**2 + Y[2]**2 + Y[3]**2)
+F_rest = d({(1,): q / r_rest}, Y)
+print("в системе покоя: E =", [sp.simplify(F_rest[(1, i)]) for i in (2, 3, 4)])
+
+boost = [gamma * (x0 - beta * x1), gamma * (x1 - beta * x0), x2, x3]
+F_lab = {k: sp.simplify(v) for k, v in pullback(F_rest, Y, boost, X).items()}
+E_lab = [F_lab.get((1, i), 0) for i in (2, 3, 4)]
+B_lab = [-F_lab.get((3, 4), 0), F_lab.get((2, 4), 0), -F_lab.get((2, 3), 0)]
+print("B = β × E:", sp.simplify(B_lab[0]) == 0,
+      sp.simplify(B_lab[1] + beta * E_lab[2]) == 0, sp.simplify(B_lab[2] - beta * E_lab[1]) == 0)
+
+# в момент x⁰ = 0 заряд в начале координат; поле в направлении θ от оси движения
+R, theta = sp.symbols("R theta", positive=True)
+point = {x0: 0, x1: R * sp.cos(theta), x2: R * sp.sin(theta), x3: 0}
+E_mag = sp.sqrt(sum(sp.simplify(e.subs(point))**2 for e in E_lab))
+expected = q * (1 - beta**2) / (R**2 * (1 - beta**2 * sp.sin(theta)**2)**sp.Rational(3, 2))
+print("|E| = q(1−β²)/(R²(1 − β² sin²θ)^{3/2}):",
+      all(abs(float((E_mag - expected).subs({q: 1, R: 1.3, beta: b, theta: th}))) < 1e-12
+          for b in (0.3, 0.9) for th in (0.2, 1.0, 1.5)))
+print("направление E радиально:", sp.simplify((E_lab[0] * point[x2] - E_lab[1] * point[x1]).subs(point)) == 0)
+```
+
+Мы не решали никаких дифференциальных уравнений: поле движущегося
+заряда получилось одной заменой переменных в форме $F$. Электрическое
+поле в момент $t = 0$ направлено от *текущего* положения заряда, а его
+величина зависит от угла с направлением движения. Вдоль движения поле
+ослаблено в $\gamma^2$ раз, поперёк — усилено в $\gamma$ раз:
+
+```{python}
+#| label: fig-moving-charge
+#| fig-cap: 'Напряжённость поля равномерно движущегося заряда, |E|·R²/q, в зависимости от направления (полярный угол θ отсчитывается от направления скорости, ось движения горизонтальна). При β = 0 — окружность (кулоновское поле); с ростом скорости поле «сплющивается» в диск, перпендикулярный движению: поперёк оно в γ раз сильнее, вдоль — в γ² раз слабее.'
+import numpy as np
+import matplotlib.pyplot as plt
+
+thetas = np.linspace(0, 2 * np.pi, 721)
+fig, ax = plt.subplots(figsize=(5.2, 5.2))
+for b, col in [(0.0, "k"), (0.6, "tab:blue"), (0.9, "tab:red")]:
+    radius = (1 - b**2) / (1 - b**2 * np.sin(thetas)**2)**1.5
+    ax.plot(radius * np.cos(thetas), radius * np.sin(thetas), color=col, lw=2, label=f"β = {b}")
+    g = 1 / np.sqrt(1 - b**2)
+    print(f"β = {b}: поперёк {radius[180]:.3f} = γ = {g:.3f};  вдоль {radius[0]:.3f} = 1/γ² = {1 / g**2:.3f}")
+ax.annotate("", xy=(-1.4, -2.3), xytext=(-2.2, -2.3), arrowprops=dict(arrowstyle="->", lw=1.5))
+ax.text(-1.95, -2.15, "v", fontsize=12)
+ax.plot(0, 0, "ko", ms=4)
+ax.set(aspect="equal", xlim=(-2.6, 2.6), ylim=(-2.6, 2.6))
+ax.axis("off")
+ax.legend(fontsize=9, loc="upper right")
+plt.tight_layout()
+plt.show()
+```
+
+**Плоская волна.** Без источников уравнения $\dd F = 0$ и $\dd\hodge F = 0$ имеют
+решения $A = \varepsilon_\mu e^{-ik_\nu x^\nu}\,\dd x^\mu$ с изотропным волновым вектором $k^\mu k_\mu = 0$. Проверим
+для волны вдоль $z$ с поляризацией по $x$:
+
+```{python}
+k = sp.Symbol("k", positive=True)
+A_wave = {(2,): sp.cos(k * (x0 - x3))}        # A_x = −cos(k(x⁰ − z)): A = A_μ dx^μ, A_1 = −A_x
+F_wave = d(A_wave, X)
+print("F =", F_wave)
+print("dF =", d(F_wave, X), "; d⋆F =", d(hodge(F_wave, eta), X))
+E_w = [F_wave.get((1, i), 0) for i in (2, 3, 4)]
+B_w = [-F_wave.get((3, 4), 0), F_wave.get((2, 4), 0), -F_wave.get((2, 3), 0)]
+print("E =", E_w, "; B =", B_w, "; инварианты E² − B² и E·B:",
+      sp.simplify(sum(e**2 for e in E_w) - sum(b**2 for b in B_w)), sp.simplify(sum(e * b for e, b in zip(E_w, B_w))))
+```
+
+У плоской волны $|\mathbf E| = |\mathbf B|$, $\mathbf E\perp\mathbf B$: оба инварианта поля
+$F\wedge\hodge F\propto\mathbf B^2 - \mathbf E^2$ и $F\wedge F\propto\mathbf E\cdot\mathbf B$ равны нулю. Поэтому никаким
+преобразованием Лоренца волну нельзя превратить в чисто электрическое
+или чисто магнитное поле.
+
+## Итоги
+
+- Поле — 2-форма $F = \dd A = \dd x^0\wedge\mathcal E - \mathcal B$; однородная пара $\dd F = 0$
+  (Фарадей и $\operatorname{div}\mathbf B = 0$) — тождество $\dd^2 = 0$; $A$ определён с точностью до $\dd f$.
+- Неоднородная пара $\dd G = 4\pi\mathfrak J$ с $G = \mathcal D + \dd x^0\wedge\mathcal H$, $\mathfrak J = \rho\,\mathrm{vol}_3 - \dd t\wedge\mathcal J$;
+  в пустоте $G = -\hodge F$ и $\dd\hodge F = -\frac{4\pi}{c}\hodge j$.
+- Метрика входит только в связь $G\leftrightarrow F$; остальное не зависит от
+  координат и метрики.
+- Сохранение заряда $\dd\mathfrak J = 0$ следует из $\dd^2 = 0$; интегральная форма — теорема Стокса
+  в пространстве-времени.
+- Поле движущегося заряда — перенос кулоновской формы бустом: $\mathbf B = \boldsymbol\beta\times\mathbf E$,
+  поле сжато в направлении движения.
+
+## Упражнения
+
+1. Запишите $\dd F = 0$ и $\dd G = 4\pi\mathfrak J$ в сферических координатах для статического
+   сферически-симметричного распределения заряда и получите $E_r(r)$.
+2. Покажите, что $F\wedge F = \dd(A\wedge F)$. Почему отсюда следует, что интеграл
+   $\int\mathbf E\cdot\mathbf B\,\dd^3x\,\dd t$ определяется только значениями полей на границе области?
+3. В изотропной среде $\mathcal D = \varepsilon\hodge\mathcal E$, $\mathcal H = \mu^{-1}\hodge\mathcal B$. Найдите скорость плоской волны.
+4. Сколько независимых уравнений содержится в $\dd F = 0$ и сколько в $\dd G = 4\pi\mathfrak J$?
+   Почему уравнения $\dd F = 0$ «не все независимы» по времени (какое из них
+   достаточно наложить в начальный момент)?
+5. Найдите поле заряда, движущегося со скоростью $\beta = 0{,}99$: во сколько раз поле
+   поперёк движения больше, чем у покоящегося заряда на том же
+   расстоянии, а вдоль — меньше?
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $G = \mathcal D = D_r r^2\sin\theta\,\dd\theta\wedge\dd\varphi$, $\mathfrak J = \rho\,r^2\sin\theta\,\dd r\wedge\dd\theta\wedge\dd\varphi$:
+   $\dd G = (r^2D_r)'\sin\theta\,\dd r\wedge\dd\theta\wedge\dd\varphi$, откуда $(r^2E_r)' = 4\pi\rho r^2$ и $E_r = Q(r)/r^2$,
+   где $Q(r)$ — заряд внутри шара радиуса $r$.
+2. $\dd(A\wedge F) = \dd A\wedge F - A\wedge\dd F = F\wedge F$. По Стоксу
+   $\int_VF\wedge F = \oint_{\partial V}A\wedge F$, а $F\wedge F = -2(\mathbf E\cdot\mathbf B)\,\mathrm{vol}$. Это топологический
+   член: добавка $\theta\,F\wedge F$ к лагранжиану не меняет уравнений движения.
+3. $\dd G = 0$ с $G = \varepsilon\hodge\mathcal E + \dd x^0\wedge\mu^{-1}\hodge\mathcal B$ и $\dd F = 0$ дают волновое уравнение
+   $\varepsilon\mu\,\partial_t^2\mathbf E = c^2\nabla^2\mathbf E$; скорость $c/\sqrt{\varepsilon\mu}$.
+4. 3-форма в 4 измерениях имеет 4 компоненты, так что каждое уравнение — 4
+   скалярных. Из $\dd F = 0$ эволюционные — три (закон Фарадея), а $\operatorname{div}\mathbf B = 0$ —
+   связь: если она выполнена в начальный момент, то сохраняется, так как
+   $\partial_t\operatorname{div}\mathbf B = -c\operatorname{div}\operatorname{rot}\mathbf E = 0$ ($\dd^2 = 0$ в пространстве).
+5. $\gamma = 1/\sqrt{1 - 0{,}99^2}\approx7{,}09$: поперёк в $7{,}09$ раз больше, вдоль в $\gamma^2\approx50{,}3$ раза меньше.
+:::
