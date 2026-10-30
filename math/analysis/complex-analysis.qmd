@@ -1,0 +1,275 @@
+---
+title: "Комплексный анализ для физика"
+topic: complex-analysis
+order: 2
+description: "Аналитичность как замкнутость 1-формы f dz: d(f dz) = 2i ∂f/∂z̄ dx∧dy и условия Коши–Римана; конформность и гармоничность; теорема Коши из теоремы Стокса, интегральная формула, ряды Лорана и вычеты; вычисление интегралов (лемма Жордана), sympy.residue; функция Грина затухающего осциллятора по вычетам и причинность; аналитичность восприимчивости в верхней полуплоскости и соотношения Крамерса–Кронига с численной проверкой (рисунок)"
+---
+
+Комплексные числа появляются в физике задолго до квантовой механики:
+затухающее колебание удобно записывать как $e^{-i\omega t}$ с комплексной
+частотой, потенциальное течение жидкости на плоскости — как одну
+аналитическую функцию, а интегралы, встречающиеся в теории
+возмущений и в преобразовании Фурье, проще всего вычисляются
+вычетами. Но самое глубокое применение — **причинность**: отклик системы
+не может опережать воздействие. Отсюда следует, что восприимчивость
+аналитична в верхней полуплоскости частоты, а её вещественная и мнимая
+части (преломление и поглощение) связаны друг с другом.
+
+В этой статье комплексный анализ строится на языке
+[дифференциальных форм](/math/forms/stokes.qmd). Это необязательно, но
+так короче: теорема Коши — частный случай теоремы Стокса.
+Знак во временном преобразовании Фурье — по [конвенциям](/conventions.qmd):
+$f(t) = \int\tilde f(\omega)e^{-i\omega t}\,\dd\omega/2\pi$.
+
+## Аналитичность как замкнутость формы
+
+Комплексная функция $f(z) = u(x, y) + iv(x, y)$ на плоскости $z = x + iy$ — это пара
+вещественных функций. Введём комплексные 1-формы $\dd z = \dd x + i\,\dd y$,
+$\dd\bar z = \dd x - i\,\dd y$ и двойственные им операторы
+$$
+\pd{}{z} = \frac12\left(\partial_x - i\partial_y\right), \qquad \pd{}{\bar z} = \frac12\left(\partial_x + i\partial_y\right),
+$$
+так что $\dd f = \pd{f}{z}\dd z + \pd{f}{\bar z}\dd\bar z$.
+
+::: {#def-holomorphic}
+Функция $f$ **аналитична** (голоморфна) в области $U$, если она
+дифференцируема и $\pd{f}{\bar z} = 0$ в $U$. Тогда $\dd f = f'(z)\,\dd z$.
+В вещественной записи это **условия Коши–Римана**
+$u_x = v_y$, $u_y = -v_x$.
+:::
+
+Геометрический смысл условия: 1-форма $f\,\dd z$ замкнута. Действительно,
+$$
+\dd(f\,\dd z) = \pd{f}{\bar z}\,\dd\bar z\wedge\dd z = 2i\,\pd{f}{\bar z}\,\dd x\wedge\dd y .
+$$
+Проверим это функцией `d` из `gmph.exterior` (базис $\dd x, \dd y$ — индексы 1, 2):
+
+```{python}
+import sympy as sp
+from gmph.exterior import d
+
+x, y = sp.symbols("x y", real=True)
+z = sp.Symbol("z")
+
+def components(f):
+    """u + iv как функция x, y."""
+    return sp.expand(f.subs(z, x + sp.I * y), complex=True)
+
+def d_bar(F):
+    return sp.simplify((sp.diff(F, x) + sp.I * sp.diff(F, y)) / 2)
+
+for f in [z**2, sp.exp(z), 1 / z, sp.conjugate(z), z * sp.conjugate(z)]:
+    F = components(f)
+    print(f"f = {str(f):18}  ∂f/∂z̄ = {str(d_bar(F)):8}  d(f dz) = {d({(1,): F, (2,): sp.I * F}, (x, y))}")
+```
+
+Многочлены, экспонента и $1/z$ (вне нуля) аналитичны; $\bar z$ и $|z|^2$ — нет, и
+коэффициент при $\dd x\wedge\dd y$ равен $2i\,\partial f/\partial\bar z$, как и должно быть.
+
+Из условий Коши–Римана следуют два факта, важные для физики:
+
+- **гармоничность**: $\Delta u = u_{xx} + u_{yy} = v_{yx} - v_{xy} = 0$, так же для $v$. Вещественная и
+  мнимая части аналитической функции — решения уравнения Лапласа на
+  плоскости (потенциалы двумерной электростатики и течений);
+- **конформность**: якобиан отображения $z\mapsto f(z)$ равен
+  $\begin{pmatrix}u_x & u_y\\ v_x & v_y\end{pmatrix} = |f'|\begin{pmatrix}\cos\alpha & -\sin\alpha\\ \sin\alpha & \cos\alpha\end{pmatrix}$ при $f' = |f'|e^{i\alpha}$ — поворот с растяжением.
+  Углы сохраняются, и при $f'\ne0$ линии уровня $u$ и $v$ перпендикулярны
+  (эквипотенциали и силовые линии).
+
+```{python}
+F = components(z**3)
+u, v = sp.re(F), sp.im(F)
+J = sp.Matrix([[u.diff(x), u.diff(y)], [v.diff(x), v.diff(y)]])
+print("u = Re z³ =", u, "; Δu =", sp.simplify(u.diff(x, 2) + u.diff(y, 2)))
+print("JᵀJ = |f'|²·1:", sp.simplify(J.T * J - sp.Abs(3 * (x + sp.I * y)**2)**2 * sp.eye(2)) == sp.zeros(2))
+```
+
+## Теорема Коши и вычеты
+
+::: {#thm-cauchy}
+**Теорема Коши.** Если $f$ аналитична в области $D$ с кусочно-гладкой
+границей $\partial D$ (и непрерывна вплоть до неё), то $\oint_{\partial D} f\,\dd z = 0$.
+:::
+
+Доказательство — [теорема Стокса](/math/forms/stokes.qmd):
+$\oint_{\partial D} f\,\dd z = \int_D \dd(f\,\dd z) = \int_D 2i\,\partial_{\bar z}f\,\dd x\wedge\dd y = 0$. Следствие: интеграл не
+меняется при деформации контура, пока он не пересекает особых точек.
+Особенно важна форма $\dd z/z$: она замкнута вне нуля, но не точна,
+$\oint_{|z| = r}\dd z/z = 2\pi i$ (это та же форма $\dd\varphi$ из статьи о [замкнутых и
+точных формах](/math/forms/closed-exact.qmd): $\dd z/z = \dd\ln r + i\,\dd\varphi$).
+Отсюда **интегральная формула Коши**
+$$
+f(z_0) = \frac1{2\pi i}\oint\frac{f(z)}{z - z_0}\,\dd z ,
+$$
+то есть значения аналитической функции внутри области определяются её
+значениями на границе. Дифференцируя по $z_0$, получаем, что аналитическая
+функция бесконечно дифференцируема и раскладывается в степенной ряд.
+
+Вблизи изолированной особой точки $z_0$ функция раскладывается в **ряд Лорана**
+$f = \sum_{n=-\infty}^{\infty}a_n(z - z_0)^n$. Все члены, кроме $a_{-1}/(z - z_0)$, — точные формы
+(производные), поэтому вклад в контурный интеграл даёт только он:
+
+::: {#def-residue}
+**Вычет** $\operatorname{Res}_{z_0}f = a_{-1}$. **Теорема о вычетах**: для контура,
+обходящего особые точки $z_k$ против часовой стрелки,
+$$
+\oint f\,\dd z = 2\pi i\sum_k\operatorname{Res}_{z_k}f .
+$$
+Для простого полюса $\operatorname{Res}_{z_0}f = \lim_{z\to z_0}(z - z_0)f(z)$.
+:::
+
+**Вычисление интегралов.** Интеграл по вещественной оси замыкают
+большой полуокружностью, вклад которой исчезает. Для рациональных
+функций, убывающих как $1/|z|^2$, это очевидно. Для $e^{ikz}$ при $k > 0$ работает
+**лемма Жордана**: экспонента затухает в *верхней* полуплоскости, туда и
+замыкаем. Проверим два классических примера с `sp.residue`:
+
+```{python}
+k, a = sp.symbols("k a", positive=True)
+X = sp.Symbol("x", real=True)
+
+f1 = 1 / (1 + z**4)
+upper = [sp.exp(sp.I * sp.pi / 4), sp.exp(3 * sp.I * sp.pi / 4)]
+by_residues = sp.simplify(2 * sp.pi * sp.I * sum(sp.residue(f1, z, p) for p in upper))
+print("∫ dx/(1+x⁴): вычеты →", sp.nsimplify(sp.expand_complex(by_residues)),
+      "; прямой интеграл →", sp.integrate(1 / (1 + X**4), (X, -sp.oo, sp.oo)))
+
+f2 = sp.exp(sp.I * k * z) / (z**2 + a**2)
+by_residues = sp.simplify(2 * sp.pi * sp.I * sp.residue(f2, z, sp.I * a))
+direct = sp.integrate(sp.cos(k * X) / (X**2 + a**2), (X, -sp.oo, sp.oo))
+print("∫ cos(kx)/(x²+a²) dx: вычеты →", by_residues, "; совпадает с прямым:",
+      sp.simplify((direct - by_residues).rewrite(sp.exp)) == 0)
+```
+
+Первый интеграл равен $\pi/\sqrt2$, второй — $\pi e^{-ka}/a$. Второй ответ —
+экспонента от $k$: преобразование Фурье лоренциана, обратное к
+результату статьи [о преобразовании Фурье](/math/analysis/fourier.qmd)
+для $e^{-a|x|}$.
+
+## Физика: причинность и Крамерс–Крониг
+
+Осциллятор с затуханием под действием силы, $\ddot x + \gamma\dot x + \omega_0^2x = F(t)$ (на
+единицу массы). В частотном представлении $\dot x\to -i\omega\tilde x$, и
+$$
+\tilde x(\omega) = \chi(\omega)\tilde F(\omega), \qquad \chi(\omega) = \frac1{\omega_0^2 - \omega^2 - i\gamma\omega} .
+$$
+Отклик во времени — свёртка $F$ с **функцией Грина**
+$G(t) = \int\chi(\omega)e^{-i\omega t}\,\dd\omega/2\pi$. Полюсы $\chi$ — корни
+$\omega_0^2 - \omega^2 - i\gamma\omega = 0$, то есть $\omega = -i\gamma/2\pm\Omega$ при $\Omega = \sqrt{\omega_0^2 - \gamma^2/4}$. Оба лежат
+в **нижней** полуплоскости. При $t > 0$ множитель $e^{-i\omega t}$ затухает внизу, и
+контур замыкается вниз, по часовой стрелке (знак минус); при $t < 0$ —
+вверх, где полюсов нет, и $G = 0$:
+
+```{python}
+w = sp.Symbol("omega")
+t, gam, Om = sp.symbols("t gamma Omega", positive=True)
+w0_sq = Om**2 + gam**2 / 4
+chi = 1 / (w0_sq - w**2 - sp.I * gam * w)
+poles = sp.solve(sp.denom(chi), w)
+print("полюсы χ:", poles)
+G = sp.simplify(-2 * sp.pi * sp.I * sum(sp.residue(chi * sp.exp(-sp.I * w * t), w, p) for p in poles) / (2 * sp.pi))
+G = sp.simplify(G.rewrite(sp.sin))
+print("G(t) при t > 0:", G)
+print("решает уравнение без силы при t > 0:",
+      sp.simplify(G.diff(t, 2) + gam * G.diff(t) + w0_sq * G) == 0,
+      "; G(0) =", G.subs(t, 0), "; G'(0) =", sp.simplify(G.diff(t).subs(t, 0)))
+```
+
+$G(t) = \theta(t)\,e^{-\gamma t/2}\sin(\Omega t)/\Omega$: при $t = 0$ смещение нулевое, а скорость равна 1 —
+это мгновенный единичный толчок $F = \delta(t)$. Причинность ($G = 0$ при $t < 0$)
+оказалась следствием того, что полюсы $\chi$ в нижней полуплоскости.
+
+Верно и обратное, и это общий закон. Если отклик причинен, то
+$\chi(\omega) = \int_0^\infty G(t)e^{i\omega t}\,\dd t$, и при $\operatorname{Im}\omega > 0$ интеграл сходится ещё лучше:
+$\chi$ **аналитична в верхней полуплоскости** и убывает на бесконечности.
+Применим формулу Коши к контуру из вещественной оси и большой
+полуокружности сверху, обходя точку $\omega$ малой полуокружностью. Получаются
+**соотношения Крамерса–Кронига**:
+$$
+\operatorname{Re}\chi(\omega) = \frac1\pi\,\mathrm{P}\!\!\int_{-\infty}^{\infty}\frac{\operatorname{Im}\chi(\omega')}{\omega' - \omega}\,\dd\omega', \qquad
+\operatorname{Im}\chi(\omega) = -\frac1\pi\,\mathrm{P}\!\!\int_{-\infty}^{\infty}\frac{\operatorname{Re}\chi(\omega')}{\omega' - \omega}\,\dd\omega' ,
+$$
+где $\mathrm{P}$ — главное значение. Мнимая часть восприимчивости отвечает за
+поглощение, вещественная — за дисперсию (показатель преломления). По
+Крамерсу–Кронигу, зная спектр поглощения на всех частотах, можно
+восстановить преломление. Проверим численно; главное значение
+вычисляет `scipy.integrate.quad` с весом `"cauchy"`:
+
+```{python}
+#| label: fig-kramers-kronig
+#| fig-cap: 'Восприимчивость осциллятора (ω₀ = 1, γ = 0,3). Сплошные линии — Re χ (дисперсия) и Im χ (поглощение, пик на резонансе); точки — Re χ, восстановленная по Im χ интегралом Крамерса–Кронига (интеграл по |ω′| < 200).'
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.integrate import quad
+
+W0, GAMMA = 1.0, 0.3
+
+def chi_num(om):
+    return 1 / (W0**2 - om**2 - 1j * GAMMA * om)
+
+def re_from_im(om, cutoff=200.0):
+    """(1/π) P∫ Im χ(ω′)/(ω′ − ω) dω′; quad с весом cauchy делит на (ω′ − ω) сам."""
+    value, _ = quad(lambda wp: chi_num(wp).imag, -cutoff, cutoff, weight="cauchy", wvar=om, limit=500)
+    return value / np.pi
+
+for om in (0.5, 0.9, 1.5):
+    print(f"ω = {om}: Re χ = {chi_num(om).real:+.5f}, по Крамерсу–Кронигу {re_from_im(om):+.5f}")
+
+oms = np.linspace(0, 2.5, 400)
+fig, ax = plt.subplots(figsize=(6.5, 3.8))
+ax.plot(oms, chi_num(oms).real, color="tab:blue", label="Re χ")
+ax.plot(oms, chi_num(oms).imag, color="tab:red", label="Im χ")
+dots = np.linspace(0.1, 2.4, 24)
+ax.plot(dots, [re_from_im(om) for om in dots], "o", color="tab:blue", ms=4, mfc="white", label="Re χ из Im χ (К–К)")
+ax.axhline(0, color="0.6", lw=0.6)
+ax.set(xlabel="ω / ω₀", ylabel="χ · ω₀²")
+ax.legend(fontsize=8)
+plt.tight_layout()
+plt.show()
+```
+
+Ниже резонанса $\operatorname{Re}\chi > 0$ (смещение в фазе с силой), выше — отрицательна; в
+резонансе $\operatorname{Re}\chi = 0$, а поглощение максимально. Эти же соотношения
+связывают показатель преломления и поглощение света в веществе, а в
+физике частиц — вещественную и мнимую части амплитуды рассеяния
+(дисперсионные соотношения).
+
+## Итоги
+
+- Аналитичность: $\partial f/\partial\bar z = 0$ (Коши–Риман), то есть форма $f\,\dd z$ замкнута:
+  $\dd(f\,\dd z) = 2i\,\partial_{\bar z}f\,\dd x\wedge\dd y$. Части $u$, $v$ гармоничны, отображение конформно.
+- Теорема Коши — теорема Стокса; $\oint\dd z/z = 2\pi i$; интегральная формула Коши
+  восстанавливает функцию по границе.
+- Вычеты: $\oint f\,\dd z = 2\pi i\sum\operatorname{Res}$; интегралы по оси замыкаются полуокружностью
+  (лемма Жордана — в ту полуплоскость, где экспонента затухает).
+- Функция Грина осциллятора по вычетам: $G = \theta(t)e^{-\gamma t/2}\sin\Omega t/\Omega$; полюсы внизу
+  ⇔ причинность.
+- Причинный отклик аналитичен в верхней полуплоскости ⇒ соотношения
+  Крамерса–Кронига между дисперсией и поглощением.
+
+## Упражнения
+
+1. Вычислите $\oint_{|z| = 2}\dfrac{e^z}{z(z - 1)}\,\dd z$.
+2. Найдите $\int_0^\infty\dfrac{\dd x}{(x^2 + 1)^2}$ вычетами (полюс второго порядка).
+3. Комплексный потенциал течения $w(z) = U\left(z + \frac{R^2}{z}\right)$. Покажите, что окружность
+   $|z| = R$ — линия тока ($\operatorname{Im}w = 0$), и найдите скорость $\bar w'(z)$ на ней. Где она
+   максимальна?
+4. Проверьте соотношения Крамерса–Кронига аналитически для
+   $\chi(\omega) = 1/(\omega_0 - \omega - i\gamma)$ (один полюс в нижней полуплоскости).
+5. Почему у функции Грина при $\gamma\to0$ полюсы нужно сдвинуть именно вниз,
+   $\omega\to\omega + i0$? Что получилось бы при сдвиге вверх?
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. Полюсы $0$ и $1$ внутри: $\operatorname{Res}_0 = -1$, $\operatorname{Res}_1 = e$; интеграл $2\pi i(e - 1)$.
+2. Полный интеграл по оси $2\pi i\operatorname{Res}_{i}\dfrac1{(z^2 + 1)^2} = 2\pi i\cdot\dfrac{-i}{4} = \dfrac\pi2$; половина: $\dfrac\pi4$.
+3. При $z = Re^{i\varphi}$: $w = U(Re^{i\varphi} + Re^{-i\varphi}) = 2UR\cos\varphi$ — вещественно. $w' = U(1 - R^2/z^2)$,
+   на окружности $|w'| = U|1 - e^{-2i\varphi}| = 2U|\sin\varphi|$: скорость нулевая в точках
+   $\varphi = 0, \pi$ (точки торможения) и максимальна, $2U$, при $\varphi = \pm\pi/2$.
+4. $\operatorname{Re}\chi = \dfrac{\omega_0 - \omega}{(\omega_0 - \omega)^2 + \gamma^2}$, $\operatorname{Im}\chi = \dfrac{\gamma}{(\omega_0 - \omega)^2 + \gamma^2}$; интеграл
+   $\frac1\pi\mathrm P\int\frac{\gamma}{((\omega' - \omega_0)^2 + \gamma^2)(\omega' - \omega)}\dd\omega'$ вычетом в $\omega' = \omega_0 + i\gamma$ плюс половина
+   вычета в $\omega' = \omega$ даёт $\operatorname{Re}\chi$.
+5. Сдвиг вниз ($\omega_0^2 - (\omega + i0)^2$, полюсы в $\pm\omega_0 - i0$) сохраняет причинность:
+   $G = \theta(t)\sin\omega_0 t/\omega_0$ (запаздывающая функция). При сдвиге вверх получилась бы
+   опережающая функция $-\theta(-t)\sin\omega_0 t/\omega_0$ — отклик раньше воздействия.
+:::
