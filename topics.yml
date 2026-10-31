@@ -500,7 +500,7 @@ sections:
   - id: numerical-mechanics
     title: Численное моделирование механических систем
     level: 2
-    requires: [symplectic-integrators, legendre-hamilton]
+    requires: [symplectic-integrators, legendre-hamilton, kepler]
     about: Маятник, задача Кеплера, многие тела; сохранение энергии и фазового объёма на больших временах.
   - id: rigid-body
     title: Твёрдое тело
