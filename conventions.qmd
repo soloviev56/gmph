@@ -210,6 +210,18 @@ subtitle: "Обозначения и соглашения о знаках, ед�
   Знак «+» перед $i\mathcal{A}_\mu$ выбран так, чтобы формулы совпадали с
   разделом «Электродинамика» без перемены знака у потенциала.
 
+## Теория поля
+
+- Действие поля $S = \int\mathcal L\,dt\,d^3x = \frac1c\int\mathcal L\,d^4x$, $x^0 = ct$; уравнения
+  $\partial_\mu\frac{\partial\mathcal L}{\partial(\partial_\mu\varphi)} = \frac{\partial\mathcal L}{\partial\varphi}$.
+- Ток Нётер преобразования $\varphi\to\varphi + \varepsilon\Phi$, при котором $\mathcal L\to\mathcal L + \varepsilon\,\partial_\mu K^\mu$:
+  $j^\mu = \frac{\partial\mathcal L}{\partial(\partial_\mu\varphi)}\Phi - K^\mu$, $\partial_\mu j^\mu = 0$.
+- Канонический тензор энергии-импульса
+  $T^\mu{}_\nu = \frac{\partial\mathcal L}{\partial(\partial_\mu\varphi)}\partial_\nu\varphi - \delta^\mu_\nu\mathcal L$, $\partial_\mu T^\mu{}_\nu = 0$ (индекс дивергенции —
+  первый), $T^{\mu\nu} = T^\mu{}_\lambda\eta^{\lambda\nu}$. Тогда $T^{00}$ — плотность энергии, $T^{0i}/c$ — плотность
+  импульса, как у Ландау и Лифшица (т. II, § 32). Функции `noether_current` и `canonical_stress`
+  из `gmph.fields`.
+
 ## Термодинамика
 
 - Первое начало: $\dd U = \delta Q - \delta A$, где $\delta Q$ — теплота,

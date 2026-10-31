@@ -30,3 +30,15 @@ def divergence(T, coords):
     """∂_μ T^μ_ν — по одному выражению на значение ν."""
     n = len(coords)
     return [sp.simplify(sum(sp.diff(T[m, v], coords[m]) for m in range(n))) for v in range(n)]
+
+
+def noether_current(L, fields, variations, coords, K=None):
+    """Ток Нётер j^μ = Σ ∂ℒ/∂(∂_μφ) Φ − K^μ.
+
+    Преобразование φ → φ + εΦ (``variations`` — список Φ по полям) меняет ℒ
+    на ε ∂_μ K^μ (``K`` — список K^μ, по умолчанию нули). Тогда ∂_μ j^μ = 0
+    на решениях уравнений поля.
+    """
+    K = K if K is not None else [0] * len(coords)
+    return [sum(sp.diff(L, sp.diff(f, x)) * v for f, v in zip(fields, variations)) - K[m]
+            for m, x in enumerate(coords)]

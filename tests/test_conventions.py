@@ -391,3 +391,27 @@ def test_codifferential_signs():
     four_pi_j_up = [-sum(sp.diff(F_up[m, n], X[n]) for n in range(4)) for m in range(4)]   # ∂_ν F^{μν} = −(4π/c) j^μ
     dF = codifferential(d(A, X), X, eta)
     assert all(sp.simplify(dF.get((m + 1,), 0) + eta[m, m] * four_pi_j_up[m]) == 0 for m in range(4))
+
+
+# --- Теория поля: T^μ_ν = ∂ℒ/∂(∂_μφ) ∂_νφ − δ^μ_ν ℒ, T^00 — энергия, T^0i/c — импульс
+
+
+def test_canonical_stress_signs():
+    from gmph.fields import canonical_stress
+
+    x0, x = sp.symbols("x0 x", real=True)
+    c, rho, T = sp.symbols("c rho T", positive=True)
+    f = sp.Function("f")
+    v = sp.Symbol("v", positive=True)
+    y = sp.Function("y")(x0, x)
+    y_t = c * y.diff(x0)                                     # ∂_t = c ∂_0
+    L = rho * y_t**2 / 2 - T * y.diff(x)**2 / 2
+    Tmix = canonical_stress(L, [y], (x0, x))
+    eta = sp.diag(1, -1)
+    Tup = Tmix * eta
+    assert sp.simplify(Tup[0, 0] - (rho * y_t**2 / 2 + T * y.diff(x)**2 / 2)) == 0   # энергия
+    # волна, бегущая вправо, y = f(x − vt), несёт импульс вдоль +x
+    wave = f(x - v * x0 / c)
+    momentum = (Tup[0, 1] / c).subs(y, wave).doit()
+    assert sp.simplify(momentum - rho * v * sp.Subs(sp.Derivative(f(sp.Symbol("u")), sp.Symbol("u")),
+                                                    sp.Symbol("u"), x - v * x0 / c).doit()**2) == 0

@@ -1,0 +1,273 @@
+---
+title: "Теорема Нётер для полей"
+topic: field-noether
+order: 2
+description: "Локальные законы сохранения ∂_μj^μ = 0 и сохраняющиеся заряды как интегралы 3-формы ⋆j; теорема Нётер для полей: ток j^μ = ∂ℒ/∂(∂_μφ)Φ − K^μ (функция noether_current в gmph.fields, знаки добавлены в конвенции); фазовая симметрия U(1) комплексного поля и сохранение заряда; сдвиги в пространстве-времени и канонический тензор энергии-импульса T^μ_ν; энергия и импульс струны, поток энергии; симметричный T^{μν} скалярного поля; численная проверка: столкновение кинка и антикинка синус-Гордона, сохранение энергии и импульса (рисунок)"
+---
+
+В механике [теорема Нётер](/physics/mechanics/noether.qmd) сопоставляет
+каждой симметрии лагранжиана сохраняющуюся величину: сдвигам во
+времени — энергию, сдвигам в пространстве — импульс, поворотам — момент.
+Для полей утверждение сильнее. Сохраняется не только полный заряд, но и
+выполняется **локальный** закон: заряд не может исчезнуть в одной точке и
+появиться в другой, он перетекает, и изменение заряда в любом объёме
+равно потоку через его границу. Математически это уравнение
+непрерывности $\partial_\mu j^\mu = 0$ для 4-тока, который строится из лагранжиана.
+Так из фазовой симметрии получается сохранение электрического заряда, а из
+однородности пространства-времени — тензор энергии-импульса, источник
+гравитации в общей теории относительности.
+
+Нужны [лагранжев формализм для полей](/physics/fields/field-lagrangian.qmd) и
+[теорема Нётер](/physics/mechanics/noether.qmd) в механике. Знаки тока и
+тензора энергии-импульса добавлены в [конвенции](/conventions.qmd) (раздел
+«Теория поля»).
+
+## Локальные законы сохранения
+
+::: {#def-conserved-current}
+**Сохраняющийся ток** — векторное поле $j^\mu$ с $\partial_\mu j^\mu = 0$. На языке форм
+это замкнутость 3-формы $\hodge j$ (или $\delta j = 0$, см.
+[кодифференциал](/math/forms/codifferential.qmd)). **Заряд** —
+$Q(t) = \int j^0\,d^3x$.
+:::
+
+По [теореме Стокса](/math/forms/stokes.qmd) для области $V\times[t_1, t_2]$ интеграл
+$\hodge j$ по её границе равен нулю. Граница — две «крышки» и «боковая стенка»,
+поэтому $Q_V(t_2) - Q_V(t_1)$ равно потоку $\mathbf j$ через $\partial V$ за это время. Если поля на
+бесконечности убывают, полный заряд постоянен.
+
+## Теорема
+
+::: {#thm-field-noether}
+## Теорема Нётер для полей
+Пусть при преобразовании $\varphi\to\varphi + \varepsilon\,\Phi(\varphi, x)$ плотность лагранжиана меняется на
+дивергенцию: $\delta\mathcal L = \varepsilon\,\partial_\mu K^\mu$. Тогда ток
+$$
+j^\mu = \pd{\mathcal L}{(\partial_\mu\varphi)}\,\Phi - K^\mu
+$$
+сохраняется на решениях уравнений поля: $\partial_\mu j^\mu = 0$.
+:::
+
+*Доказательство.* С одной стороны,
+$\delta\mathcal L = \pd{\mathcal L}{\varphi}\varepsilon\Phi + \pd{\mathcal L}{(\partial_\mu\varphi)}\partial_\mu(\varepsilon\Phi)$. На решениях $\pd{\mathcal L}{\varphi} = \partial_\mu\pd{\mathcal L}{(\partial_\mu\varphi)}$, и
+$\delta\mathcal L = \varepsilon\,\partial_\mu\left(\pd{\mathcal L}{(\partial_\mu\varphi)}\Phi\right)$. С другой стороны, $\delta\mathcal L = \varepsilon\,\partial_\mu K^\mu$. Вычитая, получаем
+$\partial_\mu j^\mu = 0$. $\square$
+
+Для нескольких полей $\pd{\mathcal L}{(\partial_\mu\varphi)}\Phi$ суммируется по полям. Функция `noether_current`
+из `gmph.fields` строит ток по $\mathcal L$, $\Phi$ и $K$.
+
+## Внутренняя симметрия: заряд
+
+Комплексное скалярное поле $\psi$ с плотностью
+$$
+\mathcal L = \partial_\mu\bar\psi\,\partial^\mu\psi - \mu^2\bar\psi\psi
+$$
+не меняется при умножении на фазу, $\psi\to e^{i\alpha}\psi$. Бесконечно малое
+преобразование — $\Phi_\psi = i\psi$, $\Phi_{\bar\psi} = -i\bar\psi$, $K = 0$. Поля $\psi$ и $\bar\psi$ при варьировании
+удобно считать независимыми. Проверим в двумерном пространстве-времени
+$(x^0, x)$:
+
+```{python}
+import numpy as np
+import sympy as sp
+from gmph.fields import canonical_stress, divergence, euler_lagrange, noether_current
+
+x0, x = sp.symbols("x0 x", real=True)
+X = (x0, x)
+eta = sp.diag(1, -1)
+mu = sp.Symbol("mu", positive=True)
+psi, psib = sp.Function("psi")(*X), sp.Function("psib")(*X)
+L_c = psib.diff(x0) * psi.diff(x0) - psib.diff(x) * psi.diff(x) - mu**2 * psib * psi
+eqs = euler_lagrange(L_c, [psi, psib], X)
+print("уравнения поля:", [sp.simplify(e) for e in eqs])
+j = noether_current(L_c, [psi, psib], [sp.I * psi, -sp.I * psib], X)
+print("j^0 =", sp.simplify(j[0]), ";  j^1 =", sp.simplify(j[1]))
+on_shell = {psi.diff(x0, 2): psi.diff(x, 2) - mu**2 * psi, psib.diff(x0, 2): psib.diff(x, 2) - mu**2 * psib}
+print("∂_μ j^μ на решениях:", sp.simplify((j[0].diff(x0) + j[1].diff(x)).subs(on_shell)))
+```
+
+Получился ток $j^\mu = i(\psi\,\partial^\mu\bar\psi - \bar\psi\,\partial^\mu\psi)$ (у $j^1$ знак меняется при подъёме индекса,
+$\partial^1 = -\partial_1$). Для плоской волны $\psi = e^{-ik_\mu x^\mu}$ ток $j^\mu = -2k^\mu$. Общий знак тока
+зависит лишь от выбора $\Phi = i\psi$ (а не $-i\psi$) и физического смысла не несёт; важно, что волны с $k^0 > 0$ и $k^0 < 0$
+несут заряды противоположного знака — в квантовой теории это частицы
+и античастицы. Вещественное поле фазовой симметрии не имеет и заряда не
+несёт. Когда поле взаимодействует с электромагнитным, именно этот ток
+(умноженный на заряд $e$) стоит в правой части уравнений Максвелла, а
+симметрия становится [калибровочной](/physics/electrodynamics/gauge-invariance-em.qmd).
+
+```{python}
+k0, k1 = sp.symbols("k0 k1", real=True)
+plane = {psi: sp.exp(-sp.I * (k0 * x0 - k1 * x)), psib: sp.exp(sp.I * (k0 * x0 - k1 * x))}
+print("плоская волна: j^μ =", [sp.simplify(c.subs(plane).doit()) for c in j])
+```
+
+## Сдвиги и тензор энергии-импульса
+
+Если $\mathcal L$ не зависит явно от координат, она симметрична относительно
+сдвигов $x\to x + a$. Поле при этом меняется на $\Phi = -a^\nu\partial_\nu\varphi$ (поле «уезжает»), а
+плотность — на $\delta\mathcal L = -a^\nu\partial_\nu\mathcal L = \partial_\mu(-a^\mu\mathcal L)$. По теореме получаем четыре тока, по
+одному на каждое направление $\nu$; со знаком минус они образуют
+**канонический тензор энергии-импульса**
+$$
+T^\mu{}_\nu = \pd{\mathcal L}{(\partial_\mu\varphi)}\,\partial_\nu\varphi - \delta^\mu_\nu\,\mathcal L, \qquad \partial_\mu T^\mu{}_\nu = 0 .
+$$
+Строка $\nu = 0$ — сохранение энергии: $T^0{}_0$ — плотность энергии ($\pi\dot\varphi - \mathcal L$), $T^i{}_0$ —
+поток энергии. Строки $\nu = i$ — сохранение импульса. Поднимем второй индекс:
+$T^{\mu\nu} = T^\mu{}_\lambda\eta^{\lambda\nu}$; тогда $T^{00}$ — плотность энергии, а $T^{0i}/c$ — плотность импульса
+([конвенции](/conventions.qmd)). Для струны ($x^0 = ct$, $\partial_t = c\,\partial_0$):
+
+```{python}
+c, rho, T = sp.symbols("c rho T", positive=True)
+y = sp.Function("y")(*X)
+y_t = c * y.diff(x0)
+L_s = rho * y_t**2 / 2 - T * y.diff(x)**2 / 2
+T_mixed = canonical_stress(L_s, [y], X)
+T_up = T_mixed * eta
+print("T^00 (энергия)  =", sp.simplify(T_up[0, 0]))
+print("T^01/c (импульс) =", sp.simplify(T_up[0, 1] / c))
+print("c·T^10 (поток энергии) =", sp.simplify(c * T_up[1, 0]))
+on_shell_s = {y.diff(x0, 2): T / (rho * c**2) * y.diff(x, 2)}
+print("∂_μT^μ_ν на решениях:", [sp.simplify(e.subs(on_shell_s)) for e in divergence(T_mixed, X)])
+```
+
+Плотность энергии струны — кинетическая плюс упругая, а поток энергии
+$-T\,y_ty_x$ — мощность, которую левая часть струны передаёт правой через
+точку $x$ (сила натяжения $-Ty_x$ на скорость $y_t$). Для волны $y = f(x - vt)$ с $v = \sqrt{T/\rho}$
+поток равен $v$ × плотность энергии: энергия бежит вместе с волной.
+
+**Симметрия тензора.** Для скалярного поля $T^{\mu\nu} = \partial^\mu\varphi\,\partial^\nu\varphi - \eta^{\mu\nu}\mathcal L$ симметричен.
+Это не случайность: симметрия $T^{\mu\nu}$ нужна для сохранения момента
+импульса (тока лоренцевых поворотов) $M^{\lambda\mu\nu} = x^\mu T^{\lambda\nu} - x^\nu T^{\lambda\mu}$. Для полей с
+индексами (векторных, спинорных) канонический тензор бывает
+несимметричным и калибровочно неинвариантным; его исправляют
+добавкой, не меняющей законов сохранения (тензор Белинфанте). Для
+электромагнитного поля это сделано в теме «Тензор
+энергии-импульса электромагнитного поля».
+
+```{python}
+X4 = sp.symbols("x0:4", real=True)
+eta4 = sp.diag(1, -1, -1, -1)
+phi = sp.Function("phi")(*X4)
+L_kg = sum(eta4[i, i] * phi.diff(X4[i])**2 for i in range(4)) / 2 - mu**2 * phi**2 / 2
+T_kg = canonical_stress(L_kg, [phi], X4) * eta4
+print("T^{μν} скалярного поля симметричен:", sp.simplify(T_kg - T_kg.T) == sp.zeros(4, 4))
+print("T^00 =", sp.expand(T_kg[0, 0]))
+```
+
+## Численная проверка: столкновение кинков
+
+[Кинк синус-Гордона](/physics/fields/field-lagrangian.qmd) — частицеподобное
+решение уравнения $\varphi_{tt} = \varphi_{xx} - \sin\varphi$ (единицы с $c = 1$). Запустим навстречу кинк
+(скорость $0{,}5$) и антикинк (скорость $-0{,}3$) и проинтегрируем уравнение
+численно схемой Верле на сетке. Энергия $E = \int T^{00}dx$ и импульс
+$P = \int T^{01}dx = -\int\varphi_t\varphi_x\,dx$ должны сохраняться, хотя за время
+столкновения поле сильно меняется:
+
+```{python}
+def kink(xx, t, x_c, v, sign=1):
+    """Кинк (sign = 1) или антикинк (sign = −1) с центром x_c при t = 0 и скоростью v."""
+    g = 1 / np.sqrt(1 - v**2)
+    s = g * (xx - x_c - v * t)
+    return 4 * np.arctan(np.exp(sign * s))
+
+L_box, N = 80.0, 4000
+dx = L_box / N
+xs = -L_box / 2 + dx * np.arange(N)
+dt = 0.4 * dx
+eps = 1e-6
+init = lambda t: kink(xs, t, -10, 0.5) + kink(xs, t, 10, -0.3, sign=-1) - 2 * np.pi
+u = init(0.0)
+u_dot = (init(eps) - init(-eps)) / (2 * eps)              # точная скорость начального поля
+
+def laplacian(u):
+    return (np.roll(u, -1) - 2 * u + np.roll(u, 1)) / dx**2
+
+def energy_momentum(u, u_dot):
+    u_x = (np.roll(u, -1) - np.roll(u, 1)) / (2 * dx)
+    density = 0.5 * u_dot**2 + 0.5 * u_x**2 + 1 - np.cos(u)
+    return density, np.sum(density) * dx, -np.sum(u_dot * u_x) * dx
+
+t_end, record_every = 60.0, 50
+history, E_t, P_t, times = [], [], [], []
+n_steps = int(t_end / dt)
+for n in range(n_steps + 1):
+    if n % record_every == 0:
+        dens, E, P = energy_momentum(u, u_dot)
+        history.append(dens.copy()); E_t.append(E); P_t.append(P); times.append(n * dt)
+    u_dot += 0.5 * dt * (laplacian(u) - np.sin(u))       # Верле: полшага по скорости
+    u += dt * u_dot
+    u_dot += 0.5 * dt * (laplacian(u) - np.sin(u))
+E_t, P_t = np.array(E_t), np.array(P_t)
+g1, g2 = 1 / np.sqrt(1 - 0.25), 1 / np.sqrt(1 - 0.09)
+print(f"E: от {E_t.min():.5f} до {E_t.max():.5f};  8(γ₁ + γ₂) = {8 * (g1 + g2):.5f}")
+print(f"P: от {P_t.min():.5f} до {P_t.max():.5f};  8(γ₁·0,5 − γ₂·0,3) = {8 * (g1 * 0.5 - g2 * 0.3):.5f}")
+```
+
+Энергия и импульс сохраняются с относительной точностью около
+$10^{-5}$ (дискретная сетка нарушает однородность пространства, поэтому
+точного сохранения импульса нет), а их значения с точностью $3\cdot10^{-5}$
+совпадают с суммой энергий и импульсов двух релятивистских «частиц»
+массы 8. Кинк и
+антикинк проходят друг сквозь друга и сохраняют свои скорости — признак
+интегрируемости уравнения синус-Гордона.
+
+```{python}
+#| label: fig-kink-collision
+#| fig-cap: 'Плотность энергии T⁰⁰(x, t) при столкновении кинка (слева, v = 0,5) и антикинка (справа, v = −0,3) в уравнении синус-Гордона. Энергия переносится двумя локализованными сгустками, которые проходят друг сквозь друга; после столкновения их траектории немного сдвинуты (фазовый сдвиг), а скорости прежние.'
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots(figsize=(6.5, 4.2))
+mesh = ax.pcolormesh(xs, times, np.array(history), cmap="magma", shading="auto", vmax=8)
+fig.colorbar(mesh, ax=ax, label="T⁰⁰")
+ts = np.array(times)
+ax.plot(-10 + 0.5 * ts, ts, "w--", lw=0.8)
+ax.plot(10 - 0.3 * ts, ts, "w--", lw=0.8)
+ax.set(xlabel="x", ylabel="t", xlim=(-30, 30), ylim=(0, t_end))
+plt.tight_layout()
+plt.show()
+```
+
+Пунктир — траектории, которые были бы без взаимодействия: после
+столкновения сгустки идут параллельно им, но смещены.
+
+## Итоги
+
+- Локальный закон сохранения: $\partial_\mu j^\mu = 0$ ($\dd\hodge j = 0$); заряд в объёме меняется
+  только за счёт потока через границу.
+- Теорема Нётер: симметрия $\delta\varphi = \varepsilon\Phi$, $\delta\mathcal L = \varepsilon\,\partial_\mu K^\mu$ даёт ток
+  $j^\mu = \frac{\partial\mathcal L}{\partial(\partial_\mu\varphi)}\Phi - K^\mu$.
+- Фазовая симметрия комплексного поля — сохраняющийся заряд
+  $j^\mu = i(\psi\partial^\mu\bar\psi - \bar\psi\partial^\mu\psi)$; частицы и античастицы несут противоположные заряды.
+- Сдвиги — тензор $T^\mu{}_\nu = \frac{\partial\mathcal L}{\partial(\partial_\mu\varphi)}\partial_\nu\varphi - \delta^\mu_\nu\mathcal L$; $T^{00}$ — энергия, $T^{0i}/c$ — импульс,
+  $cT^{i0}$ — поток энергии.
+- Для скалярного поля $T^{\mu\nu}$ симметричен; в общем случае его симметризуют
+  (Белинфанте), что нужно для сохранения момента импульса.
+
+## Упражнения
+
+1. Найдите ток Нётер для симметрии $\varphi\to\varphi + \varepsilon$ безмассового скалярного поля
+   $\mathcal L = \frac12\partial_\mu\varphi\partial^\mu\varphi$. Что сохраняется?
+2. Покажите, что ток $j^\mu$ определён неоднозначно: $j^\mu + \partial_\nu B^{\mu\nu}$ с антисимметричным
+   $B^{\mu\nu}$ тоже сохраняется. Меняется ли полный заряд?
+3. Для бегущей волны на струне $y = f(x - vt)$, $v = \sqrt{T/\rho}$, найдите отношение
+   плотности импульса к плотности энергии.
+4. Вычислите след $T^\mu{}_\mu$ тензора энергии-импульса скалярного поля в
+   четырёх измерениях. При каком условии он равен нулю?
+5. Найдите плотность заряда $j^0$ для решений $\psi = e^{-i\mu x^0}$ и $\psi = e^{+i\mu x^0}$ комплексного поля
+   (покоящиеся «частица» и «античастица»).
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $\Phi = 1$, $\delta\mathcal L = 0$: $j^\mu = \partial^\mu\varphi$, уравнение $\partial_\mu j^\mu = \Box\varphi = 0$ — само уравнение поля.
+   Сохраняется $\int\partial^0\varphi\,d^3x$, то есть $\frac1c\int\varphi_t\,d^3x$.
+2. $\partial_\mu\partial_\nu B^{\mu\nu} = 0$ из-за антисимметрии. Добавка к $j^0$ — $\partial_iB^{0i}$, её интеграл по
+   пространству — поверхностный и при убывающих полях равен нулю: заряд
+   тот же.
+3. Энергия $\rho v^2f'^2$ (кинетическая и упругая равны), импульс
+   $-\rho y_ty_x = \rho vf'^2$; отношение $1/v$, как у безмассовой частицы ($p = E/v$).
+4. $T^\mu{}_\mu = \partial_\mu\varphi\partial^\mu\varphi - 4\mathcal L = -\partial_\mu\varphi\partial^\mu\varphi + 2\mu^2\varphi^2$. Тождественно нулю не равен; у
+   безмассового поля в двух измерениях $T^\mu{}_\mu = \partial\varphi\cdot\partial\varphi - 2\mathcal L = 0$ (конформная
+   инвариантность).
+5. $j^0 = i(\psi\partial_0\bar\psi - \bar\psi\partial_0\psi) = i(i\mu + i\mu) = -2\mu$ для $e^{-i\mu x^0}$ и $+2\mu$ для $e^{+i\mu x^0}$:
+   заряды противоположны.
+:::
