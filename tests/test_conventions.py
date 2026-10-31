@@ -364,3 +364,30 @@ def test_fourier_conventions():
     assert sp.simplify(Fw - 1 / (a - sp.I * w)) == 0
     assert sp.simplify(fourier_time(sp.exp(-t**2 / 2).diff(t), t, w) + sp.I * w * fourier_time(sp.exp(-t**2 / 2), t, w)) == 0
     assert sp.simplify(inverse_fourier_time(sp.sqrt(2 * sp.pi) * sp.exp(-w**2 / 2), w, t) - sp.exp(-t**2 / 2)) == 0
+
+
+# --- Кодифференциал: δ сопряжён к d, δ(v♭) = −div v, δF = −(4π/c) j ---------
+
+
+def test_codifferential_signs():
+    from gmph.exterior import codifferential, d, laplace_de_rham
+
+    X3 = sp.symbols("x y z", real=True)
+    v = [sp.Function(f"v{i}")(*X3) for i in range(3)]
+    div_v = sum(sp.diff(v[i], X3[i]) for i in range(3))
+    assert sp.simplify(codifferential({(1,): v[0], (2,): v[1], (3,): v[2]}, X3, sp.eye(3))[()] + div_v) == 0
+    f3 = sp.Function("f")(*X3)
+    lap = sum(sp.diff(f3, xi, 2) for xi in X3)
+    assert sp.simplify(laplace_de_rham({(): f3}, X3, sp.eye(3))[()] + lap) == 0          # Δ = −∇²
+
+    X = sp.symbols("x0:4", real=True)
+    eta = sp.diag(1, -1, -1, -1)
+    A_low = [sp.Function(f"A{m}")(*X) for m in range(4)]
+    A = {(m + 1,): A_low[m] for m in range(4)}
+    div4 = sum(eta[m, m] * sp.diff(A_low[m], X[m]) for m in range(4))                  # ∂_μ A^μ
+    assert sp.simplify(codifferential(A, X, eta)[()] + div4) == 0                       # δA = −∂_μ A^μ
+    F_low = sp.Matrix(4, 4, lambda m, n: sp.diff(A_low[n], X[m]) - sp.diff(A_low[m], X[n]))
+    F_up = eta * F_low * eta
+    four_pi_j_up = [-sum(sp.diff(F_up[m, n], X[n]) for n in range(4)) for m in range(4)]   # ∂_ν F^{μν} = −(4π/c) j^μ
+    dF = codifferential(d(A, X), X, eta)
+    assert all(sp.simplify(dF.get((m + 1,), 0) + eta[m, m] * four_pi_j_up[m]) == 0 for m in range(4))

@@ -141,3 +141,21 @@ def test_interior_and_lie():
     # L_X vol = (div X) vol
     assert lie(vec, {(1, 2, 3): 1}, X3) == {}
     assert lie((x, y, z), {(1, 2, 3): 1}, X3) == {(1, 2, 3): 3}
+
+
+def test_codifferential_is_adjoint():
+    """dα∧⋆β − α∧⋆δβ = d(α∧⋆β): δ сопряжён к d с точностью до граничного члена."""
+    from itertools import combinations
+
+    from gmph.exterior import add, codifferential, d, hodge, scale, wedge
+
+    x, y = sp.symbols("x y", real=True)
+    cases = [(sp.Matrix([[1 + x**2, x * y], [x * y, 2 + y**2]]), (x, y)),
+             (sp.diag(1, -1, -1), sp.symbols("t a b", real=True))]
+    for g, X in cases:
+        n = len(X)
+        for k in range(1, n + 1):
+            alpha = {I: sp.Function("a" + "".join(map(str, I)))(*X) for I in combinations(range(1, n + 1), k - 1)}
+            beta = {I: sp.Function("b" + "".join(map(str, I)))(*X) for I in combinations(range(1, n + 1), k)}
+            lhs = add(wedge(d(alpha, X), hodge(beta, g)), scale(-1, wedge(alpha, hodge(codifferential(beta, X, g), g))))
+            assert add(lhs, scale(-1, d(wedge(alpha, hodge(beta, g)), X))) == {}

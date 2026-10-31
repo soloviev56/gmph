@@ -188,3 +188,37 @@ def show(form, names=None):
         basis = "∧".join(name(i) for i in I)
         terms.append(f"({c})" + (f"·{basis}" if basis else ""))
     return " + ".join(terms)
+
+
+def _signature_sign(g):
+    """sign(det g). Знак постоянен на всей карте, поэтому если SymPy не может
+    определить его символьно (например, det = r² sin²θ), он берётся в
+    произвольной точке общего положения."""
+    det = sp.Matrix(g).det()
+    s = sp.sign(det)
+    if s in (1, -1):
+        return s
+    point = {sym: sp.Rational(7, 10) + sp.Rational(13, 100) * i for i, sym in enumerate(sorted(det.free_symbols, key=str))}
+    return sp.sign(sp.N(det.subs(point)))
+
+
+def codifferential(form, coords, g):
+    """Кодифференциал δ — формально сопряжённый к d оператор (конвенции).
+
+    На k-формах в n измерениях δ = (−1)^{n(k+1)+1} s ⋆d⋆, где s = sign det g.
+    Форма должна быть однородной степени k.
+    """
+    g = sp.Matrix(g)
+    degrees = {len(I) for I in form}
+    if not degrees:
+        return {}
+    assert len(degrees) == 1, "δ определён для однородных форм"
+    k, n = degrees.pop(), g.rows
+    if k == 0:
+        return {}
+    return scale((-1)**(n * (k + 1) + 1) * _signature_sign(g), hodge(d(hodge(form, g), coords), g))
+
+
+def laplace_de_rham(form, coords, g):
+    """Оператор Лапласа–де Рама Δ = dδ + δd (на однородной форме)."""
+    return add(d(codifferential(form, coords, g), coords), codifferential(d(form, coords), coords, g))

@@ -1,0 +1,312 @@
+---
+title: "Кодифференциал и оператор Лапласа–де Рама"
+topic: codifferential
+order: 14
+description: "Скалярное произведение форм ∫⟨α, β⟩vol и кодифференциал δ как оператор, сопряжённый к d; формула δ = (−1)^{n(k+1)+1} sign(det g) ⋆d⋆ выведена из формулы Стокса и проверена для общей метрики (знак добавлен в конвенции, функции codifferential и laplace_de_rham в gmph.exterior); проверка сопряжённости интегрированием по сфере; δ в R³: −div, rot, −⋆d; δ² = 0; оператор Лапласа–де Рама Δ = dδ + δd неотрицателен, Δf = −∇²f, Δ(dr) = (2/r²)dr; гармонические формы замкнуты и козамкнуты; разложение Ходжа на торе через БПФ (рисунок); уравнения Максвелла δF = −(4π/c)j, калибровка Лоренца δA = 0 и □A = (4π/c)j"
+---
+
+Внешний дифференциал $\dd$ обобщает градиент, ротор и дивергенцию, но
+каждая из этих операций «смотрит» в свою сторону: $\dd$ повышает степень
+формы. Дивергенция векторного поля на языке форм —
+$\hodge\dd\hodge$: она понижает степень 1-формы до функции. Оператор, понижающий
+степень, нужен постоянно. Это закон Гаусса и уравнение
+непрерывности, условие калибровки Лоренца, неоднородные уравнения
+Максвелла, лапласиан. Правильный способ его ввести — как оператор,
+**сопряжённый** к $\dd$, подобно тому как $-\frac{d}{dx}$ сопряжён к $\frac{d}{dx}$ при интегрировании по
+частям. Получается **кодифференциал** $\delta$, а из $\dd$ и $\delta$ складывается
+лапласиан на формах любой степени — **оператор Лапласа–де Рама**.
+Его нули, гармонические формы, связывают анализ с топологией
+многообразия.
+
+Нужны [оператор Ходжа на многообразии](/math/forms/hodge-star.qmd) и
+[внешний дифференциал](/math/forms/exterior-derivative.qmd). Знак
+кодифференциала зафиксирован в [конвенциях](/conventions.qmd) (раздел
+«Метрика»; добавлен вместе с этой статьёй).
+
+## Определение через сопряжённость
+
+На многообразии с метрикой у форм одной степени есть поточечное
+скалярное произведение $\langle\alpha, \beta\rangle$ ([конвенции](/conventions.qmd)), а интегрирование
+даёт скалярное произведение функций-полей:
+$$
+(\alpha, \beta) = \int_M\langle\alpha, \beta\rangle\,\mathrm{vol} = \int_M\alpha\wedge\hodge\beta .
+$$
+
+::: {#def-codifferential}
+**Кодифференциал** $\delta$ переводит $k$-формы в $(k-1)$-формы и сопряжён к $\dd$:
+$$
+(\dd\alpha, \beta) = (\alpha, \delta\beta)
+$$
+для всех форм с компактным носителем (или на замкнутом многообразии).
+**Оператор Лапласа–де Рама** — $\Delta = \dd\delta + \delta\dd$.
+:::
+
+Формула для $\delta$ получается из теоремы Стокса. Для $(k-1)$-формы $\alpha$ и
+$k$-формы $\beta$ правило Лейбница даёт
+$\dd(\alpha\wedge\hodge\beta) = \dd\alpha\wedge\hodge\beta + (-1)^{k-1}\alpha\wedge\dd\hodge\beta$. Интеграл левой части равен нулю. Поэтому
+$(\dd\alpha, \beta) = (-1)^k\int\alpha\wedge\dd\hodge\beta$, и надо записать $\dd\hodge\beta$ как $\hodge(\text{что-то})$. Обращая $\hodge$
+по формуле $\hodge\hodge = (-1)^{p(n-p)}s$ (где $s = \operatorname{sign}\det g$), получаем
+$$
+\delta = (-1)^{n(k+1)+1}\,s\,\hodge\dd\hodge \quad\text{на $k$-формах.}
+$$
+Эту формулу реализует функция `codifferential` из `gmph.exterior`. Проверим
+исходное тождество $\dd\alpha\wedge\hodge\beta - \alpha\wedge\hodge\delta\beta = \dd(\alpha\wedge\hodge\beta)$ для произвольной метрики на
+плоскости и для трёхмерного пространства Минковского, на формах всех
+степеней:
+
+```{python}
+from itertools import combinations
+import numpy as np
+import sympy as sp
+from gmph.exterior import add, codifferential, d, hodge, laplace_de_rham, scale, show, wedge
+
+x, y = sp.symbols("x y", real=True)
+cases = {"плоскость, g общего вида": (sp.Matrix([[1 + x**2, x * y], [x * y, 2 + y**2]]), (x, y)),
+         "Минковский 1+2": (sp.diag(1, -1, -1), sp.symbols("t a b", real=True))}
+for name, (g, X) in cases.items():
+    n = len(X)
+    results = []
+    for k in range(1, n + 1):
+        alpha = {I: sp.Function("a" + "".join(map(str, I)))(*X) for I in combinations(range(1, n + 1), k - 1)}
+        beta = {I: sp.Function("b" + "".join(map(str, I)))(*X) for I in combinations(range(1, n + 1), k)}
+        lhs = add(wedge(d(alpha, X), hodge(beta, g)), scale(-1, wedge(alpha, hodge(codifferential(beta, X, g), g))))
+        results.append(add(lhs, scale(-1, d(wedge(alpha, hodge(beta, g)), X))) == {})
+    print(f"{name}: тождество верно для k = 1…{n}: {results}")
+```
+
+На замкнутом многообразии граничного члена нет. Проверим
+сопряжённость прямым интегрированием по единичной сфере с метрикой
+$\dd\theta^2 + \sin^2\theta\,\dd\varphi^2$ для функции $\alpha$ и 1-формы $\beta$:
+
+```{python}
+th, ph = sp.symbols("theta phi", real=True)
+S2 = (th, ph)
+g_s2 = sp.diag(1, sp.sin(th)**2)
+alpha = {(): sp.cos(th) + sp.sin(th) * sp.sin(ph)}
+beta = {(1,): sp.sin(th), (2,): sp.sin(th)**2 * sp.cos(ph)}
+
+def integral_over_sphere(form2):
+    """Интеграл 2-формы f dθ∧dφ по сфере."""
+    return sp.integrate(form2.get((1, 2), 0), (th, 0, sp.pi), (ph, 0, 2 * sp.pi))
+
+lhs = integral_over_sphere(wedge(d(alpha, S2), hodge(beta, g_s2)))
+rhs = integral_over_sphere(wedge(alpha, hodge(codifferential(beta, S2, g_s2), g_s2)))
+print("(dα, β) =", sp.simplify(lhs), ";  (α, δβ) =", sp.simplify(rhs))
+```
+
+## Кодифференциал в R³
+
+В $\R^3$ с евклидовой метрикой $s = 1$, $n = 3$, и знак $(-1)^{3(k+1)+1} = (-1)^k$. Вычислим $\delta$
+для 1-формы $\mathbf v^\flat$, 2-формы
+$\hodge\mathbf v^\flat = \mathbf v\cdot\dd\mathbf S$ и 3-формы $f\,\mathrm{vol}$:
+
+```{python}
+X3 = sp.symbols("x y z", real=True)
+names = ["dx", "dy", "dz"]
+v = [sp.Function(f"v_{s}")(*X3) for s in "xyz"]
+f = sp.Function("f")(*X3)
+one_form = {(1,): v[0], (2,): v[1], (3,): v[2]}
+print("δ(v♭) =", show(codifferential(one_form, X3, sp.eye(3)), names))
+print("δ(⋆v♭) =", show(codifferential(hodge(one_form, sp.eye(3)), X3, sp.eye(3)), names))
+print("δ(f vol) =", show(codifferential({(1, 2, 3): f}, X3, sp.eye(3)), names))
+```
+
+Получился словарь: $\delta\mathbf v^\flat = -\operatorname{div}\mathbf v$, $\delta(\hodge\mathbf v^\flat) = (\operatorname{rot}\mathbf v)^\flat$, $\delta(f\,\mathrm{vol}) = -\hodge\dd f = -\operatorname{grad}f\cdot\dd\mathbf S$
+(2-форма; например, при $\dd y\wedge\dd z$ стоит $-\partial_xf$).
+Минусы при дивергенции и градиенте — те же, что в интегрировании по
+частям: $\int\mathbf v\cdot\nabla f\,\dd V = -\int f\operatorname{div}\mathbf v\,\dd V$. В компонентах $\delta$ — это дивергенция по
+первому индексу со знаком минус:
+$(\delta\omega)_{i_2\dots i_k} = -\nabla^j\omega_{j\,i_2\dots i_k}$ ([связность Леви-Чивиты](/math/riemann/levi-civita.qmd)).
+
+Так как $\hodge\hodge = \pm1$, из $\dd^2 = 0$ сразу следует
+$$
+\delta^2 = \pm\hodge\dd\hodge\hodge\dd\hodge = \pm\hodge\dd\dd\hodge = 0 .
+$$
+В $\R^3$ это тождество $\operatorname{div}\operatorname{rot} = 0$, прочитанное «с другой стороны».
+
+## Оператор Лапласа–де Рама
+
+На функциях $\delta f = 0$ (функцию нечем понижать), так что $\Delta f = \delta\dd f = -\operatorname{div}\operatorname{grad}f$:
+$$
+\Delta f = -\nabla^2 f .
+$$
+Знак противоположен привычному лапласиану, зато оператор
+**неотрицателен**: $(\Delta\omega, \omega) = (\dd\omega, \dd\omega) + (\delta\omega, \delta\omega)\ge0$. Сферическая функция
+$Y_2^0\propto 3\cos^2\theta - 1$ — собственная функция $\Delta$ на сфере с числом $l(l+1) = 6$:
+
+```{python}
+Y20 = {(): 3 * sp.cos(th)**2 - 1}
+lap = laplace_de_rham(Y20, S2, g_s2)
+ratio = lap[()] / Y20[()]          # sp.simplify оставляет Piecewise из-за |sin θ|; проверим в точках
+print("ΔY₂⁰ / Y₂⁰ при θ = 0,3; 1,1; 2,0:", [round(float(ratio.subs(th, v)), 12) for v in (0.3, 1.1, 2.0)])
+```
+
+На 1-формах $\Delta$ в декартовых координатах действует покомпонентно,
+$\Delta\mathbf v^\flat = -(\nabla^2\mathbf v)^\flat$, а в криволинейных — нет. Это видно на 1-форме $\dd r$ в
+сферических координатах: её компоненты $(1, 0, 0)$ постоянны, но $\Delta\dd r\ne0$:
+
+```{python}
+r, theta, phi = SPH = sp.symbols("r theta phi", positive=True)
+g_sph = sp.diag(1, r**2, r**2 * sp.sin(theta)**2)
+dr = {(1,): sp.Integer(1)}
+print("δ(dr) =", show(codifferential(dr, SPH, g_sph), ["dr", "dθ", "dφ"]))
+print("Δ(dr) =", show(laplace_de_rham(dr, SPH, g_sph), ["dr", "dθ", "dφ"]))
+
+# в декартовых координатах: компоненты e_r = x/r, …, лапласиан покомпонентно
+xs = sp.symbols("x y z", real=True)
+rr = sp.sqrt(sum(c**2 for c in xs))
+lap_cart = [sp.simplify(-sum(sp.diff(c / rr, w, 2) for w in xs)) for c in xs]
+print("−∇²(x/r, y/r, z/r) =", lap_cart, "= (2/r²)·e_r")
+```
+
+$\Delta\,\dd r = \frac{2}{r^2}\dd r$ — это известная формула векторного лапласиана $\nabla^2\mathbf e_r = -\frac{2}{r^2}\mathbf e_r$,
+полученная без дифференцирования ортов.
+
+## Гармонические формы и разложение Ходжа
+
+Форма $h$ **гармоническая**, если $\Delta h = 0$. На замкнутом многообразии из
+$(\Delta h, h) = |\dd h|^2 + |\delta h|^2$ следует: $h$ гармоническая тогда и только тогда, когда
+$\dd h = 0$ и $\delta h = 0$. **Теорема Ходжа** утверждает больше: любая форма
+единственным образом раскладывается в сумму трёх взаимно ортогональных
+частей,
+$$
+\omega = \dd\alpha + \delta\beta + h ,
+$$
+точной, коточной и гармонической. Гармонические формы — по одной в
+каждом классе замкнутых форм по модулю точных, так что их число
+(размерность пространства) — топологический инвариант. Это тема
+«Когомологии де Рама».
+
+На плоском торе $T^2 = \R^2/(2\pi\mathbb Z)^2$ разложение делается
+[преобразованием Фурье](/math/numerics/spectral-methods.qmd). Для 1-формы
+$\omega = v_x\dd x + v_y\dd y$ с коэффициентами Фурье $\hat v(\mathbf k)$ точная часть $\dd\alpha$ — проекция
+$\hat v$ на $\mathbf k$, коточная $\delta\beta$ — на направление, перпендикулярное $\mathbf k$, а
+гармоническая — среднее значение ($\mathbf k = 0$). Гармонических 1-форм на торе две
+($\dd x$ и $\dd y$) — по числу независимых «дыр», вокруг которых можно обойти.
+Сначала проверим, что коточная форма $\delta(\psi\,\dd x\wedge\dd y)$ — это $\psi_y\dd x - \psi_x\dd y$:
+
+```{python}
+psi = sp.Function("psi")(x, y)
+print("δ(ψ dx∧dy) =", show(codifferential({(1, 2): psi}, (x, y), sp.eye(2)), ["dx", "dy"]))
+```
+
+Соберём форму из известных частей и разложим её численно:
+
+```{python}
+N = 64
+grid = np.arange(N) * 2 * np.pi / N
+GX, GY = np.meshgrid(grid, grid, indexing="ij")
+# α = sin x cos y + 0,5 cos 2y,  ψ = 0,8 cos(x + y) + 0,4 sin 2x
+exact_true = np.array([np.cos(GX) * np.cos(GY), -np.sin(GX) * np.sin(GY) - np.sin(2 * GY)])   # dα
+coexact_true = np.array([-0.8 * np.sin(GX + GY), 0.8 * np.sin(GX + GY) - 0.8 * np.cos(2 * GX)])  # (ψ_y, −ψ_x)
+harmonic_true = np.array([0.6 * np.ones_like(GX), -0.3 * np.ones_like(GX)])     # 0,6 dx − 0,3 dy
+omega_num = exact_true + coexact_true + harmonic_true
+
+def hodge_decomposition(v):
+    """Разложение 1-формы на торе [0, 2π)² на точную, коточную и гармоническую части."""
+    k = np.fft.fftfreq(N, d=1 / N)
+    KX, KY = np.meshgrid(k, k, indexing="ij")
+    K2 = KX**2 + KY**2
+    K2[0, 0] = 1
+    vx, vy = np.fft.fft2(v[0]), np.fft.fft2(v[1])
+    along = (KX * vx + KY * vy) / K2                    # проекция на k
+    ex = np.array([KX * along, KY * along])
+    ex[:, 0, 0] = 0
+    harm = np.array([np.full((N, N), vx[0, 0] / N**2), np.full((N, N), vy[0, 0] / N**2)])
+    exact = np.real(np.fft.ifft2(ex))
+    harm = np.real(harm)
+    return exact, v - exact - harm, harm
+
+exact, coexact, harm = hodge_decomposition(omega_num)
+inner_L2 = lambda a, b: float(np.sum(a * b)) * (2 * np.pi / N)**2
+print("ошибки частей:", [f"{np.abs(p - q).max():.1e}" for p, q in
+                         [(exact, exact_true), (coexact, coexact_true), (harm, harmonic_true)]])
+print("попарные скалярные произведения:", [f"{inner_L2(p, q):.1e}" for p, q in [(exact, coexact), (exact, harm), (coexact, harm)]])
+print("гармоническая часть:", np.round(harm[:, 0, 0], 12))
+```
+
+```{python}
+#| label: fig-hodge-torus
+#| fig-cap: 'Разложение Ходжа 1-формы на плоском торе (поле v^♯ на квадрате [0, 2π)² с отождествлёнными сторонами). Слева направо: исходная форма; точная часть dα (безвихревая, линии тока уходят в стоки и истоки); коточная часть δβ (бездивергентная: div = 0); гармоническая часть 0,6 dx − 0,3 dy — постоянное поле, которое нельзя получить ни как градиент, ни как вихрь периодических функций.'
+import matplotlib.pyplot as plt
+
+fig, axes = plt.subplots(1, 4, figsize=(11, 3.1))
+step = 4
+panels = [(omega_num, "ω"), (exact, "dα"), (coexact, "δβ"), (harm, "h")]
+for ax, (field, title) in zip(axes, panels):
+    ax.quiver(GX[::step, ::step], GY[::step, ::step], field[0][::step, ::step], field[1][::step, ::step],
+              color="tab:blue", scale=25, width=0.006)
+    ax.set_title(title)
+    ax.set(aspect="equal", xlim=(0, 2 * np.pi), ylim=(0, 2 * np.pi), xticks=[0, np.pi, 2 * np.pi],
+           xticklabels=["0", "π", "2π"], yticks=[0, np.pi, 2 * np.pi], yticklabels=["0", "π", "2π"])
+plt.tight_layout()
+plt.show()
+```
+
+## Физика: уравнения Максвелла через δ
+
+В пространстве Минковского ($n = 4$, $s = -1$) на 2-формах $\delta = \hodge\dd\hodge$, и неоднородная
+пара [уравнений Максвелла](/physics/electrodynamics/maxwell-forms.qmd)
+$\dd\hodge F = -\frac{4\pi}{c}\hodge j$ принимает вид
+$$
+\dd F = 0, \qquad \delta F = -\frac{4\pi}{c}\,j .
+$$
+Сохранение заряда — $\delta j = -\frac{c}{4\pi}\delta^2F = 0$, и $\delta j = -\partial_\mu j^\mu$. Условие [калибровки
+Лоренца](/physics/electrodynamics/gauge-invariance-em.qmd) — $\delta A = 0$. При $F = \dd A$ и
+$\delta A = 0$ получаем $\delta\dd A = \Delta A$, и уравнения для потенциала — $\Delta A = -\frac{4\pi}{c}j$. Проверим,
+что на функциях и 1-формах в декартовых координатах $\Delta = -\Box$, так что это
+знакомое $\Box A_\mu = \frac{4\pi}{c}j_\mu$:
+
+```{python}
+X4 = sp.symbols("x0:4", real=True)
+eta = sp.diag(1, -1, -1, -1)
+box = lambda h: sum(eta[m, m] * sp.diff(h, X4[m], 2) for m in range(4))          # □ = ∂_μ∂^μ
+A_low = [sp.Function(f"A{m}")(*X4) for m in range(4)]
+A_form = {(m + 1,): A_low[m] for m in range(4)}
+print("δA = −∂_μA^μ:", sp.simplify(codifferential(A_form, X4, eta)[()]
+                                   + sum(eta[m, m] * sp.diff(A_low[m], X4[m]) for m in range(4))) == 0)
+lapA = laplace_de_rham(A_form, X4, eta)
+print("ΔA_μ = −□A_μ:", all(sp.simplify(lapA[(m + 1,)] + box(A_low[m])) == 0 for m in range(4)))
+F_form = d(A_form, X4)
+print("δ²F = 0:", codifferential(codifferential(F_form, X4, eta), X4, eta) == {})
+```
+
+В электростатике то же самое — уравнение Пуассона в виде $\Delta\varphi = 4\pi\rho$ с
+неотрицательным $\Delta = -\nabla^2$. Вся разница со школьной записью — в знаке
+оператора, а не в физике.
+
+## Итоги
+
+- $\delta$ — оператор, сопряжённый к $\dd$ относительно $(\alpha, \beta) = \int\alpha\wedge\hodge\beta$;
+  $\delta = (-1)^{n(k+1)+1}\operatorname{sign}(\det g)\hodge\dd\hodge$ на $k$-формах; $\delta^2 = 0$.
+- В $\R^3$: $\delta\mathbf v^\flat = -\operatorname{div}\mathbf v$, $\delta(\hodge\mathbf v^\flat) = (\operatorname{rot}\mathbf v)^\flat$, $\delta(f\,\mathrm{vol}) = -\hodge\dd f$.
+- $\Delta = \dd\delta + \delta\dd\ge0$; на функциях $\Delta = -\nabla^2$, в пространстве Минковского $\Delta = -\Box$;
+  в криволинейных координатах $\Delta$ на формах не покомпонентный ($\Delta\dd r = \frac2{r^2}\dd r$).
+- Гармоническая форма замкнута и козамкнута; разложение Ходжа
+  $\omega = \dd\alpha + \delta\beta + h$ ортогонально, число гармонических форм — топологический инвариант.
+- Уравнения Максвелла: $\dd F = 0$, $\delta F = -\frac{4\pi}{c}j$; $\delta j = 0$; калибровка Лоренца $\delta A = 0$ и
+  $\Delta A = -\frac{4\pi}{c}j$.
+
+## Упражнения
+
+1. Найдите $\delta(f\,\dd r + h\,\dd\varphi)$ на плоскости в полярных координатах.
+2. Покажите, что $\Delta$ коммутирует с $\dd$, $\delta$ и $\hodge$.
+3. На плоскости без начала координат 1-форма $\dd\varphi$ замкнута, но не точна.
+   Найдите $\delta\,\dd\varphi$ и $\Delta\,\dd\varphi$.
+4. Покажите, что на замкнутом связном многообразии гармонические
+   функции — константы.
+5. При каких $k_\mu$ функция $e^{-ik_\mu x^\mu}$ в пространстве Минковского гармоническая
+   ($\Delta f = 0$)?
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $\delta(f\,\dd r + h\,\dd\varphi) = -\frac1r\partial_r(rf) - \frac1{r^2}\partial_\varphi h$ — минус дивергенция поля с
+   компонентами $(f, h/r^2)$ в базисе $\partial_r, \partial_\varphi$.
+2. $\dd\Delta = \dd\delta\dd = \Delta\dd$ (так как $\dd^2 = 0$), аналогично для $\delta$. Для $\hodge$: $\hodge\delta = \pm\dd\hodge$ и $\hodge\dd = \pm\delta\hodge$,
+   знаки в $\hodge\dd\delta$ и $\delta\dd\hodge$ совпадают.
+3. $\delta\,\dd\varphi = -\nabla^2\varphi = 0$, $\dd\,\dd\varphi = 0$, поэтому $\Delta\,\dd\varphi = 0$: гармоническая, но не
+   точная форма — признак «дыры» в начале координат.
+4. $0 = (\Delta f, f) = (\dd f, \dd f)$, значит $\dd f = 0$ и $f$ постоянна.
+5. $\Delta e^{-ikx} = -\Box e^{-ikx} = k_\mu k^\mu e^{-ikx}$; гармоническая при $k_\mu k^\mu = 0$ — изотропный
+   волновой вектор, $\omega = c|\mathbf k|$.
+:::
