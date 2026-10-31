@@ -1,0 +1,304 @@
+---
+title: "Лагранжев формализм для полей"
+topic: field-lagrangian
+order: 1
+description: "Поле как система с бесконечным числом степеней свободы: струна как предел цепочки масс, дисперсия цепочки и её континуальный предел (рисунок); плотность лагранжиана, действие как интеграл n-формы ℒ vol; уравнения Эйлера–Лагранжа ∂_μ(∂ℒ/∂(∂_μφ)) = ∂ℒ/∂φ из вариации и формулы Стокса (модуль gmph.fields); скалярное поле: уравнение Клейна–Гордона, лоренц-инвариантность; лагранжиан в криволинейных координатах с √|g| и связь с кодифференциалом; плотность импульса и гамильтониана; уравнение синус-Гордона: кинк, его энергия 8γ и лоренцево сокращение (рисунок)"
+---
+
+Механическая система описывается конечным числом координат $q^i(t)$. Поле —
+смещение струны $y(t, x)$, потенциал $\varphi(t, \mathbf r)$, компоненты $A_\mu(x)$ — задаётся
+значением в каждой точке пространства: «координата» $\varphi(\mathbf r)$ нумеруется
+непрерывным индексом $\mathbf r$. Чтобы перенести на поля [принцип наименьшего
+действия](/physics/mechanics/least-action.qmd), сумму по степеням свободы надо
+заменить интегралом по пространству. Тогда лагранжиан становится
+интегралом **плотности лагранжиана**, а действие — интегралом по
+области пространства-времени. В релятивистской теории это естественно:
+время и пространство входят в действие равноправно, и лоренц-инвариантность
+теории сводится к тому, что плотность лагранжиана — скаляр. Этот язык —
+основа электродинамики, теории гравитации и квантовой теории поля.
+
+Нужны [принцип наименьшего действия](/physics/mechanics/least-action.qmd) и
+[пространство Минковского](/physics/relativity/minkowski.qmd). Сигнатура
+$(+,-,-,-)$ по [конвенциям](/conventions.qmd).
+
+## От цепочки масс к струне
+
+Возьмём цепочку частиц массы $m$, соединённых пружинами жёсткости $k$, с
+шагом $a$. Поперечные (или продольные) смещения $y_j(t)$ имеют лагранжиан
+$$
+L = \sum_j\frac{m\dot y_j^2}{2} - \sum_j\frac{k\,(y_{j+1} - y_j)^2}{2} .
+$$
+При $a\to0$ с постоянными линейной плотностью $\rho = m/a$ и «натяжением»
+$T = ka$ смещения сливаются в функцию $y(t, x)$, разность $y_{j+1} - y_j\approx a\,\partial_xy$, и
+сумма превращается в интеграл:
+$$
+L = \int\left(\frac{\rho\,y_t^2}{2} - \frac{T\,y_x^2}{2}\right)dx, \qquad \mathcal L = \frac{\rho\,y_t^2}{2} - \frac{T\,y_x^2}{2} .
+$$
+Уравнения Лагранжа цепочки $m\ddot y_j = k(y_{j+1} - 2y_j + y_{j-1})$ для волны $y_j = e^{i(qja - \omega t)}$
+дают закон дисперсии $\omega = 2\sqrt{k/m}\,|\sin(qa/2)|$. Сравним его с пределом:
+
+```{python}
+import numpy as np
+import sympy as sp
+from gmph.mechanics import euler_lagrange as euler_lagrange_mech
+from gmph.fields import euler_lagrange, momentum_densities, canonical_stress
+
+t = sp.Symbol("t", real=True)
+m, k, a, q = sp.symbols("m k a q", positive=True)
+ys = [sp.Function(f"y{j}")(t) for j in range(-1, 2)]                 # y_{−1}, y_0, y_1
+L_chain = m * ys[1].diff(t)**2 / 2 - k * ((ys[2] - ys[1])**2 + (ys[1] - ys[0])**2) / 2
+eq0 = euler_lagrange_mech(L_chain, [ys[1]], t)[0]                    # уравнение для частицы 0
+w = sp.Symbol("omega", positive=True)
+wave = {ys[j + 1]: sp.exp(sp.I * (q * j * a - w * t)) for j in (-1, 0, 1)}
+disp = sp.simplify((eq0.subs(wave).doit() / sp.exp(-sp.I * w * t)).rewrite(sp.cos))
+print("уравнение дисперсии:", sp.simplify(disp), "= 0")
+omega_chain = sp.sqrt(4 * k / m) * sp.sin(q * a / 2)
+print("ω = 2√(k/m) sin(qa/2) — решение:", sp.simplify(disp.subs(w, omega_chain)) == 0)
+rho, T = sp.symbols("rho T", positive=True)
+print("при a → 0 (m = ρa, k = T/a): ω →", sp.limit(omega_chain.subs({m: rho * a, k: T / a}), a, 0))
+```
+
+В пределе $\omega = q\sqrt{T/\rho}$: волны бегут без дисперсии со скоростью $\sqrt{T/\rho}$. У
+цепочки дисперсия есть: длинные волны ($qa\ll1$) не чувствуют дискретности,
+а у короткой волны $q = \pi/a$ частота максимальна и групповая скорость
+равна нулю. Континуальная теория поля — длинноволновое приближение к
+дискретной среде, и она применима, пока длина волны много больше шага.
+
+```{python}
+#| label: fig-chain-dispersion
+#| fig-cap: 'Закон дисперсии цепочки масс ω = 2√(k/m) sin(qa/2) (сплошная) и его континуальный предел ω = q√(T/ρ) (пунктир) в единицах шага a и частоты √(k/m). Совпадение при qa ≪ 1; на границе зоны Бриллюэна qa = π групповая скорость цепочки обращается в нуль.'
+import matplotlib.pyplot as plt
+
+qa = np.linspace(0, np.pi, 200)
+fig, ax = plt.subplots(figsize=(6, 3.6))
+ax.plot(qa, 2 * np.sin(qa / 2), lw=2, label="цепочка")
+ax.plot(qa, qa, "--", lw=1.5, label="струна (предел a → 0)")
+ax.set(xlabel="qa", ylabel="ω / √(k/m)", xlim=(0, np.pi), ylim=(0, 3.3),
+       xticks=[0, np.pi / 2, np.pi], xticklabels=["0", "π/2", "π"])
+ax.legend(loc="upper left")
+plt.tight_layout()
+plt.show()
+```
+
+## Действие и уравнения Эйлера–Лагранжа
+
+::: {#def-field-action}
+**Плотность лагранжиана** — функция $\mathcal L(\varphi, \partial_\mu\varphi, x)$ полей и их первых
+производных. **Действие** — интеграл по области $\Omega$ пространства-времени
+$$
+S[\varphi] = \int_\Omega\mathcal L\,\mathrm{vol} = \frac1c\int\mathcal L\,d^4x, \qquad d^4x = dx^0dx^1dx^2dx^3,\ x^0 = ct .
+$$
+Действительное поле делает действие стационарным относительно
+вариаций $\delta\varphi$, обращающихся в нуль на границе $\partial\Omega$.
+:::
+
+Здесь $\mathcal L\,\mathrm{vol}$ — $n$-форма на $n$-мерном пространстве-времени, и действие — её
+интеграл. Варьируем:
+$$
+\delta S = \frac1c\int\left(\pd{\mathcal L}{\varphi}\delta\varphi + \pd{\mathcal L}{(\partial_\mu\varphi)}\partial_\mu\delta\varphi\right)d^4x
+= \frac1c\int\left(\pd{\mathcal L}{\varphi} - \partial_\mu\pd{\mathcal L}{(\partial_\mu\varphi)}\right)\delta\varphi\,d^4x + \frac1c\int\partial_\mu\left(\pd{\mathcal L}{(\partial_\mu\varphi)}\delta\varphi\right)d^4x .
+$$
+Последний интеграл — интеграл от дивергенции, то есть от $\dd$ некоторой
+$(n-1)$-формы. По [теореме Стокса](/math/forms/stokes.qmd) он сводится к интегралу
+по границе, где $\delta\varphi = 0$. Из произвольности $\delta\varphi$ внутри области получаем
+**уравнения Эйлера–Лагранжа для полей**
+$$
+\partial_\mu\pd{\mathcal L}{(\partial_\mu\varphi)} - \pd{\mathcal L}{\varphi} = 0
+$$
+— по одному на каждую компоненту поля. Отличие от механики одно: вместо
+$\frac{d}{dt}$ стоит сумма производных по всем координатам. Функция `euler_lagrange`
+из `gmph.fields` строит левые части. Для струны:
+
+```{python}
+x = sp.Symbol("x", real=True)
+y = sp.Function("y")(t, x)
+L_string = rho * y.diff(t)**2 / 2 - T * y.diff(x)**2 / 2
+print("уравнение струны:", euler_lagrange(L_string, [y], (t, x))[0], "= 0")
+```
+
+Как и в механике, плотность лагранжиана определена неоднозначно:
+добавка полной дивергенции $\partial_\mu K^\mu(\varphi, x)$ меняет действие на граничный
+член и не меняет уравнений (упражнение 2).
+
+## Скалярное поле и лоренц-инвариантность
+
+Простейшее релятивистское поле — вещественный скаляр $\varphi(x)$ с плотностью
+$$
+\mathcal L = \frac12\,\partial_\mu\varphi\,\partial^\mu\varphi - \frac12\,\mu^2\varphi^2 = \frac12\left(\frac{1}{c^2}\varphi_t^2 - (\nabla\varphi)^2 - \mu^2\varphi^2\right),
+$$
+где $\mu$ — обратная длина (в квантовой теории $\mu = mc/\hbar$). Уравнение
+Эйлера–Лагранжа — **уравнение Клейна–Гордона**:
+
+```{python}
+X = sp.symbols("x0:4", real=True)
+eta = sp.diag(1, -1, -1, -1)
+mu = sp.Symbol("mu", positive=True)
+phi = sp.Function("phi")(*X)
+dphi = [phi.diff(xi) for xi in X]
+L_kg = sum(eta[i, i] * dphi[i]**2 for i in range(4)) / 2 - mu**2 * phi**2 / 2
+box = sum(eta[i, i] * phi.diff(X[i], 2) for i in range(4))
+print("уравнение Эйлера–Лагранжа = □φ + μ²φ:", sp.simplify(euler_lagrange(L_kg, [phi], X)[0] - (box + mu**2 * phi)) == 0)
+```
+
+Плотность $\mathcal L$ — скаляр: $\partial_\mu\varphi\,\partial^\mu\varphi$ не меняется при преобразованиях Лоренца, и
+форма объёма $\dd x^0\wedge\dots\wedge\dd x^3$ тоже (определитель преобразования равен 1). Значит,
+действие инвариантно, и уравнения движения автоматически
+лоренц-ковариантны. Это главный практический рецепт теории поля:
+чтобы получить релятивистские уравнения, достаточно составить
+лоренц-скалярную плотность. Проверим инвариантность для буста вдоль $x$:
+
+```{python}
+beta = sp.Symbol("beta", positive=True)
+gamma = 1 / sp.sqrt(1 - beta**2)
+Y = sp.symbols("y0:4", real=True)
+phi_rest = sp.Function("Phi")(*Y)
+boost = {Y[0]: gamma * (X[0] - beta * X[1]), Y[1]: gamma * (X[1] - beta * X[0]), Y[2]: X[2], Y[3]: X[3]}
+phi_lab = phi_rest.subs(boost)                                  # φ(x) = Φ(Λx)
+L_lab = L_kg.subs(phi, phi_lab).doit()
+# та же плотность, вычисленная в переменных y и подставленная в точке y = Λx
+dPhi = [sp.Derivative(phi_rest, yi) for yi in Y]
+L_rest = (sum(eta[i, i] * dPhi[i]**2 for i in range(4)) / 2 - mu**2 * phi_rest**2 / 2)
+print("ℒ — скаляр:", sp.simplify(L_lab - L_rest.subs(boost).doit()) == 0)
+```
+
+## Криволинейные координаты и форма объёма
+
+Записанное как интеграл формы $\mathcal L\,\mathrm{vol}$, действие не зависит от координат. В
+произвольных координатах $\mathrm{vol} = \sqrt{|g|}\,\dd x^1\wedge\dots\wedge\dd x^n$, и плотность «в координатах»
+получает множитель $\sqrt{|g|}$. Для статического поля на плоскости в
+полярных координатах энергия $\int\frac12(\nabla\varphi)^2\,dA$ — это
+$\int\frac12\left(\varphi_r^2 + \varphi_\theta^2/r^2\right)r\,dr\,d\theta$. Уравнение Эйлера–Лагранжа с весом $r$ даёт
+лапласиан в полярных координатах — с точностью до множителя $\sqrt g = r$ это
+$-\delta\dd\varphi$, где $\delta$ — [кодифференциал](/math/forms/codifferential.qmd):
+
+```{python}
+from gmph.exterior import codifferential, d as ext_d
+
+r, th = sp.symbols("r theta", positive=True)
+u = sp.Function("u")(r, th)
+L_polar = (u.diff(r)**2 + u.diff(th)**2 / r**2) / 2 * r
+el = euler_lagrange(L_polar, [u], (r, th))[0]
+delta_d = codifferential(ext_d({(): u}, (r, th)), (r, th), sp.diag(1, r**2)).get((), 0)
+print("уравнение:", sp.expand(el / r), "= 0")
+print("ЭЛ = −√g·δdu:", sp.simplify(el + r * delta_d) == 0)
+```
+
+Общее правило: для $\mathcal L = \frac12\langle\dd\varphi, \dd\varphi\rangle - V(\varphi)$ уравнение поля — $\delta\dd\varphi + V'(\varphi) = 0$ в
+любых координатах и на любом многообразии с метрикой. При
+$\langle\dd\varphi, \dd\varphi\rangle = \partial_\mu\varphi\partial^\mu\varphi$ и $\delta\dd = -\Box$ это снова уравнение Клейна–Гордона.
+
+## Импульс и энергия поля
+
+Каноническая **плотность импульса**, сопряжённая полю, — $\pi = \partial\mathcal L/\partial\varphi_t$; для струны
+$\pi = \rho y_t$. **Плотность гамильтониана** $\mathcal H = \pi\varphi_t - \mathcal L$ — плотность энергии. Для струны:
+
+```{python}
+pi_y = momentum_densities(L_string, [y], t)[0]
+H_density = sp.expand(pi_y * y.diff(t) - L_string)
+print("π =", pi_y, ";  ℋ =", H_density)
+print("совпадает с T^t_t канонического тензора:", sp.simplify(canonical_stress(L_string, [y], (t, x))[0, 0] - H_density) == 0)
+```
+
+Плотность энергии струны — кинетическая плюс упругая. Её сохранение и
+связь с симметрией относительно сдвигов во времени — предмет теоремы
+Нётер для полей, а матрица $T^\mu{}_\nu$ (функция `canonical_stress`) —
+канонический тензор энергии-импульса.
+
+## Физика: уравнение синус-Гордона
+
+Цепочку маятников, насаженных на упругую нить (каждый маятник
+закручивает нить), в непрерывном пределе описывает поле угла $\varphi(t, x)$ с
+плотностью (в безразмерных единицах, скорость волн 1)
+$$
+\mathcal L = \frac12\left(\varphi_t^2 - \varphi_x^2\right) - (1 - \cos\varphi) .
+$$
+Уравнение Эйлера–Лагранжа $\varphi_{tt} - \varphi_{xx} + \sin\varphi = 0$ — **уравнение синус-Гордона**. У него
+есть решение-**кинк**: $\varphi = 4\arctan e^{\gamma(x - vt)}$, $\gamma = 1/\sqrt{1 - v^2}$. Маятники слева от кинка
+висят ($\varphi = 0$), справа сделали полный оборот ($\varphi = 2\pi$), а переход между ними
+локализован и движется как частица:
+
+```{python}
+tt, xx = sp.symbols("t x", real=True)
+v = sp.Symbol("v", positive=True)
+g_v = 1 / sp.sqrt(1 - v**2)
+f = sp.Function("f")(tt, xx)
+L_sg = (f.diff(tt)**2 - f.diff(xx)**2) / 2 - (1 - sp.cos(f))
+eq_sg = euler_lagrange(L_sg, [f], (tt, xx))[0]
+print("уравнение:", eq_sg, "= 0")
+kink = 4 * sp.atan(sp.exp(g_v * (xx - v * tt)))
+residual = eq_sg.subs(f, kink).doit()
+print("кинк — решение:", all(abs(float(residual.subs({tt: t0, xx: x0, v: v0}))) < 1e-12
+                             for t0, x0, v0 in [(0.3, -0.7, 0.5), (1.1, 2.0, 0.9), (0.0, 0.4, 0.1)]))
+
+energy_density = sp.lambdify((tt, xx, v), (kink.diff(tt)**2 + kink.diff(xx)**2) / 2 + 1 - sp.cos(kink))
+from scipy.integrate import quad
+for v0 in (0.0, 0.6, 0.9):
+    E = quad(lambda s: energy_density(0.0, s, v0), -40, 40, points=[0], limit=200)[0]
+    print(f"v = {v0}: энергия кинка {E:.6f}, 8γ = {8 / np.sqrt(1 - v0**2):.6f}")
+```
+
+Энергия кинка равна $8\gamma$ — формула энергии релятивистской частицы массы $8$
+(в единицах, где скорость волн равна 1). Сам кинк при движении
+сжимается в $\gamma$ раз — лоренцево сокращение. Уравнение синус-Гордона
+лоренц-инвариантно (его плотность — скаляр в двумерном
+пространстве-времени), поэтому движущийся кинк — просто «буст»
+покоящегося. Так из теории поля появляются частицеподобные объекты;
+кинки описывают дислокации в кристаллах, флюксоны в джозефсоновских
+контактах и доменные стенки.
+
+```{python}
+#| label: fig-kink
+#| fig-cap: 'Кинк уравнения синус-Гордона φ = 4 arctg e^{γ(x − vt)} в момент t = 0 (слева) и плотность его энергии (справа) при v = 0 и v = 0,9. Движущийся кинк сжат в γ ≈ 2,29 раза, а его плотность энергии выше; полная энергия 8γ.'
+xs = np.linspace(-6, 6, 600)
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9, 3.4))
+kink_num = sp.lambdify((tt, xx, v), kink)
+for v0, col in [(0.0, "tab:blue"), (0.9, "tab:red")]:
+    ax1.plot(xs, kink_num(0.0, xs, v0), color=col, lw=2, label=f"v = {v0}")
+    ax2.plot(xs, energy_density(0.0, xs, v0), color=col, lw=2, label=f"v = {v0}")
+ax1.set(xlabel="x", ylabel="φ", yticks=[0, np.pi, 2 * np.pi], yticklabels=["0", "π", "2π"])
+ax2.set(xlabel="x", ylabel="плотность энергии")
+ax1.legend(loc="upper left")
+ax2.legend(loc="upper right")
+plt.tight_layout()
+plt.show()
+```
+
+## Итоги
+
+- Поле — система с континуумом степеней свободы; струна — предел цепочки
+  масс, справедливый для длин волн много больше шага.
+- Действие $S = \int\mathcal L\,\mathrm{vol}$ — интеграл $n$-формы; уравнения Эйлера–Лагранжа
+  $\partial_\mu\frac{\partial\mathcal L}{\partial(\partial_\mu\varphi)} = \frac{\partial\mathcal L}{\partial\varphi}$ получаются вариацией и теоремой Стокса.
+- Лоренц-скалярная плотность даёт ковариантные уравнения; скалярное
+  поле — уравнение Клейна–Гордона $\Box\varphi + \mu^2\varphi = 0$.
+- В криволинейных координатах плотность умножается на $\sqrt{|g|}$; для
+  $\frac12\langle\dd\varphi, \dd\varphi\rangle - V$ уравнение поля $\delta\dd\varphi + V' = 0$.
+- $\pi = \partial\mathcal L/\partial\varphi_t$, $\mathcal H = \pi\varphi_t - \mathcal L$ — плотность энергии.
+- Синус-Гордон: кинк — локализованное решение с энергией $8\gamma$, ведущее
+  себя как релятивистская частица.
+
+## Упражнения
+
+1. Найдите уравнение поля для $\mathcal L = \frac12(\varphi_t^2 - c^2\varphi_x^2) - V(\varphi)$.
+2. Покажите, что добавка $\partial_\mu K^\mu(\varphi, x)$ к $\mathcal L$ не меняет уравнений. Проверьте на
+   примере $\mathcal L' = \mathcal L + \partial_x(\varphi^2)$ для струны.
+3. Балка (изгибные колебания): $\mathcal L = \frac12\rho y_t^2 - \frac12EI\,y_{xx}^2$. Плотность зависит от
+   вторых производных; выведите уравнение (вариацией с двумя
+   интегрированиями по частям) и закон дисперсии.
+4. Вычислите энергию покоящегося кинка $\int\left(\frac12\varphi_x^2 + 1 - \cos\varphi\right)dx$ аналитически.
+   (Подсказка: для статического решения $\frac12\varphi_x^2 = 1 - \cos\varphi$.)
+5. Найдите групповую скорость волн в цепочке масс и её значения при $q\to0$ и
+   $q = \pi/a$.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $\varphi_{tt} - c^2\varphi_{xx} + V'(\varphi) = 0$.
+2. Добавка $\partial_\mu K^\mu$ меняет действие на интеграл по границе $\oint K^\mu\,\dd S_\mu$, который
+   не зависит от $\delta\varphi$ внутри области; поэтому уравнения те же. Прямой счёт для
+   $\partial_x(\varphi^2) = 2\varphi\varphi_x$: вклад в уравнение $\partial_x(2\varphi) - 2\varphi_x = 0$.
+3. $\rho y_{tt} + EI\,y_{xxxx} = 0$; для $e^{i(qx - \omega t)}$: $\omega = \sqrt{EI/\rho}\;q^2$ — сильная дисперсия, групповая
+   скорость вдвое больше фазовой.
+4. $E = \int2(1 - \cos\varphi)\,dx = \int_0^{2\pi}\sqrt{2(1 - \cos\varphi)}\,d\varphi = \int_0^{2\pi}2\sin(\varphi/2)\,d\varphi = 8$.
+5. $v_{\text{гр}} = \frac{d\omega}{dq} = a\sqrt{k/m}\cos(qa/2)$: при $q\to0$ это $a\sqrt{k/m} = \sqrt{T/\rho}$ (скорость звука
+   струны), при $q = \pi/a$ — нуль.
+:::
