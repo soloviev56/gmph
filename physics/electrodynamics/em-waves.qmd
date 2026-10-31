@@ -1,0 +1,326 @@
+---
+title: "Электромагнитные волны"
+topic: em-waves
+order: 7
+description: "Волновое уравнение □A = 0 из d⋆dA = 0 в калибровке Лоренца; плоские волны и уравнения Максвелла в пространстве Фурье (∂ → волновой вектор): поперечность, ω = ck, правая тройка E, B, k; поляризация: вектор Джонса, параметры Стокса как ψ†σψ, сфера Пуанкаре и фазовые пластинки как вращения SU(2) → SO(3) (рисунок эллипсов); прямоугольный волновод: мода TE₁₀ проверена кодом, частоты отсечки, фазовая и групповая скорости, v_ф·v_гр = c² (рисунок дисперсии); резонатор: собственные частоты, подсчёт мод и закон Вейля N(ω) ≈ Vω³/3π²c³ — плотность мод в формуле Планка"
+---
+
+Уравнения Максвелла в пустоте допускают решения, которые живут без
+зарядов и токов: поле поддерживает само себя, меняющееся электрическое
+поле порождает магнитное, и наоборот. Это электромагнитные волны —
+свет, радиоволны, рентген. Максвелл, вычислив их скорость из
+электрических и магнитных констант, получил скорость света и сделал
+вывод, что свет — электромагнитное явление. В этой статье волны
+изучаются с трёх сторон. Плоские волны: после
+[преобразования Фурье](/math/analysis/fourier.qmd) уравнения Максвелла
+становятся алгебраическими. Поляризация: её геометрия — сфера Пуанкаре и
+уже знакомое накрытие $SU(2)\to SO(3)$. Волны в металлических волноводах и
+резонаторах: граничные условия выделяют дискретный набор мод.
+
+Нужны [уравнения Максвелла на языке форм](/physics/electrodynamics/maxwell-forms.qmd)
+и [ряды и преобразование Фурье](/math/analysis/fourier.qmd). Знаки — по
+[конвенциям](/conventions.qmd): плоская волна $e^{i(\mathbf k\cdot\mathbf r - \omega t)} = e^{-ik_\mu x^\mu}$ с
+$k^\mu = (\omega/c, \mathbf k)$, физическое поле — вещественная часть.
+
+## Волновое уравнение
+
+В пустоте $\dd F = 0$ и $\dd\hodge F = 0$. С $F = \dd A$ первое выполнено тождественно, а второе
+в [калибровке Лоренца](/physics/electrodynamics/gauge-invariance-em.qmd)
+$\partial_\mu A^\mu = 0$ превращается в четыре волновых уравнения
+$$
+\Box A^\mu = \frac1{c^2}\pd{^2A^\mu}{t^2} - \Delta A^\mu = 0 .
+$$
+Так же можно получить уравнения для самих полей: из
+$\operatorname{rot}\mathbf E = -\frac1c\partial_t\mathbf B$, $\operatorname{rot}\mathbf B = \frac1c\partial_t\mathbf E$ и $\operatorname{div}\mathbf E = 0$ следует
+$\operatorname{rot}\operatorname{rot}\mathbf E = -\Delta\mathbf E = -\frac1{c^2}\partial_t^2\mathbf E$, то есть $\Box\mathbf E = 0$, и так же $\Box\mathbf B = 0$.
+
+## Плоские волны
+
+Подставим $\mathbf E = \mathbf E_0e^{i(\mathbf k\cdot\mathbf r - \omega t)}$, $\mathbf B = \mathbf B_0e^{i(\mathbf k\cdot\mathbf r - \omega t)}$. Производные становятся
+умножением: $\nabla\to i\mathbf k$, $\partial_t\to -i\omega$. Уравнения Максвелла превращаются в
+линейную алгебру:
+$$
+\mathbf k\cdot\mathbf E_0 = 0, \quad \mathbf k\cdot\mathbf B_0 = 0, \quad \mathbf k\times\mathbf E_0 = \frac\omega c\,\mathbf B_0, \quad \mathbf k\times\mathbf B_0 = -\frac\omega c\,\mathbf E_0 .
+$$
+Исключим $\mathbf B_0$: $\mathbf k\times(\mathbf k\times\mathbf E_0) = -\frac{\omega^2}{c^2}\mathbf E_0$. Оператор $M\mathbf E = -\mathbf k\times(\mathbf k\times\mathbf E)$
+симметричен; его собственные значения — частоты $\omega^2/c^2$ возможных волн:
+
+```{python}
+import numpy as np
+import sympy as sp
+
+kx, ky, kz = sp.symbols("k_x k_y k_z", real=True)
+kvec = sp.Matrix([kx, ky, kz])
+cross = lambda a, b: a.cross(b)
+M = sp.Matrix(3, 3, lambda i, j: -cross(kvec, cross(kvec, sp.eye(3)[:, j]))[i])
+print("M =", M.tolist())
+for value, mult, vecs in M.eigenvects():
+    print(f"собственное значение {sp.factor(value)} (кратность {mult})")
+```
+
+Собственное значение $k^2$ двукратно: две **поперечные** волны ($\mathbf E\perp\mathbf k$) с законом
+дисперсии $\omega = ck$. Нулевое значение — продольное поле $\mathbf E\parallel\mathbf k$ с $\omega = 0$; его
+запрещает закон Гаусса $\mathbf k\cdot\mathbf E_0 = 0$. В четырёхмерной записи всё это —
+условие $k_\mu k^\mu = 0$: волновой вектор изотропен.
+
+Для волны вдоль $z$ с поляризацией по $x$ проверим, что поля
+удовлетворяют всем уравнениям, а $\mathbf E$, $\mathbf B$, $\mathbf k$ образуют правую тройку:
+
+```{python}
+x, y, z, t = sp.symbols("x y z t", real=True)
+c, k, E0 = sp.symbols("c k E_0", positive=True)
+omega = c * k
+E = sp.Matrix([E0 * sp.cos(k * z - omega * t), 0, 0])
+B = sp.Matrix([0, E0 * sp.cos(k * z - omega * t), 0])
+coords = (x, y, z)
+rot = lambda V: sp.Matrix([sp.diff(V[2], y) - sp.diff(V[1], z), sp.diff(V[0], z) - sp.diff(V[2], x),
+                           sp.diff(V[1], x) - sp.diff(V[0], y)])
+div = lambda V: sum(sp.diff(V[i], coords[i]) for i in range(3))
+checks = {"div E": div(E), "div B": div(B), "rot E + ∂_t B/c": rot(E) + B.diff(t) / c,
+          "rot B − ∂_t E/c": rot(B) - E.diff(t) / c}
+for name, value in checks.items():
+    value = sp.simplify(value)
+    print(f"{name} = {list(value) if isinstance(value, sp.MatrixBase) else value}")
+print("E × B ∥ k:", list(sp.simplify(E.cross(B))), "; |E| = |B|:", sp.simplify(E.norm() - B.norm()) == 0)
+```
+
+Поток энергии $\mathbf S = \frac{c}{4\pi}\mathbf E\times\mathbf B$ направлен вдоль $\mathbf k$ — волна переносит энергию в
+направлении распространения.
+
+## Поляризация
+
+Для волны вдоль $z$ поле $\mathbf E = \operatorname{Re}\left[(E_x, E_y)\,e^{i(kz - \omega t)}\right]$ задаётся двумя
+комплексными числами — **вектором Джонса** $\psi = (E_x, E_y)\in\mathbb C^2$. За период конец вектора
+$\mathbf E$ описывает эллипс. Общая фаза $\psi$ на форму эллипса не влияет (это лишь
+сдвиг во времени), а норма $|\psi|^2$ — интенсивность. Значит, состояния
+поляризации заданной интенсивности — это $\mathbb C^2$-векторы единичной нормы по
+модулю фазы. Это пространство — сфера $S^3/U(1) = S^2$, **сфера Пуанкаре**.
+Точку на ней задают **параметры Стокса**:
+$$
+S_0 = |E_x|^2 + |E_y|^2, \quad S_1 = |E_x|^2 - |E_y|^2, \quad S_2 = 2\operatorname{Re}(\bar E_xE_y), \quad S_3 = 2\operatorname{Im}(\bar E_xE_y),
+$$
+с $S_1^2 + S_2^2 + S_3^2 = S_0^2$. Это $\psi^\dagger\sigma\psi$ с матрицами Паули, переставленными как
+$(\sigma_z, \sigma_x, \sigma_y)$. Экватор сферы ($S_3 = 0$) — линейные поляризации, полюсы
+($S_3 = \pm S_0$) — круговые. При $S_3 > 0$ вектор $\mathbf E$ в фиксированной точке вращается от
+$x$ к $y$, то есть по правилу правого винта относительно $\mathbf k$ (положительная
+спиральность). Названия «правая» и «левая» круговая поляризация в
+оптике и в физике частиц, к сожалению, противоположны; поэтому
+указываем знак $S_3$.
+
+**Фазовые пластинки.** Пластинка из двулучепреломляющего кристалла задерживает
+одну компоненту относительно другой: $\psi\mapsto U\psi$ с унитарной $U$. Умножение
+на $U\in SU(2)$ поворачивает вектор Стокса матрицей $R(U)_{ij} = \frac12\operatorname{tr}(\sigma_iU\sigma_jU^\dagger)$ —
+это двулистное накрытие из статьи о [группах SO(3) и SU(2)](/math/lie/so3-su2.qmd).
+Четвертьволновая пластинка $U = \operatorname{diag}(e^{-i\pi/4}, e^{i\pi/4})$ (быстрая ось $x$) поворачивает
+сферу Пуанкаре на $90^\circ$ вокруг оси $S_1$ и превращает линейную поляризацию под
+$45^\circ$ в круговую:
+
+```{python}
+pauli_stokes = [sp.Matrix([[1, 0], [0, -1]]), sp.Matrix([[0, 1], [1, 0]]), sp.Matrix([[0, -sp.I], [sp.I, 0]])]
+
+def stokes(psi):
+    psi = sp.Matrix(psi)
+    S0 = sp.simplify((psi.H * psi)[0])
+    return [S0] + [sp.simplify((psi.H * s * psi)[0]) for s in pauli_stokes]
+
+def rotation(U):
+    return sp.Matrix(3, 3, lambda i, j: sp.simplify((pauli_stokes[i] * U * pauli_stokes[j] * U.H).trace() / 2))
+
+quarter = sp.diag(sp.exp(-sp.I * sp.pi / 4), sp.exp(sp.I * sp.pi / 4))
+half = sp.diag(-sp.I, sp.I)
+for name, psi in [("линейная по x", [1, 0]), ("линейная под 45°", [1 / sp.sqrt(2), 1 / sp.sqrt(2)]),
+                  ("круговая", [1 / sp.sqrt(2), sp.I / sp.sqrt(2)])]:
+    print(f"{name:17s}: S = {stokes(psi)};  после λ/4: {stokes(quarter * sp.Matrix(psi))}")
+print("λ/4 — поворот сферы Пуанкаре:", rotation(quarter).tolist())
+print("λ/2 — поворот на 180° вокруг S₁:", rotation(half).tolist())
+```
+
+```{python}
+#| label: fig-polarization
+#| fig-cap: 'Эллипсы поляризации (траектория конца вектора E за период в плоскости z = 0, ось x вправо, ось y вверх) для точек сферы Пуанкаре с S₁ = cos 2χ cos 2α, S₂ = cos 2χ sin 2α, S₃ = sin 2χ. По горизонтали меняется азимут α (наклон эллипса), по вертикали — эллиптичность χ: в третьем ряду (χ = 0, экватор) поляризация линейная, в верхнем (χ = 45°, полюс S₃ = 1) — круговая. Стрелка — направление вращения при S₃ ≠ 0.'
+import matplotlib.pyplot as plt
+
+def jones(chi, psi_angle):
+    """Вектор Джонса для азимута α = psi_angle и эллиптичности χ."""
+    base = np.array([np.cos(chi), 1j * np.sin(chi)])
+    R = np.array([[np.cos(psi_angle), -np.sin(psi_angle)], [np.sin(psi_angle), np.cos(psi_angle)]])
+    return R @ base
+
+phase = np.linspace(0, 2 * np.pi, 200)
+chis = [np.pi / 4, np.pi / 8, 0, -np.pi / 8]
+psis = [0, np.pi / 8, np.pi / 4, 3 * np.pi / 8]
+fig, axes = plt.subplots(len(chis), len(psis), figsize=(7, 7))
+for i, chi in enumerate(chis):
+    for j, psi_angle in enumerate(psis):
+        ax = axes[i, j]
+        Ej = jones(chi, psi_angle)
+        trace = np.real(np.outer(Ej, np.exp(-1j * phase)))         # Re(ψ e^{−iωt}) при z = 0
+        ax.plot(trace[0], trace[1], color="tab:blue", lw=1.8)
+        if abs(chi) > 1e-9:
+            n0 = 20
+            ax.annotate("", xy=trace[:, n0 + 6], xytext=trace[:, n0],
+                        arrowprops=dict(arrowstyle="->", color="tab:red", lw=1.5))
+        ax.set(xlim=(-1.2, 1.2), ylim=(-1.2, 1.2), aspect="equal", xticks=[], yticks=[])
+        S = [np.abs(Ej[0])**2 - np.abs(Ej[1])**2, 2 * np.real(np.conj(Ej[0]) * Ej[1]), 2 * np.imag(np.conj(Ej[0]) * Ej[1])]
+        S = [round(float(v), 2) + 0.0 for v in S]                      # без «−0.00»
+        ax.set_title(f"S = ({S[0]:+.2f}, {S[1]:+.2f}, {S[2]:+.2f})", fontsize=7)
+for i, chi in enumerate(chis):
+    axes[i, 0].set_ylabel(f"χ = {np.degrees(chi):.1f}°", fontsize=9)
+for j, psi_angle in enumerate(psis):
+    axes[-1, j].set_xlabel(f"α = {np.degrees(psi_angle):.1f}°", fontsize=9)
+plt.tight_layout()
+plt.show()
+```
+
+## Волновод
+
+Волна в полой металлической трубе отражается от стенок. В идеальном
+проводнике на его поверхности касательная составляющая $\mathbf E$ и нормальная
+составляющая $\mathbf B$ равны нулю. Рассмотрим прямоугольную трубу
+$0\le x\le a$, $0\le y\le b$ ($a > b$) и попробуем волну вдоль $z$ с полем
+$E_y = E_0\sin(\pi x/a)\cos(k_zz - \omega t)$. Магнитное поле найдём из закона Фарадея,
+$\partial_t\mathbf B = -c\operatorname{rot}\mathbf E$, и проверим остальные уравнения и граничные условия:
+
+```{python}
+a_, b_, kz_ = sp.symbols("a b k_z", positive=True)
+w = sp.Symbol("omega", positive=True)
+phase_z = kz_ * z - w * t
+E_te = sp.Matrix([0, E0 * sp.sin(sp.pi * x / a_) * sp.cos(phase_z), 0])
+B_te = -c * rot(E_te).applyfunc(lambda f: sp.integrate(f, t))          # B = −c ∫ rot E dt
+print("B =", list(sp.simplify(B_te)))
+print("div E =", sp.simplify(div(E_te)), "; div B =", sp.simplify(div(B_te)))
+ampere = sp.simplify(rot(B_te) - E_te.diff(t) / c)
+print("rot B − ∂_t E/c =", list(ampere))
+profile = sp.sin(sp.pi * x / a_) * sp.sin(phase_z)
+dispersion = sp.solve(sp.numer(sp.together(ampere[1] / profile)), w)
+print("уравнение выполнено при ω =", dispersion)
+print("граничные условия: E_y(x = 0, a) =", [E_te[1].subs(x, 0), E_te[1].subs(x, a_)],
+      "; B_x(x = 0, a) =", [sp.simplify(B_te[0].subs(x, 0)), sp.simplify(B_te[0].subs(x, a_))])
+```
+
+На стенках $y = 0, b$ поле $E_y$ нормально, а $B_y = 0$ — граничные условия выполнены.
+Это мода $\mathrm{TE}_{10}$ («поперечная электрическая»: $E_z = 0$). Её закон дисперсии
+$$
+\omega^2 = \omega_c^2 + c^2k_z^2, \qquad \omega_c = \frac{\pi c}{a} .
+$$
+Волны с частотой ниже **частоты отсечки** $\omega_c$ по трубе не идут: $k_z$
+становится мнимым, и поле затухает экспоненциально. Общая мода $\mathrm{TE}_{mn}$
+имеет $\omega_c = \pi c\sqrt{(m/a)^2 + (n/b)^2}$. Фазовая скорость $\omega/k_z$ больше $c$, групповая
+$\dd\omega/\dd k_z = c^2k_z/\omega$ меньше $c$, и их произведение равно $c^2$. Энергия и сигнал
+переносятся с групповой скоростью. Частоты отсечки стандартного волновода WR-90 (X-диапазон,
+$a = 22{,}86$ мм, $b = 10{,}16$ мм):
+
+```{python}
+c_SI = 299792458.0
+a_wr, b_wr = 22.86e-3, 10.16e-3
+cutoffs = {(m, n): c_SI / 2 * np.hypot(m / a_wr, n / b_wr) / 1e9 for m in range(3) for n in range(2) if (m, n) != (0, 0)}
+for (m, n), fc in sorted(cutoffs.items(), key=lambda item: item[1]):
+    print(f"TE{m}{n}: f_c = {fc:.3f} ГГц")
+f = 10.0
+f10 = cutoffs[(1, 0)]
+root = np.sqrt(1 - (f10 / f)**2)
+print(f"на {f} ГГц одна мода TE10: v_ф = {1 / root:.4f} c, v_гр = {root:.4f} c, "
+      f"длина волны в волноводе {c_SI / (f * 1e9) / root * 100:.3f} см (в пустоте {c_SI / (f * 1e9) * 100:.3f} см)")
+```
+
+От $6{,}56$ до $13{,}1$ ГГц по волноводу идёт единственная мода — для этого и
+выбирают размеры $a\approx 2b$.
+
+```{python}
+#| label: fig-waveguide
+#| fig-cap: 'Закон дисперсии мод прямоугольного волновода WR-90: частота f в зависимости от продольного волнового числа k_z. Каждая мода начинается на своей частоте отсечки (точки на оси f); пунктир — световая линия f = ck_z/2π, к которой все моды приближаются при больших k_z. Серая полоса — одномодовый диапазон.'
+kz_grid = np.linspace(0, 450, 300)                       # рад/м
+fig, ax = plt.subplots(figsize=(6.5, 4))
+for (m, n), fc in sorted(cutoffs.items(), key=lambda item: item[1])[:4]:
+    fz = np.sqrt(fc**2 + (c_SI * kz_grid / (2 * np.pi) / 1e9)**2)
+    line, = ax.plot(kz_grid, fz, lw=2, label=f"TE{m}{n}")
+    ax.plot(0, fc, "o", color=line.get_color())
+ax.plot(kz_grid, c_SI * kz_grid / (2 * np.pi) / 1e9, "k--", lw=1, label="f = ck_z/2π")
+ax.axhspan(f10, cutoffs[(2, 0)], color="0.9", zorder=0)
+ax.set(xlabel="k_z, рад/м", ylabel="f, ГГц", xlim=(0, 450), ylim=(0, 25))
+ax.legend(fontsize=8, loc="lower right")
+plt.tight_layout()
+plt.show()
+```
+
+## Резонатор и подсчёт мод
+
+В замкнутой проводящей коробке $a\times b\times d$ волна отражается и от торцов, и $k_z$
+тоже квантуется. Собственные частоты
+$$
+\omega_{mnl} = \pi c\sqrt{\frac{m^2}{a^2} + \frac{n^2}{b^2} + \frac{l^2}{d^2}}, \qquad m, n, l\ge0 .
+$$
+Каждой тройке с тремя ненулевыми индексами отвечают две моды (две
+поляризации). Тройке с одним нулевым индексом — одна. Тройки с двумя
+нулями поля не дают. Сколько мод с частотой ниже $\omega$? При больших $\omega$
+каждая мода занимает в пространстве волновых векторов ячейку объёмом
+$\pi^3/V$, а моды заполняют октант шара радиуса $\omega/c$. С учётом двух поляризаций
+получается **закон Вейля**
+$$
+N(\omega)\approx 2\cdot\frac18\cdot\frac43\pi\left(\frac\omega c\right)^3\frac{V}{\pi^3} = \frac{V\omega^3}{3\pi^2c^3} .
+$$
+Проверим прямым подсчётом в кубе:
+
+```{python}
+def count_modes(K, sides=(1.0, 1.0, 1.0)):
+    """Число мод резонатора с ω/c < K (поляризации учтены)."""
+    a, b, d = sides
+    idx = [np.arange(0, int(K * s / np.pi) + 2) for s in sides]
+    m, n, l = np.meshgrid(*idx, indexing="ij")
+    k2 = (np.pi * m / a)**2 + (np.pi * n / b)**2 + (np.pi * l / d)**2
+    zeros = (m == 0).astype(int) + (n == 0) + (l == 0)
+    weight = np.where(zeros == 0, 2, np.where(zeros == 1, 1, 0))
+    return int(np.sum(weight[k2 < K**2]))
+
+for K in (10, 30, 100, 300):
+    weyl = K**3 / (3 * np.pi**2)
+    print(f"ω/c = {K:4d}: мод {count_modes(K):9d}, закон Вейля {weyl:12.1f}, отношение {count_modes(K) / weyl:.4f}")
+```
+
+Отношение стремится к единице: от формы и размеров коробки асимптотика не
+зависит, важен только объём. Плотность мод $\dd N/\dd\omega = V\omega^2/\pi^2c^3$ — та самая,
+с которой начинается вывод формул Рэлея–Джинса и Планка для теплового
+излучения. Каждой моде классическая статистика приписывает энергию $T$, что
+даёт «ультрафиолетовую катастрофу»; квантовая — энергию
+$\hbar\omega/(e^{\hbar\omega/T} - 1)$.
+
+## Итоги
+
+- В пустоте $\Box A^\mu = 0$ (калибровка Лоренца), $\Box\mathbf E = \Box\mathbf B = 0$.
+- После преобразования Фурье уравнения Максвелла — алгебра: $\mathbf k\cdot\mathbf E_0 = 0$, $\mathbf k\times\mathbf E_0 = \frac\omega c\mathbf B_0$;
+  две поперечные волны с $\omega = ck$, $|\mathbf E| = |\mathbf B|$, $\mathbf E\times\mathbf B\parallel\mathbf k$.
+- Поляризация — вектор Джонса $\psi\in\mathbb C^2$ по модулю фазы, то есть точка сферы
+  Пуанкаре $S = \psi^\dagger\sigma\psi$; фазовые пластинки $U\in SU(2)$ поворачивают её матрицей $R(U)\in SO(3)$.
+- В волноводе $\omega^2 = \omega_c^2 + c^2k_z^2$; ниже отсечки волна не распространяется;
+  $v_{\text{ф}}v_{\text{гр}} = c^2$.
+- В резонаторе спектр дискретен; число мод $N(\omega)\approx V\omega^3/3\pi^2c^3$ (закон Вейля).
+
+## Упражнения
+
+1. Покажите, что из $\mathbf k\times\mathbf E_0 = \frac\omega c\mathbf B_0$ и $\mathbf k\cdot\mathbf E_0 = 0$ следуют $|\mathbf B_0| = |\mathbf E_0|$ и
+   $\mathbf E_0\cdot\mathbf B_0 = 0$ при $\omega = ck$.
+2. Найдите параметры Стокса для $\psi = (\cos\chi,\ i\sin\chi)$. Какая это поляризация при
+   $\chi = 0$, $\pi/8$, $\pi/4$?
+3. Полуволновая пластинка $U = \operatorname{diag}(-i, i)$ действует на линейную поляризацию
+   $\psi = (\cos\theta, \sin\theta)$. Какой станет поляризация? Как это выглядит на сфере
+   Пуанкаре?
+4. Волновод WR-90 на частоте $12$ ГГц: найдите $v_{\text{ф}}$, $v_{\text{гр}}$ и длину волны в
+   волноводе для моды $\mathrm{TE}_{10}$. Распространяется ли мода $\mathrm{TE}_{01}$?
+5. Найдите низшую собственную частоту кубического резонатора со
+   стороной $L$ и её кратность (число мод).
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $|\mathbf B_0| = \frac{c}{\omega}|\mathbf k\times\mathbf E_0| = \frac{ck}{\omega}|\mathbf E_0| = |\mathbf E_0|$, так как $\mathbf k\perp\mathbf E_0$; $\mathbf B_0\perp\mathbf E_0$ как векторное
+   произведение с $\mathbf E_0$.
+2. $S = (1,\ \cos2\chi,\ 0,\ \sin2\chi)$: при $\chi = 0$ линейная по $x$, при $\chi = \pi/8$ эллиптическая
+   с осями по $x$ и $y$ ($S_3 = 1/\sqrt2$), при $\chi = \pi/4$ круговая ($S_3 = 1$).
+3. $U\psi = -i(\cos\theta, -\sin\theta)$ — линейная поляризация под углом $-\theta$ (отражение
+   относительно оси $x$). На сфере Пуанкаре — поворот на $180^\circ$ вокруг оси $S_1$:
+   $(S_1, S_2, S_3)\to(S_1, -S_2, -S_3)$.
+4. $\sqrt{1 - (6{,}557/12)^2} = 0{,}838$: $v_{\text{ф}} = 1{,}194\,c$, $v_{\text{гр}} = 0{,}838\,c$, длина волны в волноводе
+   $2{,}98$ см (в пустоте $2{,}50$ см). $\mathrm{TE}_{01}$ имеет отсечку $14{,}75$ ГГц и на $12$ ГГц
+   не распространяется.
+5. $\omega = \sqrt2\,\pi c/L$ (индексы $(1, 1, 0)$ и перестановки), кратность 3: каждая тройка с одним
+   нулём даёт одну моду.
+:::
