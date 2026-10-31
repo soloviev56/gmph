@@ -1,0 +1,359 @@
+---
+title: "Связность Леви-Чивиты"
+topic: levi-civita
+order: 3
+description: "Метрическая связность без кручения существует и единственна; вывод символов Кристоффеля Γ^i_{jk} = ½g^{il}(∂_jg_{lk} + ∂_kg_{lj} − ∂_lg_{jk}) (функция christoffel в gmph.riemann); проверка ∇g = 0 для общей метрики; связность поверхности в R³ — связность Леви-Чивиты индуцированной метрики; перенос сохраняет скалярные произведения; геодезические — экстремали энергии и длины; дивергенция и лапласиан через √g; плоскость Лобачевского (рисунок геодезических); оптическая метрика и принцип Ферма, «рыбий глаз» Максвелла (рисунок)"
+---
+
+На многообразии бесконечно много связностей, и [ковариантная
+производная](/math/riemann/covariant-derivative.qmd) сама по себе ничего не
+выделяет. Но если на многообразии есть метрика — длины и углы, — то
+среди связностей есть одна естественная. При параллельном переносе
+она не меняет длин и углов и не «закручивает» бесконечно малые
+параллелограммы. Это **связность Леви-Чивиты**. Её символы — **символы
+Кристоффеля** — уже появлялись в [уравнениях
+Лагранжа](/physics/mechanics/lagrange-equations.qmd) натуральной системы, а
+связность сферы из статьи о [параллельном
+переносе](/math/riemann/parallel-transport.qmd) оказывается именно ею. На
+связности Леви-Чивиты построена общая теория относительности: метрика
+пространства-времени определяет, какие мировые линии «прямые», то есть
+как движутся свободно падающие тела.
+
+Нужны [ковариантная производная](/math/riemann/covariant-derivative.qmd) и
+[метрика](/math/algebra/metric.qmd). Порядок индексов в $\Gamma^i_{jk}$ — по
+[конвенциям](/conventions.qmd); для симметричной связности он не важен.
+
+## Основная теорема
+
+::: {#def-levi-civita}
+Связность $\nabla$ на многообразии с метрикой $g$ называется **связностью
+Леви-Чивиты**, если
+
+1. она **согласована с метрикой**: $\nabla g = 0$, то есть $\nabla_jg_{kl} = \partial_jg_{kl} - \Gamma^m_{jk}g_{ml} - \Gamma^m_{jl}g_{km} = 0$;
+2. у неё **нет кручения**: $\Gamma^i_{jk} = \Gamma^i_{kj}$.
+:::
+
+::: {#thm-levi-civita}
+## Основная теорема римановой геометрии
+Связность Леви-Чивиты существует и единственна. Её символы —
+**символы Кристоффеля**
+$$
+\Gamma^i_{jk} = \frac12\,g^{il}\left(\partial_jg_{lk} + \partial_kg_{lj} - \partial_lg_{jk}\right).
+$$
+:::
+
+*Доказательство.* Обозначим $\Gamma_{l,jk} = g_{lm}\Gamma^m_{jk}$. Условие 1 гласит
+$\partial_jg_{kl} = \Gamma_{l,jk} + \Gamma_{k,jl}$. Запишем его ещё дважды с циклически переставленными
+индексами, $\partial_kg_{lj} = \Gamma_{j,kl} + \Gamma_{l,kj}$ и $\partial_lg_{jk} = \Gamma_{k,lj} + \Gamma_{j,lk}$, сложим первые два
+равенства и вычтем третье. С учётом симметрии $\Gamma_{l,jk} = \Gamma_{l,kj}$ всё, кроме
+$2\Gamma_{l,jk}$, сокращается:
+$\Gamma_{l,jk} = \frac12(\partial_jg_{lk} + \partial_kg_{lj} - \partial_lg_{jk})$. Значит, символы однозначно
+определены метрикой (единственность). Обратно, эта формула задаёт
+связность (закон преобразования проверяется прямым счётом) с нужными
+свойствами (существование). $\square$
+
+Функция `christoffel` из `gmph.riemann` вычисляет символы по этой формуле.
+Проверим оба свойства для произвольной двумерной метрики — с тремя
+произвольными функциями $E$, $F$, $G$ (обозначения Гаусса):
+
+```{python}
+import numpy as np
+import sympy as sp
+from scipy.integrate import solve_ivp
+from gmph.riemann import christoffel, covariant_derivative, torsion, induced_connection, geodesic_rhs, transport_rhs
+
+u, v = sp.symbols("u v", real=True)
+E, F, G_ = (sp.Function(n)(u, v) for n in "EFG")
+g_general = sp.Matrix([[E, F], [F, G_]])
+Gamma = christoffel(g_general, (u, v))
+print("∇g = 0:", covariant_derivative(g_general, "dd", Gamma, (u, v)).applyfunc(sp.simplify) == sp.Array.zeros(2, 2, 2))
+print("кручение = 0:", all(c == 0 for row in torsion(Gamma) for col in row for c in col))
+```
+
+Поверхность в $\R^3$ наследует метрику $g_{jk} = \partial_jX\cdot\partial_kX$. Связность,
+полученная проекцией производной на касательную плоскость (функция
+`induced_connection`), согласована с этой метрикой и симметрична —
+значит, по теореме это связность Леви-Чивиты. Проверим на торе и на
+седле:
+
+```{python}
+a, b = sp.symbols("a b", positive=True)
+th, ph = sp.symbols("theta phi", real=True)
+surfaces = {
+    "тор": ([(a + b * sp.cos(th)) * sp.cos(ph), (a + b * sp.cos(th)) * sp.sin(ph), b * sp.sin(th)], (th, ph)),
+    "седло z = uv": ([u, v, u * v], (u, v)),
+}
+for name, (X, q) in surfaces.items():
+    g_induced = sp.Matrix(2, 2, lambda j, k: sp.simplify(sum(sp.diff(c, q[j]) * sp.diff(c, q[k]) for c in X)))
+    G1, G2 = induced_connection(X, q), christoffel(g_induced, q)
+    same = all(sp.simplify(G1[i][j][k] - G2[i][j][k]) == 0 for i in range(2) for j in range(2) for k in range(2))
+    print(f"{name}: g = {g_induced.tolist()}, проекция = Кристоффель: {same}")
+```
+
+Важно, что символы Кристоффеля зависят **только от метрики поверхности**,
+а не от того, как она изогнута в пространстве. Это «внутренняя»
+геометрия. Цилиндр, свёрнутый из листа бумаги, имеет ту же метрику, что
+лист, а значит, ту же связность, те же геодезические и тот же перенос
+(упражнение 1).
+
+## Перенос сохраняет скалярные произведения
+
+Согласованность с метрикой означает: если $V$ и $W$ переносятся
+параллельно вдоль кривой, то
+$\frac{d}{dt}g(V, W) = (\nabla_{\dot x}g)(V, W) + g(\tfrac{DV}{dt}, W) + g(V, \tfrac{DW}{dt}) = 0$.
+Длины и углы сохраняются, и перенос — изометрия касательных
+пространств. В частности, у геодезической (её скорость переносится
+параллельно) постоянна длина скорости $g(\dot x, \dot x)$. Проверим численно на
+**плоскости Лобачевского** — верхней полуплоскости $y > 0$ с метрикой
+$\dd s^2 = (\dd x^2 + \dd y^2)/y^2$:
+
+```{python}
+x, y = sp.symbols("x y", positive=True)
+g_hyp = sp.diag(1 / y**2, 1 / y**2)
+G_hyp = christoffel(g_hyp, (x, y))
+names = ["x", "y"]
+for i in range(2):
+    for j in range(2):
+        for k in range(j, 2):
+            if G_hyp[i][j][k] != 0:
+                print(f"Γ^{names[i]}_{names[j]}{names[k]} = {G_hyp[i][j][k]}")
+
+# два вектора переносятся по кривой x = cos t, y = 1.5 + sin t
+path = lambda t: np.array([np.cos(t), 1.5 + np.sin(t)])
+vel = lambda t: np.array([-np.sin(t), np.cos(t)])
+rhs = transport_rhs(G_hyp, (x, y), path, vel)
+gram = lambda V, W, t: (V @ W) / path(t)[1]**2                 # g(V, W)
+ts = np.linspace(0, 2 * np.pi, 9)
+V = solve_ivp(rhs, (0, 2 * np.pi), [1.0, 0.0], t_eval=ts, rtol=1e-11, atol=1e-12).y
+W = solve_ivp(rhs, (0, 2 * np.pi), [0.3, 0.7], t_eval=ts, rtol=1e-11, atol=1e-12).y
+products = [(gram(V[:, n], V[:, n], t), gram(V[:, n], W[:, n], t), gram(W[:, n], W[:, n], t)) for n, t in enumerate(ts)]
+print("g(V,V), g(V,W), g(W,W) вдоль пути: разброс", np.ptp(np.array(products), axis=0))
+angle = np.degrees(np.arctan2(V[1, -1], V[0, -1]))
+area = 2 * np.pi * (1.5 / np.sqrt(1.5**2 - 1) - 1)          # площадь круга в метрике Лобачевского
+print(f"после обхода V повёрнут на {angle:.2f}° (голономия); площадь круга {np.degrees(area):.2f}° (в радианах {area:.4f})")
+```
+
+Произведения постоянны, а сам вектор после обхода повернулся: перенос
+сохраняет длины, но зависит от пути. Поворот отрицателен (по часовой
+стрелке при обходе против часовой), в отличие от сферы, и по модулю
+равен площади охваченного круга в метрике Лобачевского. Это признак
+постоянной отрицательной кривизны (тема «Тензор кривизны Римана»).
+
+## Геодезические как экстремали
+
+Уравнение геодезических связности Леви-Чивиты — это уравнение
+Эйлера–Лагранжа для **функционала энергии**
+$$
+\mathcal E[x] = \frac12\int g_{jk}(x)\,\dot x^j\dot x^k\,dt .
+$$
+Это [уравнения Лагранжа](/physics/mechanics/lagrange-equations.qmd) свободной
+частицы с метрикой $g$ в роли матрицы масс: $g_{ij}\ddot x^j + \Gamma_{i,jk}\dot x^j\dot x^k = 0$, и
+после подъёма индекса $\ddot x^i + \Gamma^i_{jk}\dot x^j\dot x^k = 0$. Проверим для общей метрики:
+
+```{python}
+from gmph.mechanics import euler_lagrange
+
+t = sp.Symbol("t", real=True)
+path_f = [sp.Function("u")(t), sp.Function("v")(t)]
+on_path = {u: path_f[0], v: path_f[1]}
+g_t = g_general.subs(on_path)
+qd = sp.Matrix([p.diff(t) for p in path_f])
+energy = (qd.T * g_t * qd)[0] / 2
+EL = euler_lagrange(energy, path_f, t)
+geo = [path_f[i].diff(t, 2) + sum(Gamma[i][j][k].subs(on_path) * qd[j] * qd[k] for j in range(2) for k in range(2))
+       for i in range(2)]
+lowered = g_t * sp.Matrix(geo)
+print("уравнения Эйлера–Лагранжа энергии = g · (уравнения геодезических):",
+      all(sp.simplify(EL[i] - lowered[i]) == 0 for i in range(2)))
+```
+
+Функционал **длины** $\int\sqrt{g_{jk}\dot x^j\dot x^k}\,dt$ имеет те же экстремали, но не зависит от
+параметризации. Энергия выбирает среди них параметр, пропорциональный
+длине, — аффинный параметр. Отсюда название: геодезические — локально
+кратчайшие линии. «Локально» существенно: дуга большого круга длиннее
+полуокружности тоже геодезическая, но не кратчайшая.
+
+**Плоскость Лобачевского.** Геодезические полуплоскости — полуокружности
+с центром на оси $x$ и вертикальные прямые. Проверим, что точка
+геодезической остаётся на окружности $(x - x_c)^2 + y^2 = R^2$ с центром, найденным из
+начальных данных, и что длина скорости постоянна:
+
+```{python}
+geo_rhs = geodesic_rhs(G_hyp, (x, y))
+start = np.array([0.0, 1.0])
+for alpha in (0.3, 1.0, 2.0):
+    v0 = start[1] * np.array([np.cos(alpha), np.sin(alpha)])          # единичная скорость
+    fwd = solve_ivp(geo_rhs, (0, 3), np.r_[start, v0], t_eval=np.linspace(0, 3, 61), rtol=1e-11, atol=1e-12)
+    xc = start[0] + start[1] * v0[1] / v0[0]                  # центр: нормаль к скорости пересекает ось x
+    radius2 = (fwd.y[0] - xc)**2 + fwd.y[1]**2
+    speed = np.hypot(fwd.y[2], fwd.y[3]) / fwd.y[1]
+    print(f"α = {alpha}: центр {xc:+.3f}, разброс R² {np.ptp(radius2):.1e}, разброс |ẋ| {np.ptp(speed):.1e}")
+```
+
+```{python}
+#| label: fig-hyperbolic
+#| fig-cap: 'Геодезические плоскости Лобачевского (верхняя полуплоскость с метрикой (dx² + dy²)/y²), выпущенные из точки (0, 1) под разными углами, на отрезке длины 3 в обе стороны. Это дуги окружностей с центрами на оси x (пунктир — недостроенные части окружностей) и вертикальная прямая. Чем ближе к оси x, тем «длиннее» единица евклидовой длины: точки на расстоянии 3 от (0, 1) прижаты к оси.'
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots(figsize=(7, 3.8))
+for alpha in np.linspace(0, np.pi, 9)[:-1] + np.pi / 16:
+    v0 = np.array([np.cos(alpha), np.sin(alpha)])
+    pieces = [solve_ivp(geo_rhs, (0, sgn * 3), np.r_[start, v0], t_eval=np.linspace(0, sgn * 3, 200),
+                        rtol=1e-10, atol=1e-12).y for sgn in (1, -1)]
+    col = plt.cm.viridis(alpha / np.pi)
+    for p in pieces:
+        ax.plot(p[0], p[1], color=col, lw=2)
+    xc = v0[1] / v0[0]
+    R = np.hypot(xc, 1.0)
+    arc = np.linspace(0, np.pi, 300)
+    ax.plot(xc + R * np.cos(arc), R * np.sin(arc), color=col, lw=1.0, ls="--", alpha=0.6)
+ax.plot([0, 0], [np.exp(-3), np.exp(3)], color="k", lw=2)                 # вертикальная геодезическая
+ax.plot(*start, "ro", ms=5)
+ax.axhline(0, color="0.5", lw=0.8)
+ax.set(xlim=(-6, 6), ylim=(0, 4), aspect="equal", xlabel="x", ylabel="y")
+plt.tight_layout()
+plt.show()
+```
+
+## Дивергенция и лапласиан
+
+Свёртка символов Кристоффеля по двум индексам выражается через
+определитель метрики: $\Gamma^i_{ik} = \partial_k\ln\sqrt{|g|}$ (упражнение 2). Отсюда
+дивергенция векторного поля и лапласиан в любых координатах:
+$$
+\nabla_iV^i = \frac{1}{\sqrt{|g|}}\,\partial_i\left(\sqrt{|g|}\,V^i\right), \qquad
+\Delta f = \nabla_i\nabla^if = \frac{1}{\sqrt{|g|}}\,\partial_i\left(\sqrt{|g|}\,g^{ij}\partial_jf\right).
+$$
+Те же формулы получались в статье о [векторном анализе на языке
+форм](/math/forms/vector-calculus-forms.qmd) через $\hodge\dd\hodge$, без всякой связности.
+Проверим их совпадение в сферических координатах:
+
+```{python}
+r, theta, phi = sp.symbols("r theta phi", positive=True)
+sph = (r, theta, phi)
+g_sph = sp.diag(1, r**2, r**2 * sp.sin(theta)**2)
+G_sph = christoffel(g_sph, sph)
+sqrt_g = r**2 * sp.sin(theta)
+print("Γ^i_ik = ∂_k ln√g:", all(sp.simplify(sum(G_sph[i][i][k] for i in range(3)) - sp.diff(sp.log(sqrt_g), sph[k])) == 0
+                                 for k in range(3)))
+
+fun = sp.Function("f")(*sph)
+grad_up = [sum(g_sph.inv()[i, j] * sp.diff(fun, sph[j]) for j in range(3)) for i in range(3)]
+nabla_grad = covariant_derivative(grad_up, "u", G_sph, sph)                  # ∇_j (∇f)^i
+lap_connection = sum(nabla_grad[i, i] for i in range(3))
+lap_sqrt_g = sum(sp.diff(sqrt_g * grad_up[i], sph[i]) for i in range(3)) / sqrt_g
+print("∇_i∇^i f = (1/√g)∂_i(√g g^ij ∂_j f):", sp.simplify(lap_connection - lap_sqrt_g) == 0)
+print("Δf =", sp.expand(sp.simplify(lap_sqrt_g)))
+```
+
+## Физика: оптическая метрика
+
+По **принципу Ферма** луч света в неоднородной среде с показателем
+преломления $n(\mathbf r)$ идёт по пути, на котором время распространения
+$\frac1c\int n\,\dd l$ стационарно. Но $\int n\,\dd l$ — это длина в **оптической метрике**
+$\dd s^2 = n^2(\mathbf r)\,(\dd x^2 + \dd y^2 + \dd z^2)$. Значит, лучи — геодезические этой метрики, и
+вся геометрическая оптика — риманова геометрия. Плоскость Лобачевского,
+например, — оптическая метрика среды с $n = 1/y$: лучи в такой среде — дуги
+окружностей с центрами на оси $x$.
+
+Красивый пример — **«рыбий глаз» Максвелла**, линза с
+$n(r) = \frac{2}{1 + r^2}$. Её оптическая метрика
+$\frac{4(\dd x^2 + \dd y^2)}{(1 + r^2)^2}$ — это метрика единичной сферы в [стереографической
+карте](/math/forms/manifolds.qmd). Поэтому лучи — образы больших кругов, то есть
+окружности, и все лучи из точки $p$ собираются в точке $-p/|p|^2$ — образе
+диаметрально противоположной точки сферы. Это идеальная
+фокусировка, которую Максвелл нашёл в 1854 году. Проверим её:
+
+```{python}
+n_fish = 2 / (1 + x**2 + y**2)
+xf, yf = sp.symbols("x y", real=True)
+G_fish = christoffel(sp.diag(1, 1) * (2 / (1 + xf**2 + yf**2))**2, (xf, yf))
+fish_rhs = geodesic_rhs(G_fish, (xf, yf))
+source = np.array([-0.6, 0.0])
+image = -source / (source @ source)
+n0 = 2 / (1 + source @ source)
+misses = []
+rays = []
+for alpha in np.linspace(0.15, np.pi - 0.15, 9):
+    v0 = np.array([np.cos(alpha), np.sin(alpha)]) / n0              # единичная оптическая скорость
+    sol = solve_ivp(fish_rhs, (0, np.pi), np.r_[source, v0], dense_output=True, rtol=1e-11, atol=1e-12)
+    rays.append(sol)
+    misses.append(np.linalg.norm(sol.y[:2, -1] - image))
+print(f"изображение в {image + 0.0}; все лучи приходят туда при s = π: max промах {max(misses):.1e}")
+```
+
+Оптическая длина пути между точкой и её изображением одинакова для всех
+лучей и равна $\pi$ — половине большого круга. Равенство оптических путей —
+общее свойство идеальных изображающих систем.
+
+```{python}
+#| label: fig-fisheye
+#| fig-cap: 'Лучи в «рыбьем глазе» Максвелла, n = 2/(1 + r²): лучи из источника (−0,6; 0) — дуги окружностей — собираются в точке (1,67; 0). Цветом фона показан показатель преломления; пунктирная окружность r = 1 — образ экватора сферы.'
+fig, ax = plt.subplots(figsize=(6.4, 4.4))
+grid = np.linspace(-2.2, 2.2, 300)
+GX, GY = np.meshgrid(grid, grid)
+im = ax.pcolormesh(GX, GY, 2 / (1 + GX**2 + GY**2), cmap="Blues", shading="auto", vmin=0, vmax=2.2)
+fig.colorbar(im, ax=ax, label="n")
+s_plot = np.linspace(0, np.pi, 300)
+for sol in rays:
+    P = sol.sol(s_plot)
+    ax.plot(P[0], P[1], color="tab:orange", lw=1.6)
+    ax.plot(P[0], -P[1], color="tab:orange", lw=1.6)
+ax.add_patch(plt.Circle((0, 0), 1, fill=False, ls="--", color="0.3"))
+ax.plot(*source, "ko", ms=5)
+ax.plot(*image, "ro", ms=5)
+ax.set(aspect="equal", xlim=(-2.2, 2.2), ylim=(-2.2, 2.2), xlabel="x", ylabel="y")
+plt.tight_layout()
+plt.show()
+```
+
+Та же логика в механике даёт **метрику Якоби**: траектории частицы с
+энергией $E$ в потенциале $U$ — геодезические метрики $2m(E - U)\,\dd\mathbf r^2$ (принцип
+Мопертюи). А в общей теории относительности все свободно падающие тела
+движутся по геодезическим одной метрики пространства-времени —
+независимо от массы и состава.
+
+## Итоги
+
+- Связность Леви-Чивиты — единственная связность с $\nabla g = 0$ и без кручения;
+  её символы $\Gamma^i_{jk} = \frac12g^{il}(\partial_jg_{lk} + \partial_kg_{lj} - \partial_lg_{jk})$ (функция `christoffel`).
+- Связность поверхности в $\R^3$ (проекция) — связность Леви-Чивиты индуцированной
+  метрики; она определяется внутренней геометрией.
+- Параллельный перенос сохраняет длины и углы; у геодезических постоянна
+  длина скорости.
+- Геодезические — экстремали энергии $\frac12\int g\dot x\dot x\,dt$ (аффинный параметр) и длины;
+  уравнения — уравнения Лагранжа свободной частицы с метрикой $g$.
+- $\Gamma^i_{ik} = \partial_k\ln\sqrt{|g|}$, откуда $\nabla_iV^i = \frac{1}{\sqrt g}\partial_i(\sqrt gV^i)$ и лапласиан в любых координатах.
+- Лучи света — геодезические оптической метрики $n^2\dd\mathbf r^2$ (Ферма); «рыбий глаз»
+  Максвелла — стереографическая карта сферы, идеальная фокусировка.
+
+## Упражнения
+
+1. Цилиндр радиуса $R$: координаты $(\varphi, z)$, метрика $R^2\dd\varphi^2 + \dd z^2$. Найдите символы
+   Кристоффеля и геодезические. Почему они — винтовые линии?
+2. Докажите, что $\Gamma^i_{ik} = \partial_k\ln\sqrt{|g|}$. (Используйте $\partial_k\ln\det g = g^{ij}\partial_kg_{ij}$.)
+3. Плоскость Минковского в координатах Риндлера: $\dd s^2 = \xi^2\dd\eta^2 - \dd\xi^2$ ($\xi > 0$).
+   Найдите символы Кристоффеля. Какой мировой линии соответствует
+   $\xi = \mathrm{const}$ и является ли она геодезической?
+4. Найдите аффинный параметр с единичной скоростью для вертикальной
+   геодезической $x = 0$ плоскости Лобачевского. Какова длина отрезка от $y = 1$ до
+   $y = \varepsilon$ и что происходит при $\varepsilon\to0$?
+5. Среда со слоями, $n = n(y)$. Покажите, что вдоль луча сохраняется $n\cos\alpha$,
+   где $\alpha$ — угол луча с осью $x$ (закон Снеллиуса).
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. Все символы нулевые (метрика постоянна в этих координатах).
+   Геодезические — $\varphi = \varphi_0 + at$, $z = z_0 + bt$: на развёртке это прямые, на цилиндре —
+   винтовые линии (частные случаи: окружности и образующие).
+2. $\Gamma^i_{ik} = \frac12g^{il}(\partial_ig_{lk} + \partial_kg_{li} - \partial_lg_{ik})$; первое и третье слагаемые сокращаются после
+   перестановки немых индексов $i\leftrightarrow l$ (метрика симметрична), остаётся
+   $\frac12g^{il}\partial_kg_{il} = \frac12\partial_k\ln|\det g| = \partial_k\ln\sqrt{|g|}$.
+3. $\Gamma^\xi_{\eta\eta} = \xi$, $\Gamma^\eta_{\eta\xi} = \Gamma^\eta_{\xi\eta} = 1/\xi$. Линия $\xi = \xi_0$ — мировая линия равноускоренного
+   наблюдателя с собственным ускорением $1/\xi_0$ (в единицах $c = 1$); она не
+   геодезическая: $\ddot\xi + \Gamma^\xi_{\eta\eta}\dot\eta^2 = \xi_0\dot\eta^2 \ne 0$.
+4. Уравнение $\ddot y - \dot y^2/y = 0$ даёт $y = e^{\pm s}$, скорость $|\dot y|/y = 1$. Длина от $y = 1$ до
+   $y = \varepsilon$ равна $\ln(1/\varepsilon)\to\infty$: ось $x$ — бесконечно удалённая граница.
+5. Энергия $\frac12n^2(y)(\dot x^2 + \dot y^2)$ не зависит от $x$, поэтому сохраняется $p_x = n^2\dot x$. При
+   единичной оптической скорости $n\sqrt{\dot x^2 + \dot y^2} = 1$ имеем $n\dot x = \cos\alpha$, и $p_x = n\cos\alpha$.
+:::
