@@ -1,0 +1,296 @@
+---
+title: "Канонические преобразования"
+topic: canonical-transformations
+order: 5
+description: "Каноническое преобразование как симплектоморфизм F*ω = ω; эквивалентные критерии: скобки Пуассона {Q, P} = 1 и матрица Якоби JᵀΩJ = Ω; переменные действие–угол осциллятора; производящие функции из замкнутости p dq − P dQ (лемма Пуанкаре): F₁(q, Q), F₂(q, P) и переход между ними преобразованием Лежандра; точечные преобразования и поднятие на импульсы; калибровочный сдвиг импульса; гамильтоновы потоки и инфинитезимальные преобразования с производящей функцией G; дискретная динамика: стандартное отображение как композиция канонических сдвигов (рисунок)"
+---
+
+Уравнения Гамильтона сохраняют вид не при любой замене переменных. Если
+перейти от $(q, p)$ к новым переменным $(Q, P)$ «как попало», уравнения
+станут уравнениями общего вида, и вся гамильтонова структура будет
+потеряна. Но есть замены, при которых новые уравнения — снова уравнения
+Гамильтона, часто с более простым гамильтонианом. Их называют
+**каноническими**. Это основной инструмент аналитической механики: найти
+переменные, в которых гамильтониан зависит только от импульсов, — значит
+проинтегрировать систему. Геометрически канонические преобразования —
+это **симплектоморфизмы**, преобразования фазового пространства,
+сохраняющие симплектическую форму. К ним относятся фазовые потоки
+гамильтоновых систем, шаги симплектических интеграторов и замены
+переменных квантовой механики в классическом пределе.
+
+Нужны [скобки Пуассона](/math/symplectic/poisson-brackets.qmd) и [замкнутые и
+точные формы](/math/forms/closed-exact.qmd). Знаки — по [конвенциям](/conventions.qmd):
+$\omega = \dd p\wedge\dd q$, $\iota_{X_H}\omega = -\dd H$, $\Omega = \begin{pmatrix}0 & -1\\ 1 & 0\end{pmatrix}$ при порядке $z = (q, p)$.
+
+## Определение и критерии
+
+::: {#def-canonical-transformation}
+Отображение $F\colon(q, p)\mapsto(Q, P)$ фазового пространства — **каноническое
+преобразование** (симплектоморфизм), если оно сохраняет симплектическую
+форму: $F^*\omega = \omega$, то есть $\sum\dd P_i\wedge\dd Q^i = \sum\dd p_i\wedge\dd q^i$.
+:::
+
+Три эквивалентные проверки:
+
+1. **Формы:** $\dd P\wedge\dd Q = \dd p\wedge\dd q$ после подстановки $Q(q, p)$, $P(q, p)$.
+2. **Скобки:** $\{Q^i, Q^j\} = \{P_i, P_j\} = 0$, $\{Q^i, P_j\} = \delta^i_j$ — новые переменные
+   канонически сопряжены.
+3. **Матрица Якоби** $J = \partial(Q, P)/\partial(q, p)$ симплектична в каждой точке:
+   $J^{\mathsf T}\Omega J = \Omega$ ([линейная симплектическая
+   алгебра](/math/symplectic/symplectic-linear.qmd)).
+
+Проверим все три для перехода к переменным **действие–угол**
+гармонического осциллятора $H = \frac12(p^2 + q^2)$ (единицы с $m = \omega = 1$):
+$q = \sqrt{2P}\sin Q$, $p = \sqrt{2P}\cos Q$:
+
+```{python}
+import numpy as np
+import sympy as sp
+from gmph.exterior import d, pullback, wedge
+from gmph.symplectic import canonical_omega, poisson
+
+q, p = sp.symbols("q p", real=True)
+Q, P = sp.symbols("Q P", positive=True)
+old_of_new = [sp.sqrt(2 * P) * sp.sin(Q), sp.sqrt(2 * P) * sp.cos(Q)]       # q(Q, P), p(Q, P)
+
+omega_qp = canonical_omega(1)                                               # dp∧dq в координатах (q, p)
+print("F*(dp∧dq) =", {k: sp.simplify(v) for k, v in pullback(omega_qp, (q, p), old_of_new, (Q, P)).items()},
+      "  (ключ (1, 2) = dQ∧dP; −1 — это dP∧dQ)")
+
+# обратное преобразование и скобка {Q, P} в старых переменных
+Q_of = sp.atan2(q, p)
+P_of = (q**2 + p**2) / 2
+print("{Q, P} =", sp.simplify(poisson(Q_of, P_of, (q, p), omega_qp)))
+
+Jac = sp.Matrix([[sp.diff(f, v) for v in (q, p)] for f in (Q_of, P_of)])
+Om = sp.Matrix([[0, -1], [1, 0]])
+print("JᵀΩJ = Ω:", sp.simplify(Jac.T * Om * Jac - Om) == sp.zeros(2, 2))
+print("H в новых переменных:", sp.simplify((old_of_new[0]**2 + old_of_new[1]**2) / 2))
+```
+
+В новых переменных $H = P$: угол $Q$ циклический, $\dot P = 0$, $\dot Q = \partial H/\partial P = 1$. Движение
+осциллятора — равномерное вращение по углу при постоянном действии.
+Переменные действие–угол для любой интегрируемой системы — тема
+«Переменные действие–угол».
+
+Для зависящих от времени преобразований условие то же в каждый момент,
+но гамильтониан меняется: $K = H + \partial F/\partial t$ (ниже).
+
+## Производящие функции
+
+Как строить канонические преобразования? Здесь работает [лемма
+Пуанкаре](/math/forms/closed-exact.qmd). Симплектическая форма точна:
+$\omega = \dd\theta$ с формой Лиувилля $\theta = p\,\dd q$. Условие $\dd P\wedge\dd Q = \dd p\wedge\dd q$ означает
+$\dd(p\,\dd q - P\,\dd Q) = 0$: 1-форма $p\,\dd q - P\,\dd Q$ замкнута. Значит, локально она точна:
+$$
+p\,\dd q - P\,\dd Q = \dd F .
+$$
+Если $(q, Q)$ можно взять независимыми координатами, то $F = F_1(q, Q)$ и
+$$
+p = \pd{F_1}{q}, \qquad P = -\pd{F_1}{Q} .
+$$
+Функция $F_1$ — **производящая функция** преобразования. Обратно, любая
+функция $F_1(q, Q)$ с $\partial^2F_1/\partial q\,\partial Q\ne0$ задаёт каноническое преобразование, и
+проверять его не нужно: оно канонично по построению. Для осциллятора
+$F_1 = \frac12q^2\cot Q$:
+
+```{python}
+F1 = q**2 * sp.cot(Q) / 2
+p_expr, P_expr = sp.diff(F1, q), -sp.diff(F1, Q)
+print("p = ∂F₁/∂q =", p_expr, ";  P = −∂F₁/∂Q =", sp.simplify(P_expr))
+# совпадает ли с q = √(2P) sin Q, p = √(2P) cos Q?
+sub = {q: old_of_new[0]}
+print("проверка:", sp.simplify(p_expr.subs(sub) - old_of_new[1]) == 0, sp.simplify(P_expr.subs(sub) - P) == 0)
+```
+
+Часто удобнее другие пары независимых переменных. Преобразование
+Лежандра $F_2 = F_1 + PQ$ даёт $\dd F_2 = p\,\dd q + Q\,\dd P$, то есть для $F_2(q, P)$
+$$
+p = \pd{F_2}{q}, \qquad Q = \pd{F_2}{P} .
+$$
+Тождественное преобразование порождается $F_2 = qP$ (а $F_1$ для него не
+существует: $q$ и $Q = q$ не независимы). Поэтому $F_2$ — естественный язык
+для преобразований, близких к тождественному.
+
+**Зависимость от времени.** Если $F$ зависит от $t$, то в расширенном фазовом
+пространстве $p\,\dd q - H\dd t = P\,\dd Q - K\dd t + \dd F$, и новый гамильтониан $K = H + \pd{F}{t}$.
+
+## Примеры
+
+**Точечные преобразования.** Замена координат $Q = f(q)$ продолжается на
+импульсы производящей функцией $F_2 = f(q)\cdot P$: $p = f'(q)P$, то есть $P = p/f'(q)$.
+Это то самое поднятие замены координат на кокасательное расслоение из
+статьи о [симплектических многообразиях](/math/symplectic/symplectic-manifolds.qmd).
+Для перехода к полярным координатам на плоскости
+$F_2 = P_r\sqrt{x^2 + y^2} + P_\varphi\operatorname{atan2}(y, x)$:
+
+```{python}
+x, y, px, py = sp.symbols("x y p_x p_y", real=True)
+Pr, Pphi = sp.symbols("P_r P_phi", real=True)
+F2 = Pr * sp.sqrt(x**2 + y**2) + Pphi * sp.atan2(y, x)
+sol = sp.solve([sp.Eq(px, sp.diff(F2, x)), sp.Eq(py, sp.diff(F2, y))], [Pr, Pphi], dict=True)[0]
+print("P_r =", sp.simplify(sol[Pr]), ";  P_φ =", sp.simplify(sol[Pphi]))
+coords4 = (x, y, px, py)
+omega4 = canonical_omega(2)
+r_new, phi_new = sp.sqrt(x**2 + y**2), sp.atan2(y, x)
+brackets = {"{r, P_r}": poisson(r_new, sol[Pr], coords4, omega4), "{φ, P_φ}": poisson(phi_new, sol[Pphi], coords4, omega4),
+            "{r, P_φ}": poisson(r_new, sol[Pphi], coords4, omega4), "{P_r, P_φ}": poisson(sol[Pr], sol[Pphi], coords4, omega4)}
+print({k: sp.simplify(v) for k, v in brackets.items()})
+```
+
+$P_\varphi = xp_y - yp_x$ — момент импульса, $P_r$ — радиальный импульс $\mathbf p\cdot\mathbf r/r$.
+
+**Калибровочный сдвиг импульса.** Преобразование $Q = q$, $P = p + \partial f/\partial q$ с
+производящей функцией $F_2 = qP - f(q)$ каноническое для любой $f$. В
+[электродинамике](/physics/electrodynamics/gauge-invariance-em.qmd) именно так меняется
+канонический импульс заряда при калибровочном преобразовании,
+$\mathbf p\to\mathbf p + \frac ec\nabla f$. Калибровочная свобода в механике заряда — частный случай
+канонических преобразований.
+
+**Линейные преобразования.** Сжатие $Q = \lambda q$, $P = p/\lambda$ — каноническое (его матрица
+$\operatorname{diag}(\lambda, 1/\lambda)$ симплектична). А «растяжение» $Q = q$, $P = 2p$ — нет: $\{Q, P\} = 2$, и
+площадь на фазовой плоскости удваивается.
+
+## Гамильтоновы потоки — канонические преобразования
+
+Фазовый поток $\varphi_t$ любой гамильтоновой системы каноничен: по формуле
+Картана $\Lie{X_H}\omega = \dd\,\iota_{X_H}\omega + \iota_{X_H}\dd\omega = -\dd\dd H = 0$ (это было в статье о [гамильтоновых
+полях](/math/symplectic/hamiltonian-fields.qmd)). Обратно, однопараметрическое
+семейство канонических преобразований, близких к тождественному,
+порождается функцией $G$: производящая функция $F_2 = qP + \varepsilon G(q, P)$ даёт
+$$
+Q = q + \varepsilon\pd{G}{p} + O(\varepsilon^2), \qquad P = p - \varepsilon\pd{G}{q} + O(\varepsilon^2),
+$$
+то есть сдвиг вдоль гамильтонова поля $X_G$. Этим теорема Нётер в
+гамильтоновой форме и объясняется: интеграл движения $G$ порождает
+каноническое преобразование, сохраняющее $H$. Проверим на вращениях,
+порождённых моментом $G = L_z = xp_y - yp_x$:
+
+```{python}
+eps = sp.Symbol("epsilon", real=True)
+X_new, Y_new, Pxn, Pyn = sp.symbols("X Y P_X P_Y", real=True)
+G = x * Pyn - y * Pxn                                  # L_z, записанный через (x, y, P_X, P_Y)
+F2_rot = x * Pxn + y * Pyn + eps * G
+relations = [sp.Eq(px, sp.diff(F2_rot, x)), sp.Eq(py, sp.diff(F2_rot, y)),
+             sp.Eq(X_new, sp.diff(F2_rot, Pxn)), sp.Eq(Y_new, sp.diff(F2_rot, Pyn))]
+rot = sp.solve(relations, [X_new, Y_new, Pxn, Pyn], dict=True)[0]
+print("X =", sp.simplify(rot[X_new]), ";  Y =", sp.simplify(rot[Y_new]))
+print("P_X =", sp.simplify(rot[Pxn]), ";  P_Y =", sp.simplify(rot[Pyn]))
+new_vars = [rot[X_new], rot[Y_new], rot[Pxn], rot[Pyn]]
+brackets = sp.Matrix(4, 4, lambda i, j: sp.simplify(poisson(new_vars[i], new_vars[j], coords4, omega4)))
+print("скобки {Z_i, Z_j} для Z = (X, Y, P_X, P_Y):", brackets.tolist(), "— каноническое при любом ε")
+```
+
+При $\varepsilon\to0$ это поворот на угол $\varepsilon$: $X\approx x - \varepsilon y$, $Y\approx y + \varepsilon x$ (импульс
+поворачивается так же). Конечный $\varepsilon$ даёт точно каноническое
+преобразование, которое лишь приближает поворот.
+
+## Дискретная динамика: стандартное отображение
+
+Каноническое преобразование, применённое многократно, — дискретная
+гамильтонова динамика. Производящая функция
+$$
+F_2(q, P) = qP + \frac{P^2}{2} + K\cos q
+$$
+даёт **стандартное отображение** (отображение Чирикова)
+$$
+P = p + K\sin q, \qquad Q = q + P \pmod{2\pi} .
+$$
+Это отображение за период «толкаемого ротора» — ротора, который
+периодически получает удар, зависящий от угла. Это композиция двух
+канонических сдвигов, удара по импульсу и свободного поворота, —
+тот же приём, что в [симплектических
+интеграторах](/math/numerics/symplectic-integrators.qmd). Проверим каноничность
+и посмотрим на орбиты:
+
+```{python}
+K = sp.Symbol("K", positive=True)
+Pn = sp.Symbol("P")
+F2_std = q * Pn + Pn**2 / 2 + K * sp.cos(q)
+P_std = sp.solve(sp.Eq(p, sp.diff(F2_std, q)), Pn)[0]
+Q_std = sp.diff(F2_std, Pn).subs(Pn, P_std)
+print("P =", P_std, ";  Q =", sp.expand(Q_std))
+print("{Q, P} =", sp.simplify(poisson(Q_std, P_std, (q, p), omega_qp)))
+
+def standard_map(q0, p0, K, n):
+    qs, ps = np.empty(n), np.empty(n)
+    for i in range(n):
+        p0 = p0 + K * np.sin(q0)
+        q0 = (q0 + p0) % (2 * np.pi)
+        p0 = (p0 + np.pi) % (2 * np.pi) - np.pi        # импульс тоже по модулю 2π
+        qs[i], ps[i] = q0, p0
+    return qs, ps
+
+# площадь сохраняется: якобиан отображения равен 1 в любой точке
+rng = np.random.default_rng(1)
+for _ in range(3):
+    q0, p0, Kv = rng.uniform(0, 2 * np.pi), rng.uniform(-np.pi, np.pi), 0.97
+    Jn = np.array([[1 + Kv * np.cos(q0), 1], [Kv * np.cos(q0), 1]])        # ∂(Q, P)/∂(q, p)
+    print(f"det J в точке ({q0:.2f}, {p0:.2f}) = {np.linalg.det(Jn):.12f}")
+```
+
+```{python}
+#| label: fig-standard-map
+#| fig-cap: 'Орбиты стандартного отображения P = p + K sin q, Q = q + P (обе переменные по модулю 2π) при K = 0,5 (слева) и K = 0,97 (справа); по 1500 итераций для 40 начальных точек на отрезке q = π (каждая орбита своим цветом). При малом K большинство орбит лежит на инвариантных кривых, вокруг неподвижной точки (π, 0) — острова; при K ≈ 1 крупные инвариантные кривые разрушаются, и между островами появляется хаотическое море.'
+import matplotlib.pyplot as plt
+
+fig, axes = plt.subplots(1, 2, figsize=(10, 4.6))
+starts = np.linspace(-np.pi, np.pi, 40, endpoint=False) + 0.05
+for ax, Kv in zip(axes, (0.5, 0.97)):
+    for i, p_start in enumerate(starts):
+        qs, ps = standard_map(np.pi, p_start, Kv, 1500)
+        ax.plot(qs, ps, ".", ms=0.9, color=plt.cm.viridis(i / len(starts)))
+    ax.set(xlim=(0, 2 * np.pi), ylim=(-np.pi, np.pi), xlabel="q", ylabel="p", title=f"K = {Kv}",
+           xticks=[0, np.pi, 2 * np.pi], xticklabels=["0", "π", "2π"],
+           yticks=[-np.pi, 0, np.pi], yticklabels=["−π", "0", "π"])
+plt.tight_layout()
+plt.show()
+```
+
+Каноничность не делает динамику простой: стандартное отображение —
+классическая модель перехода к хаосу. Но она накладывает жёсткие
+ограничения: сохраняется площадь, притягивающих точек и предельных
+циклов нет, и острова устойчивости окружены инвариантными кривыми.
+Это работает и на больших временах (теорема КАМ).
+
+## Итоги
+
+- Каноническое преобразование — симплектоморфизм: $F^*\omega = \omega$, или $\{Q^i, P_j\} = \delta^i_j$ и
+  $\{Q, Q\} = \{P, P\} = 0$, или $J^{\mathsf T}\Omega J = \Omega$.
+- Замкнутость $p\,\dd q - P\,\dd Q$ и лемма Пуанкаре дают производящую функцию:
+  $p = \partial F_1/\partial q$, $P = -\partial F_1/\partial Q$; или $p = \partial F_2/\partial q$, $Q = \partial F_2/\partial P$; при зависимости от
+  времени $K = H + \partial F/\partial t$.
+- Примеры: действие–угол осциллятора ($H = P$), поднятие замены координат,
+  калибровочный сдвиг импульса, сжатия.
+- Гамильтоновы потоки каноничны; генератор $G$ порождает
+  инфинитезимальное преобразование вдоль $X_G$.
+- Итерации канонического отображения — дискретная гамильтонова
+  динамика (стандартное отображение): площадь сохраняется, хаос
+  возможен.
+
+## Упражнения
+
+1. Каноническое ли преобразование $Q = p$, $P = -q$? Найдите его
+   производящую функцию $F_1(q, Q)$.
+2. При каком $\alpha$ преобразование $Q = q^\alpha\cos p$, $P = q^\alpha\sin p$ каноническое?
+3. Найдите производящую функцию $F_2(q, P)$ сжатия $Q = \lambda q$, $P = p/\lambda$.
+4. Частица в однородном поле, $H = \frac{p^2}{2} + gq$. Найдите новый гамильтониан $K$
+   после зависящего от времени преобразования $F_2 = (q + \frac12gt^2)P - gtq$ и
+   объясните смысл.
+5. Найдите неподвижные точки стандартного отображения и их
+   устойчивость при малом $K > 0$.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. Да: $\dd P\wedge\dd Q = -\dd q\wedge\dd p = \dd p\wedge\dd q$. $F_1 = qQ$: $p = \partial F_1/\partial q = Q$, $P = -\partial F_1/\partial Q = -q$.
+   Координаты и импульсы равноправны — их можно менять местами.
+2. $\{Q, P\} = \pd{Q}{q}\pd{P}{p} - \pd{Q}{p}\pd{P}{q} = \alpha q^{2\alpha-1}$; равно 1 при $\alpha = 1/2$.
+3. $F_2 = \lambda qP$: $p = \lambda P$, $Q = \lambda q$.
+4. $p = \partial F_2/\partial q = P - gt$, $Q = q + \frac12gt^2$, $\partial F_2/\partial t = gtP - gq$, и
+   $K = \frac{(P - gt)^2}{2} + gq + gtP - gq = \frac{P^2}{2} + \frac{g^2t^2}{2}$. Последнее слагаемое — функция
+   только времени, уравнений не меняет: $\dot Q = P$, $\dot P = 0$. Это переход в свободно
+   падающую систему отсчёта, где частица свободна.
+5. $p = 0$ (по модулю $2\pi$), $\sin q = 0$: $(0, 0)$ и $(\pi, 0)$. След матрицы Якоби $2 + K\cos q$:
+   в $(0, 0)$ он $2 + K > 2$ — гиперболическая (неустойчивая) точка; в $(\pi, 0)$ он $2 - K$,
+   при $0 < K < 4$ эллиптическая (устойчивая) — центр острова на рисунке.
+:::
