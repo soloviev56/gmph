@@ -436,3 +436,22 @@ def test_riemann_sign():
     lhs = [sp.simplify(x - y) for x, y in zip(nabla(0, nabla(1, d_phi)), nabla(1, nabla(0, d_phi)))]
     assert all(sp.simplify(lhs[i] - R[i][1][0][1]) == 0 for i in range(2))
     assert sp.simplify(scalar_curvature(ricci(R), g) - 2 / a**2) == 0
+
+
+# --- Функции Грина: L G = +δ, G = 1/4πr для −∇², δ(t − r/c)/4πr для (1/c²)∂²_t − ∇²
+
+
+def test_green_function_signs():
+    r, t, D, c, k = sp.symbols("r t D c k", positive=True)
+    G = 1 / (4 * sp.pi * r)
+    assert sp.limit(-4 * sp.pi * r**2 * G.diff(r), r, 0) == 1          # −∮∇G·dS = +1
+    heat = (4 * sp.pi * D * t)**sp.Rational(-3, 2) * sp.exp(-r**2 / (4 * D * t))
+    radial_lap = lambda u: sp.diff(r**2 * u.diff(r), r) / r**2
+    assert sp.simplify(heat.diff(t) - D * radial_lap(heat)) == 0
+    assert sp.integrate(4 * sp.pi * r**2 * heat, (r, 0, sp.oo)) == 1
+    f = sp.Function("f")
+    wave = f(t - r / c) / (4 * sp.pi * r)
+    assert sp.simplify(wave.diff(t, 2) / c**2 - radial_lap(wave)) == 0
+    # G(k, t) = θ(t) c sin(ckt)/k: при t → 0+ G = 0, ∂_t G = c²  (скачок от δ(t) при множителе 1/c²)
+    Gk = c * sp.sin(c * k * t) / k
+    assert Gk.subs(t, 0) == 0 and sp.simplify(Gk.diff(t).subs(t, 0) - c**2) == 0

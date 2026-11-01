@@ -257,6 +257,17 @@ subtitle: "Обозначения и соглашения о знаках, ед�
   `inverse_fourier`, `fourier_time`, `inverse_fourier_time` из `gmph.fourier` переводят
   его в соглашения пособия.
 
+## Функции Грина
+
+- Функция Грина линейного оператора $L$ — решение уравнения с точечным источником
+  **со знаком плюс**: $L_xG(x, x') = \delta(x - x')$; тогда решение $Lu = f$ есть $u = \int G(x, x')f(x')\,\dd x'$.
+- Поэтому функции Грина основных операторов положительны:
+  $$-\nabla^2G = \delta^3(\mathbf r):\ G = \frac{1}{4\pi r}, \qquad
+  (\partial_t - D\nabla^2)G = \delta(t)\delta^3(\mathbf r):\ G = \frac{\theta(t)}{(4\pi Dt)^{3/2}}e^{-r^2/4Dt},$$
+  $$\left(\frac{1}{c^2}\partial_t^2 - \nabla^2\right)G = \delta(t)\delta^3(\mathbf r):\ G_\text{ret} = \frac{\delta(t - r/c)}{4\pi r} .$$
+  Оператор $-\nabla^2$ здесь — это лапласиан де Рама $\Delta$ на функциях (раздел «Метрика»).
+  Потенциал заряда: $-\nabla^2\varphi = 4\pi\rho$, $\varphi = 4\pi\int G\rho\,\dd V$.
+
 ## Обозначения в формулах
 
 | Запись | Смысл |
