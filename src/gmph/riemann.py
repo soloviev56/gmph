@@ -115,3 +115,50 @@ def transport_rhs(Gamma, coords, path, velocity):
 
     G = numeric_connection(Gamma, coords)
     return lambda t, V: -np.einsum("ijk,j,k->i", G(path(t)), velocity(t), V)
+
+
+def riemann(Gamma, coords):
+    """Тензор кривизны R^i_{jkl} (массив ``R[i][j][k][l]``).
+
+    Соглашение (страница «Конвенции»): R(∂_k, ∂_l)∂_j = R^i_{jkl} ∂_i, где
+    R(X, Y) = ∇_X∇_Y − ∇_Y∇_X − ∇_{[X,Y]}; в компонентах
+    R^i_{jkl} = ∂_k Γ^i_{lj} − ∂_l Γ^i_{kj} + Γ^i_{km} Γ^m_{lj} − Γ^i_{lm} Γ^m_{kj}.
+    """
+    n = len(coords)
+
+    def component(i, j, k, l):
+        value = sp.diff(Gamma[i][l][j], coords[k]) - sp.diff(Gamma[i][k][j], coords[l])
+        value += sum(Gamma[i][k][m] * Gamma[m][l][j] - Gamma[i][l][m] * Gamma[m][k][j] for m in range(n))
+        return _tidy(value)
+    return [[[[component(i, j, k, l) for l in range(n)] for k in range(n)] for j in range(n)] for i in range(n)]
+
+
+def _tidy(expr):
+    """simplify, а для тригонометрии — ещё и fu, если так короче (sin²θ вместо sin2θ/2tgθ − cos2θ)."""
+    expr = sp.simplify(expr)
+    if expr.has(sp.sin, sp.cos, sp.tan, sp.cot):
+        alt = sp.fu(expr)
+        if sp.count_ops(alt) < sp.count_ops(expr):
+            expr = alt
+    return expr
+
+
+def ricci(R):
+    """Тензор Риччи R_{jl} = R^i_{jil} (sympy Matrix)."""
+    n = len(R)
+    return sp.Matrix(n, n, lambda j, l: _tidy(sum(R[i][j][i][l] for i in range(n))))
+
+
+def scalar_curvature(Ric, g):
+    """Скалярная кривизна R = g^{jl} R_{jl}."""
+    ginv = sp.Matrix(g).inv()
+    n = ginv.shape[0]
+    return sp.simplify(sum(ginv[j, l] * Ric[j, l] for j in range(n) for l in range(n)))
+
+
+def lower_first(R, g):
+    """Тензор R_{ijkl} = g_{im} R^m_{jkl}."""
+    g = sp.Matrix(g)
+    n = g.shape[0]
+    return [[[[sp.simplify(sum(g[i, m] * R[m][j][k][l] for m in range(n)))
+               for l in range(n)] for k in range(n)] for j in range(n)] for i in range(n)]

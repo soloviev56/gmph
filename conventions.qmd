@@ -62,6 +62,14 @@ subtitle: "Обозначения и соглашения о знаках, ед�
   совпадают с Ландау–Лифшицем (т. II, § 85).
 - Плоская связность в полярных координатах: $\Gamma^r_{\varphi\varphi} = -r$,
   $\Gamma^\varphi_{r\varphi} = \Gamma^\varphi_{\varphi r} = 1/r$ (функция `flat_connection` из `gmph.riemann`).
+- Тензор кривизны: $R(X, Y) = \nabla_X\nabla_Y - \nabla_Y\nabla_X - \nabla_{[X, Y]}$,
+  $R(\partial_k, \partial_l)\,\partial_j = R^i{}_{jkl}\,\partial_i$, то есть
+  $$R^i{}_{jkl} = \partial_k\Gamma^i_{lj} - \partial_l\Gamma^i_{kj} + \Gamma^i_{km}\Gamma^m_{lj} - \Gamma^i_{lm}\Gamma^m_{kj},
+  \qquad (\nabla_k\nabla_l - \nabla_l\nabla_k)V^i = R^i{}_{jkl}V^j$$
+  (последнее — для связности без кручения). Тензор Риччи $R_{jl} = R^i{}_{jil}$, скалярная
+  кривизна $R = g^{jl}R_{jl}$; у сферы радиуса $a$ $R = 2/a^2 > 0$. Для симметричной связности
+  это соглашения Ландау–Лифшица (т. II, § 91–92). Функции `riemann`, `ricci`,
+  `scalar_curvature` из `gmph.riemann`.
 
 ## Метрика
 

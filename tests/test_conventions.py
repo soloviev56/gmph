@@ -415,3 +415,24 @@ def test_canonical_stress_signs():
     momentum = (Tup[0, 1] / c).subs(y, wave).doit()
     assert sp.simplify(momentum - rho * v * sp.Subs(sp.Derivative(f(sp.Symbol("u")), sp.Symbol("u")),
                                                     sp.Symbol("u"), x - v * x0 / c).doit()**2) == 0
+
+
+# --- Кривизна: R(∂_k, ∂_l)∂_j = R^i_{jkl} ∂_i, R_{jl} = R^i_{jil}, сфера R = 2/a² > 0
+
+
+def test_riemann_sign():
+    from gmph.riemann import christoffel, ricci, riemann, scalar_curvature
+
+    th, ph = sp.symbols("theta phi", positive=True)
+    a = sp.Symbol("a", positive=True)
+    q = (th, ph)
+    g = sp.diag(a**2, a**2 * sp.sin(th)**2)
+    G = christoffel(g, q)
+    R = riemann(G, q)
+    # R(∂_θ, ∂_φ)∂_φ = ∇_θ∇_φ ∂_φ − ∇_φ∇_θ ∂_φ (коммутатор координатных полей равен нулю)
+    def nabla(j, V):                    # ∇_{∂_j} V для поля с компонентами V
+        return [sp.diff(V[i], q[j]) + sum(G[i][j][k] * V[k] for k in range(2)) for i in range(2)]
+    d_phi = [0, 1]
+    lhs = [sp.simplify(x - y) for x, y in zip(nabla(0, nabla(1, d_phi)), nabla(1, nabla(0, d_phi)))]
+    assert all(sp.simplify(lhs[i] - R[i][1][0][1]) == 0 for i in range(2))
+    assert sp.simplify(scalar_curvature(ricci(R), g) - 2 / a**2) == 0

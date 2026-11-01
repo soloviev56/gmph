@@ -1,0 +1,330 @@
+---
+title: "Тензор кривизны"
+topic: curvature-riemann
+order: 4
+description: "Тензор Римана как некоммутативность ковариантных производных, R^i_{jkl} = ∂_kΓ^i_{lj} − ∂_lΓ^i_{kj} + ΓΓ − ΓΓ (функции riemann, ricci, scalar_curvature в gmph.riemann; знаки — в конвенциях); полярные координаты плоские, сфера — нет; голономия малой петли δV = −R(∂_k, ∂_l)V·εη; симметрии и число компонент n²(n²−1)/12; гауссова кривизна и Theorema egregium на торе (рисунок); тензор Риччи и скалярная кривизна; Шварцшильд: R_{jl} = 0, но R_{ijkl}R^{ijkl} = 12r_s²/r⁶"
+---
+
+В статье о [параллельном переносе](/math/riemann/parallel-transport.qmd) вектор,
+обнесённый по широте сферы, возвращался повёрнутым, а на плоскости
+Лобачевского ([связность Леви-Чивиты](/math/riemann/levi-civita.qmd)) — повёрнутым
+в другую сторону. В полярных координатах на плоскости символы
+Кристоффеля тоже не равны нулю, но никакого поворота нет: плоскость
+остаётся плоскостью в любых координатах. Нужна величина, которая
+отличает настоящую кривизну от кривизны координатной сетки. Это
+**тензор кривизны Римана**. Он измеряет, насколько перенос по маленькой
+петле отличается от тождественного, или, что то же самое, насколько не
+коммутируют ковариантные производные. В общей теории относительности
+тензор Римана — это и есть гравитационное поле, которое нельзя убрать
+выбором системы отсчёта: приливные силы.
+
+Нужны [связность Леви-Чивиты](/math/riemann/levi-civita.qmd) и [параллельный
+перенос](/math/riemann/parallel-transport.qmd). Знак тензора кривизны и порядок
+его индексов зафиксированы в [конвенциях](/conventions.qmd).
+
+## Определение
+
+Частные производные коммутируют, $\partial_k\partial_l = \partial_l\partial_k$. Ковариантные — нет:
+в $\nabla_k\nabla_lV^i$ символы связности дифференцируются, и в разности остаётся
+член без производных $V$.
+
+::: {#def-riemann}
+**Тензор кривизны** связности $\nabla$ — отображение
+$$
+R(X, Y)Z = \nabla_X\nabla_YZ - \nabla_Y\nabla_XZ - \nabla_{[X, Y]}Z .
+$$
+Его компоненты определяются равенством $R(\partial_k, \partial_l)\,\partial_j = R^i{}_{jkl}\,\partial_i$:
+$$
+R^i{}_{jkl} = \partial_k\Gamma^i_{lj} - \partial_l\Gamma^i_{kj} + \Gamma^i_{km}\Gamma^m_{lj} - \Gamma^i_{lm}\Gamma^m_{kj} .
+$$
+:::
+
+Слагаемое $\nabla_{[X, Y]}$ делает $R(X, Y)Z$ линейным по функциям в каждом
+аргументе: $R(fX, Y)Z = fR(X, Y)Z$ и так далее (упражнение для читателя:
+производные $f$ сокращаются). Поэтому $R$ — тензор типа $(1, 3)$, а не
+дифференциальный оператор: значение $R(X, Y)Z$ в точке зависит только от
+векторов в этой точке. Для координатных полей $[\partial_k, \partial_l] = 0$, и формула для
+компонент получается прямым дифференцированием $\nabla_k(\Gamma^i_{lj}\partial_i)$.
+
+Для связности без кручения отсюда следует
+$$
+(\nabla_k\nabla_l - \nabla_l\nabla_k)\,V^i = R^i{}_{jkl}\,V^j .
+$$
+Функция `riemann` из `gmph.riemann` вычисляет компоненты по формуле
+определения. Проверим тождество для общей диагональной метрики
+$E\,\dd u^2 + G\,\dd v^2$ и произвольного поля $V$:
+
+```{python}
+import itertools
+import numpy as np
+import sympy as sp
+from scipy.integrate import solve_ivp
+from gmph.riemann import (christoffel, covariant_derivative, flat_connection, lower_first, ricci, riemann,
+                          scalar_curvature, transport_rhs)
+
+u, v = sp.symbols("u v", real=True)
+E, G_ = sp.Function("E")(u, v), sp.Function("G")(u, v)
+q = (u, v)
+Gamma = christoffel(sp.diag(E, G_), q)
+R = riemann(Gamma, q)
+V = [sp.Function("V0")(u, v), sp.Function("V1")(u, v)]
+DDV = covariant_derivative(covariant_derivative(V, "u", Gamma, q), "du", Gamma, q)   # [k, l, i] = ∇_k∇_l V^i
+print("[∇_k, ∇_l]V^i = R^i_jkl V^j:",
+      all(sp.simplify(DDV[k, l, i] - DDV[l, k, i] - sum(R[i][j][k][l] * V[j] for j in range(2))) == 0
+          for k in range(2) for l in range(2) for i in range(2)))
+```
+
+Теперь главный пример. В полярных координатах на плоскости символы
+не нулевые, а кривизна равна нулю. На единичной сфере — нет:
+
+```{python}
+r, phi, theta = sp.symbols("r phi theta", positive=True)
+names = {0: "θ", 1: "φ"}
+R_polar = riemann(flat_connection([r * sp.cos(phi), r * sp.sin(phi)], (r, phi)), (r, phi))
+print("плоскость, полярные: все R^i_jkl = 0:", all(c == 0 for a in R_polar for b in a for e in b for c in e))
+
+g_sphere = sp.diag(1, sp.sin(theta)**2)
+R_sphere = riemann(christoffel(g_sphere, (theta, phi)), (theta, phi))
+for i, j, k, l in itertools.product(range(2), repeat=4):
+    if k < l and R_sphere[i][j][k][l] != 0:
+        print(f"сфера: R^{names[i]}_{names[j]}{names[k]}{names[l]} = {R_sphere[i][j][k][l]}")
+```
+
+Нулевая кривизна не зависит от координат: $R$ — тензор, и если его
+компоненты равны нулю в одной карте, они равны нулю во всех. Верно и
+обратное (локально): если $R = 0$, перенос не зависит от пути, и
+параллельные поля дают координаты, в которых $\Gamma = 0$. Значит, никакая
+замена координат не сделает метрику сферы евклидовой — карты Земли без
+искажений не бывает.
+
+## Голономия малой петли
+
+Обнесём вектор $V$ по маленькому координатному параллелограмму: сначала
+на $\varepsilon$ вдоль $\partial_k$, потом на $\eta$ вдоль $\partial_l$, затем назад. С точностью до
+членов третьего порядка вектор изменится на
+$$
+\delta V^i = -R^i{}_{jkl}\,V^j\,\varepsilon\eta .
+$$
+Это и есть геометрический смысл кривизны: «поворот на единицу площади».
+Проверим численно на единичной сфере у широты $\theta_0 = 1$ (сначала вдоль
+$\partial_\theta$, потом вдоль $\partial_\varphi$):
+
+```{python}
+G_sphere = christoffel(g_sphere, (theta, phi))
+th0, eps = 1.0, 0.01
+corners = [np.array([th0, 0.0]), np.array([th0 + eps, 0.0]), np.array([th0 + eps, eps]), np.array([th0, eps])]
+V0 = np.array([0.3, 0.8])
+V_loop = V0.copy()
+for start, end in zip(corners, corners[1:] + corners[:1]):
+    step = (end - start) / eps                                   # отрезок с параметром t ∈ [0, ε]
+    rhs = transport_rhs(G_sphere, (theta, phi), lambda t, s=start, d=step: s + t * d, lambda t, d=step: d)
+    V_loop = solve_ivp(rhs, (0, eps), V_loop, rtol=1e-12, atol=1e-14).y[:, -1]
+R_num = np.array([[float(R_sphere[i][j][0][1].subs(theta, th0)) for j in range(2)] for i in range(2)])
+print("δV после обхода:", V_loop - V0)
+print("−R^i_jθφ V^j ε²:", -R_num @ V0 * eps**2)
+```
+
+Расхождение — в третьем знаке, как и положено поправке порядка $\varepsilon^3$.
+Обход по широте из статьи о переносе — та же формула, проинтегрированная
+по большой площади: угол поворота равен интегралу гауссовой кривизны
+по охваченной площади (см. ниже).
+
+## Симметрии и число компонент
+
+Опустим первый индекс: $R_{ijkl} = g_{im}R^m{}_{jkl}$. Для связности Леви-Чивиты
+$$
+R_{ijkl} = -R_{ijlk} = -R_{jikl} = R_{klij}, \qquad R_{ijkl} + R_{iklj} + R_{iljk} = 0 .
+$$
+Первое — по определению, второе — из согласованности с метрикой
+(перенос — поворот, а матрица поворота на единицу площади антисимметрична),
+последнее — **первое тождество Бианки**, следствие отсутствия кручения.
+Из $n^4$ компонент независимыми остаются $n^2(n^2 - 1)/12$. Подсчитаем ранг
+системы линейных условий:
+
+```{python}
+def independent_components(n):
+    index = {ijkl: m for m, ijkl in enumerate(itertools.product(range(n), repeat=4))}
+    rows = []
+    def condition(*terms):                       # Σ coef · R[ijkl] = 0
+        row = np.zeros(n**4)
+        for coef, ijkl in terms:
+            row[index[ijkl]] += coef
+        rows.append(row)
+    for i, j, k, l in index:
+        condition((1, (i, j, k, l)), (1, (i, j, l, k)))
+        condition((1, (i, j, k, l)), (1, (j, i, k, l)))
+        condition((1, (i, j, k, l)), (-1, (k, l, i, j)))
+        condition((1, (i, j, k, l)), (1, (i, k, l, j)), (1, (i, l, j, k)))
+    return n**4 - np.linalg.matrix_rank(np.array(rows))
+
+for n in (2, 3, 4):
+    print(f"n = {n}: независимых компонент {independent_components(n)}, формула {n**2 * (n**2 - 1) // 12}")
+```
+
+В двух измерениях компонента одна, $R_{1212}$, и кривизна — одно число в
+каждой точке. В трёх — шесть, столько же, сколько у симметричного
+тензора Риччи (ниже): в 3D Риччи определяет всё. В четырёх — двадцать,
+из них десять в тензоре Риччи, а остальные десять — **тензор Вейля**,
+та часть кривизны, которая есть и в пустоте.
+
+## Гауссова кривизна
+
+В двух измерениях $R_{ijkl} = K\,(g_{ik}g_{jl} - g_{il}g_{jk})$, где
+$$
+K = \frac{R_{1212}}{\det g}
+$$
+— **гауссова кривизна**. Гаусс определял её «снаружи», для поверхности в
+$\R^3$: как произведение главных кривизн, $K = \det(\mathrm{II})/\det(\mathrm{I})$, где
+$\mathrm{I}_{jk} = \partial_jX\cdot\partial_kX$ — метрика, а $\mathrm{II}_{jk} = \partial_j\partial_kX\cdot\mathbf n$ — вторая
+фундаментальная форма. Его **Theorema egregium** («замечательная
+теорема») утверждает, что $K$ зависит только от метрики. Для нас это
+очевидно: $R$ построен из символов Кристоффеля, а они — из метрики.
+Проверим на торе с радиусами $a > b$:
+
+```{python}
+a, b = sp.symbols("a b", positive=True)
+g_torus = sp.diag(b**2, (a + b * sp.cos(theta))**2)
+R_torus = lower_first(riemann(christoffel(g_torus, (theta, phi)), (theta, phi)), g_torus)
+K_intrinsic = sp.simplify(R_torus[0][1][0][1] / g_torus.det())
+
+X = sp.Matrix([(a + b * sp.cos(theta)) * sp.cos(phi), (a + b * sp.cos(theta)) * sp.sin(phi), b * sp.sin(theta)])
+tangent = [X.diff(theta), X.diff(phi)]
+normal = tangent[0].cross(tangent[1])
+II = sp.Matrix(2, 2, lambda j, k: X.diff((theta, phi)[j], (theta, phi)[k]).dot(normal))   # без нормировки n
+K_extrinsic = sp.simplify(II.det() / normal.dot(normal)**2)
+print("K по метрике:          ", K_intrinsic)
+print("K = det II / det I:    ", K_extrinsic)
+print("∫K dA по тору =", sp.integrate(sp.simplify(K_intrinsic * b * (a + b * sp.cos(theta))), (theta, 0, 2 * sp.pi), (phi, 0, 2 * sp.pi)))
+```
+
+(В коде нормаль не нормирована, $|\mathbf N|^2 = \det\mathrm I$, отсюда квадрат в знаменателе.)
+Внешняя сторона тора ($\theta = 0$) изогнута как сфера, $K > 0$, внутренняя
+($\theta = \pi$) — как седло, $K < 0$, и интеграл кривизны по всему тору равен
+нулю. Это частный случай **теоремы Гаусса–Бонне**:
+$\int K\,\dd A = 2\pi\chi$, где $\chi$ — эйлерова характеристика ($2$ для сферы, $0$ для тора).
+
+```{python}
+#| label: fig-torus-curvature
+#| fig-cap: 'Гауссова кривизна тора с радиусами a = 2, b = 1: K = cos θ / (b(a + b cos θ)). Снаружи (красное) K > 0, как у сферы; внутри (синее) K < 0, как у седла; на верхней и нижней окружностях (θ = ±π/2) K = 0. Полный интеграл ∫K dA = 0.'
+import matplotlib.pyplot as plt
+from matplotlib.colors import TwoSlopeNorm
+
+A_, B_ = 2.0, 1.0
+TH, PH = np.meshgrid(np.linspace(0, 2 * np.pi, 120), np.linspace(0, 2 * np.pi, 120))
+K_vals = np.cos(TH) / (B_ * (A_ + B_ * np.cos(TH)))
+norm = TwoSlopeNorm(vmin=K_vals.min(), vcenter=0, vmax=K_vals.max())
+fig = plt.figure(figsize=(7, 4.2))
+ax = fig.add_subplot(projection="3d")
+ax.plot_surface((A_ + B_ * np.cos(TH)) * np.cos(PH), (A_ + B_ * np.cos(TH)) * np.sin(PH), B_ * np.sin(TH),
+                facecolors=plt.cm.coolwarm(norm(K_vals)), rstride=2, cstride=2, linewidth=0, shade=False)
+ax.set_box_aspect((3, 3, 1))
+ax.set_axis_off()
+ax.view_init(elev=35, azim=30)
+mappable = plt.cm.ScalarMappable(norm=norm, cmap="coolwarm")
+fig.colorbar(mappable, ax=ax, shrink=0.6, label="K")
+plt.show()
+```
+
+## Тензор Риччи и скалярная кривизна
+
+Свёртки тензора Римана:
+
+::: {#def-ricci}
+**Тензор Риччи** $R_{jl} = R^i{}_{jil}$ (симметричен), **скалярная кривизна**
+$R = g^{jl}R_{jl}$.
+:::
+
+Для сферы $S^n$ радиуса $a$ кривизна одинакова во всех направлениях:
+$R_{jl} = \frac{n - 1}{a^2}\,g_{jl}$ и $R = \frac{n(n - 1)}{a^2}$. В двух измерениях $R = 2K$. Функции
+`ricci` и `scalar_curvature`:
+
+```{python}
+a_ = sp.Symbol("a", positive=True)
+g_a = a_**2 * g_sphere
+Ric_a = ricci(riemann(christoffel(g_a, (theta, phi)), (theta, phi)))
+print("сфера радиуса a: R_jl =", Ric_a.tolist(), " R =", scalar_curvature(Ric_a, g_a))
+```
+
+Смысл тензора Риччи — изменение объёма. Пучок геодезических, выпущенных
+параллельно, на сфере сходится, и малый объём, который они несут,
+уменьшается со скоростью, пропорциональной $R_{jl}\dot x^j\dot x^l$ (тема
+«Девиация геодезических»). Положительная кривизна Риччи фокусирует.
+
+## Физика: кривизна без материи
+
+В общей теории относительности уравнения Эйнштейна связывают с
+материей тензор Риччи: $R_{\mu\nu} - \frac12g_{\mu\nu}R = \frac{8\pi k}{c^4}T_{\mu\nu}$. В пустоте $R_{\mu\nu} = 0$.
+Но это не значит, что пространство-время плоское: остаётся тензор
+Вейля. Метрика Шварцшильда вне сферической звезды в сигнатуре
+$(+,-,-,-)$
+$$
+\dd s^2 = \left(1 - \frac{r_s}{r}\right)c^2\dd t^2 - \frac{\dd r^2}{1 - r_s/r} - r^2(\dd\theta^2 + \sin^2\theta\,\dd\varphi^2), \qquad r_s = \frac{2kM}{c^2},
+$$
+— решение уравнений в пустоте. Проверим и найдём инвариант
+Кречмана $R_{ijkl}R^{ijkl}$, который не зависит от координат (здесь $c = 1$):
+
+```{python}
+t, r_s = sp.symbols("t r_s", positive=True)
+schw = (t, r, theta, phi)
+f = 1 - r_s / r
+g_schw = sp.diag(f, -1 / f, -r**2, -r**2 * sp.sin(theta)**2)
+R_schw = riemann(christoffel(g_schw, schw), schw)
+print("тензор Риччи равен нулю:", ricci(R_schw) == sp.zeros(4, 4))
+R_low = lower_first(R_schw, g_schw)
+g_inv = g_schw.inv()                                     # метрика диагональна
+kretschmann = sum(R_low[i][j][k][l]**2 * g_inv[i, i] * g_inv[j, j] * g_inv[k, k] * g_inv[l, l]
+                  for i, j, k, l in itertools.product(range(4), repeat=4))
+print("R_ijkl R^ijkl =", sp.simplify(kretschmann))
+```
+
+Инвариант $12r_s^2/r^6$ конечен на сфере $r = r_s$: там особенность координат,
+а не геометрии, и падающий наблюдатель горизонта не замечает. При $r \to 0$
+инвариант бесконечен — это настоящая сингулярность. Кривизна
+спадает как $1/r^3$ (корень из инварианта), как приливное ускорение
+ньютоновой гравитации $2kM\,\delta r/r^3$: компоненты тензора Римана и есть
+приливные силы.
+
+## Итоги
+
+- Тензор кривизны $R(X, Y) = [\nabla_X, \nabla_Y] - \nabla_{[X, Y]}$, компоненты
+  $R^i{}_{jkl} = \partial_k\Gamma^i_{lj} - \partial_l\Gamma^i_{kj} + \Gamma^i_{km}\Gamma^m_{lj} - \Gamma^i_{lm}\Gamma^m_{kj}$; $[\nabla_k, \nabla_l]V^i = R^i{}_{jkl}V^j$.
+- $R = 0$ — признак плоскости, не зависящий от координат: полярные
+  координаты плоские, сфера — нет.
+- Обход малой петли поворачивает вектор: $\delta V^i = -R^i{}_{jkl}V^j\varepsilon\eta$.
+- Симметрии $R_{ijkl} = -R_{jikl} = -R_{ijlk} = R_{klij}$ и тождество Бианки оставляют
+  $n^2(n^2 - 1)/12$ компонент: 1, 6, 20 при $n = 2, 3, 4$.
+- В 2D всё определяет гауссова кривизна $K = R_{1212}/\det g$; она внутренняя (Theorema
+  egregium), $\int K\,\dd A = 2\pi\chi$.
+- Тензор Риччи $R_{jl} = R^i{}_{jil}$, скалярная кривизна $R$; у сферы $R = n(n - 1)/a^2$.
+- Метрика Шварцшильда: $R_{\mu\nu} = 0$, но $R_{ijkl}R^{ijkl} = 12r_s^2/r^6$ — кривизна без материи.
+
+## Упражнения
+
+1. Найдите гауссову и скалярную кривизну плоскости Лобачевского
+   $(\dd x^2 + \dd y^2)/y^2$. Согласуется ли знак с направлением поворота вектора в статье
+   о [связности Леви-Чивиты](/math/riemann/levi-civita.qmd)?
+2. Метрика вращения $\dd r^2 + f(r)^2\dd\varphi^2$. Покажите, что $K = -f''/f$. Чему равна $K$ для
+   $f = \sin r$, $f = r\sin\alpha$ (конус), $f = \operatorname{sh} r$?
+3. Сколько независимых компонент в 4D у тензора Римана, тензора Риччи и
+   тензора Вейля?
+4. Найдите тензор Риччи и скалярную кривизну трёхмерной сферы радиуса $a$:
+   $a^2\left(\dd\chi^2 + \sin^2\chi\,(\dd\theta^2 + \sin^2\theta\,\dd\varphi^2)\right)$.
+5. Конформно плоская метрика $e^{2\sigma(x, y)}(\dd x^2 + \dd y^2)$. Покажите, что
+   $K = -e^{-2\sigma}\nabla^2\sigma$, где $\nabla^2 = \partial_x^2 + \partial_y^2$. Проверьте на плоскости Лобачевского.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $K = -1$, $R = -2$. Отрицательная кривизна: при обходе против часовой
+   стрелки вектор поворачивается по часовой, $\delta\alpha = \int K\,\dd A < 0$, как и
+   получилось там.
+2. Единственная компонента $R_{r\varphi r\varphi} = -ff''$, $\det g = f^2$, поэтому $K = -f''/f$.
+   Для $f = \sin r$ (сфера) $K = 1$; для конуса $K = 0$ (вне вершины конус плоский — его
+   можно развернуть); для $f = \operatorname{sh} r$ $K = -1$ (плоскость Лобачевского в полярных
+   координатах).
+3. $20$ у тензора Римана, $10$ у Риччи (симметричная матрица $4\times4$), $20 - 10 = 10$ у
+   тензора Вейля.
+4. $R_{jl} = \frac{2}{a^2}\,g_{jl}$, $R = \frac{6}{a^2}$ — частный случай $R_{jl} = \frac{n - 1}{a^2}g_{jl}$, $R = \frac{n(n - 1)}{a^2}$ при $n = 3$.
+5. Прямой счёт символов Кристоффеля ($\Gamma^x_{xx} = \sigma_x$, $\Gamma^x_{yy} = -\sigma_x$, $\Gamma^y_{xy} = \sigma_x$ и
+   аналогично) даёт $R_{xyxy} = -e^{2\sigma}\nabla^2\sigma$, $\det g = e^{4\sigma}$. Для Лобачевского $\sigma = -\ln y$,
+   $\nabla^2\sigma = 1/y^2$, $K = -y^2\cdot y^{-2} = -1$.
+:::

@@ -49,3 +49,38 @@ def test_latitude_holonomy():
     V = solve_ivp(rhs, (0, 2 * np.pi), [1.0, 0.0], rtol=1e-11, atol=1e-12).y[:, -1]
     z = V[0] + 1j * np.sin(th0) * V[1]                  # компоненты в ортах e_θ, e_φ
     assert abs(z - np.exp(-2j * np.pi * np.cos(th0))) < 1e-8   # поворот на −2π cos θ₀
+
+
+def test_sphere_curvature():
+    from gmph.riemann import christoffel, ricci, riemann, scalar_curvature
+
+    a = sp.Symbol("a", positive=True)
+    g = sp.diag(a**2, a**2 * sp.sin(theta)**2)
+    R = riemann(christoffel(g, (theta, phi)), (theta, phi))
+    assert sp.simplify(R[0][1][0][1] - sp.sin(theta)**2) == 0          # R^θ_{φθφ}
+    Ric = ricci(R)
+    assert sp.simplify(Ric - g / a**2) == sp.zeros(2, 2)
+    assert sp.simplify(scalar_curvature(Ric, g) - 2 / a**2) == 0
+
+
+def test_flat_curvature_vanishes():
+    from gmph.riemann import riemann
+
+    R = riemann(flat_connection(POLAR, (r, phi)), (r, phi))
+    assert all(c == 0 for a in R for b in a for e in b for c in e)
+
+
+def test_commutator_of_covariant_derivatives():
+    from gmph.riemann import christoffel, riemann
+
+    g = sp.diag(1, sp.sin(theta)**2)
+    q = (theta, phi)
+    G = christoffel(g, q)
+    R = riemann(G, q)
+    V = [sp.Function("V0")(*q), sp.Function("V1")(*q)]
+    DDV = covariant_derivative(covariant_derivative(V, "u", G, q), "du", G, q)   # [k, l, i] = ∇_k∇_l V^i
+    for k in range(2):
+        for l in range(2):
+            for i in range(2):
+                rhs = sum(R[i][j][k][l] * V[j] for j in range(2))
+                assert sp.simplify(DDV[k, l, i] - DDV[l, k, i] - rhs) == 0
