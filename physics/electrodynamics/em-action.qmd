@@ -1,0 +1,279 @@
+---
+title: "Действие для поля и заряда"
+topic: em-action
+order: 5
+description: "Полное действие электродинамики S = −mc∫ds − (e/c)∫A − (1/16πc)∫F_μνF^μν d⁴x (как у Ландау–Лифшица); лагранжиан поля (E² − B²)/8π = −F∧⋆F/8π; вариация по траектории — релятивистская сила Лоренца в 3-мерной и ковариантной форме mc du_μ/ds = (e/c)F_μν u^ν; вариация по полю — неоднородные уравнения Максвелла ∂_νF^μν = −(4π/c)j^μ (проверка gmph.fields); калибровочная инвариантность взаимодействия требует сохранения заряда; гамильтониан заряда c√(m²c² + (P − eA/c)²) + eφ; член F∧F = d(A∧F) не влияет на уравнения; дрейф в скрещенных полях cE×B/B² и максимальное отклонение 2mc²E/e(B² − E²) (рисунок)"
+---
+
+Электродинамика — это три слагаемых в одном действии: свободные
+частицы, свободное поле и их взаимодействие. Варьируя действие по
+траекториям частиц, получаем силу Лоренца, по полю — уравнения
+Максвелла. Ни то ни другое не нужно постулировать отдельно: всё
+определяется требованиями лоренц-инвариантности, калибровочной
+инвариантности и простоты. А требование калибровочной инвариантности
+заодно объясняет, почему заряд сохраняется.
+
+Нужны: действие [релятивистской частицы](/physics/relativity/relativistic-particle.qmd),
+[калибровочная инвариантность](/physics/electrodynamics/gauge-invariance-em.qmd) и
+[лагранжев формализм для полей](/physics/fields/field-lagrangian.qmd). Знаки и
+единицы (гауссовы) — по [конвенциям](/conventions.qmd): $A_\mu = (\varphi, -\mathbf A)$,
+$F_{\mu\nu} = \partial_\mu A_\nu - \partial_\nu A_\mu$, $S = \frac1c\int\mathcal L\,\dd^4x$.
+
+## Полное действие
+
+::: {#def-em-action}
+Действие системы зарядов и электромагнитного поля:
+$$
+S = -\sum mc\int\dd s \;-\; \sum\frac ec\int A_\mu\,\dd x^\mu \;-\; \frac{1}{16\pi c}\int F_{\mu\nu}F^{\mu\nu}\,\dd^4x .
+$$
+Первый член — действие свободных частиц (собственное время), второй —
+взаимодействие (интеграл 1-формы $A = A_\mu\dd x^\mu$ вдоль мировой линии), третий —
+действие свободного поля.
+:::
+
+Почему именно так? Член взаимодействия — простейший лоренц-инвариантный
+функционал мировой линии, линейный по полю; при калибровочном
+преобразовании $A\to A - \dd f$ он меняется на граничный член
+$\frac ec\int\dd f = \frac ec(f_2 - f_1)$. Член поля должен быть скаляром, квадратичным по
+$F = \dd A$ (тогда уравнения линейны, что требует принцип суперпозиции).
+Таких скаляров два: $F_{\mu\nu}F^{\mu\nu} = 2(\mathbf B^2 - \mathbf E^2)$ и $F_{\mu\nu}\tilde F^{\mu\nu} \propto \mathbf E\cdot\mathbf B$. Второй — полная
+производная (упражнение 2) и уравнений не меняет. На языке форм
+$F\wedge\hodge F = (\mathbf B^2 - \mathbf E^2)\,\mathrm{vol}$ ([конвенции](/conventions.qmd)), и
+$$
+S_\text{поле} = -\frac{1}{8\pi c}\int F\wedge\hodge F = \int\frac{\mathbf E^2 - \mathbf B^2}{8\pi}\,\dd V\,\dd t ,
+$$
+то есть плотность лагранжиана поля $\mathcal L = (\mathbf E^2 - \mathbf B^2)/8\pi$ — «кинетическая»
+энергия минус «потенциальная». Знак выбран так, чтобы энергия поля
+оказалась положительной (тема «Энергия и импульс электромагнитного
+поля»). Коэффициент $1/16\pi$ задаёт гауссову систему единиц.
+
+```{python}
+import numpy as np
+import sympy as sp
+from scipy.integrate import solve_ivp
+from gmph.fields import euler_lagrange as field_equations
+from gmph.mechanics import euler_lagrange
+
+X = sp.symbols("x0:4", real=True)
+eta = sp.diag(1, -1, -1, -1)
+c = sp.Symbol("c", positive=True)
+A_low = [sp.Function(f"A{m}")(*X) for m in range(4)]                    # A_μ
+F_low = sp.Matrix(4, 4, lambda m, n: sp.diff(A_low[n], X[m]) - sp.diff(A_low[m], X[n]))
+F_up = eta * F_low * eta
+FF = sum(F_low[m, n] * F_up[m, n] for m in range(4) for n in range(4))
+
+# поля через потенциалы: φ = A_0, A = −A_i, ∂_t = c∂_0
+phi, A_vec = A_low[0], [-A_low[i] for i in (1, 2, 3)]
+E = [-sp.diff(phi, X[i + 1]) - sp.diff(A_vec[i], X[0]) for i in range(3)]
+B = [sp.diff(A_vec[2], X[2]) - sp.diff(A_vec[1], X[3]),
+     sp.diff(A_vec[0], X[3]) - sp.diff(A_vec[2], X[1]),
+     sp.diff(A_vec[1], X[1]) - sp.diff(A_vec[0], X[2])]
+print("F_μν F^μν = 2(B² − E²):", sp.simplify(FF - 2 * sum(b**2 - e_**2 for b, e_ in zip(B, E))) == 0)
+```
+
+## Вариация по траектории: сила Лоренца
+
+Запишем первые два члена для одной частицы через время $t$:
+$\dd s = c\sqrt{1 - v^2/c^2}\,\dd t$, $A_\mu\dd x^\mu = (c\varphi - \mathbf A\cdot\mathbf v)\,\dd t$. Получаем лагранжиан
+$$
+L = -mc^2\sqrt{1 - \frac{v^2}{c^2}} - e\varphi + \frac ec\,\mathbf A\cdot\mathbf v .
+$$
+Уравнения Лагранжа с **произвольными** полями $\varphi(t, \mathbf r)$, $\mathbf A(t, \mathbf r)$ должны
+дать $\frac{\dd\mathbf p}{\dd t} = e\mathbf E + \frac ec\,\mathbf v\times\mathbf B$ с релятивистским импульсом $\mathbf p = m\mathbf v/\sqrt{1 - v^2/c^2}$:
+
+```{python}
+t = sp.Symbol("t", real=True)
+m = sp.Symbol("m", positive=True)
+e = sp.Symbol("e", real=True)
+traj = [sp.Function(n)(t) for n in "xyz"]
+on_path = {X[0]: c * t, X[1]: traj[0], X[2]: traj[1], X[3]: traj[2]}
+v = [q.diff(t) for q in traj]
+v2 = sum(vi**2 for vi in v)
+L = -m * c**2 * sp.sqrt(1 - v2 / c**2) - e * phi.subs(on_path) + e / c * sum(a.subs(on_path) * vi for a, vi in zip(A_vec, v))
+
+p = [m * vi / sp.sqrt(1 - v2 / c**2) for vi in v]
+v_cross_B = [v[1] * B[2] - v[2] * B[1], v[2] * B[0] - v[0] * B[2], v[0] * B[1] - v[1] * B[0]]
+lagrange = euler_lagrange(L, traj, t)
+print("уравнения Лагранжа = dp/dt − eE − (e/c) v×B:",
+      all(sp.simplify((lagrange[i] - (p[i].diff(t) - e * E[i].subs(on_path) - e / c * v_cross_B[i].subs(on_path))).doit()) == 0
+          for i in range(3)))
+```
+
+**Ковариантная форма.** Параметризуем мировую линию произвольным
+параметром $\lambda$: $L = -mc\sqrt{\eta_{\mu\nu}\dot x^\mu\dot x^\nu} - \frac ec A_\mu\dot x^\mu$. Действие не зависит от
+параметризации, а уравнения Эйлера–Лагранжа после выбора $\lambda = s$
+(тогда $\dot x^\mu = u^\mu$, $u_\mu u^\mu = 1$) принимают вид
+$$
+mc\,\frac{\dd u_\mu}{\dd s} = \frac ec\,F_{\mu\nu}\,u^\nu .
+$$
+Свёртка с $u^\mu$ даёт нуль ($F$ антисимметричен), как и должно быть при
+$u_\mu u^\mu = 1$: поле поворачивает 4-скорость, не меняя её длины. Проверим:
+
+```{python}
+lam = sp.Symbol("lambda", real=True)
+world = [sp.Function(f"X{m}")(lam) for m in range(4)]
+on_world = dict(zip(X, world))
+xdot = [w.diff(lam) for w in world]
+norm = sp.sqrt(sum(eta[m, m] * xdot[m]**2 for m in range(4)))
+L_cov = -m * c * norm - e / c * sum(A_low[m].subs(on_world) * xdot[m] for m in range(4))
+cov = euler_lagrange(L_cov, world, lam)
+u_low = [eta[m, m] * xdot[m] / norm for m in range(4)]                     # u_μ при произвольном λ
+target = [m * c * u_low[mu].diff(lam) - e / c * sum(F_low[mu, nu].subs(on_world) * xdot[nu] for nu in range(4))
+          for mu in range(4)]
+print("ЭЛ = −(mc du_μ/dλ − (e/c) F_μν dx^ν/dλ):",
+      all(sp.simplify((cov[mu] + target[mu]).doit()) == 0 for mu in range(4)))
+```
+
+## Вариация по полю: уравнения Максвелла
+
+Чтобы варьировать по полю, член взаимодействия переписывают через
+4-ток. Для точечного заряда $\rho = e\,\delta(\mathbf r - \mathbf r(t))$, $\mathbf j = \rho\mathbf v$, $j^\mu = (c\rho, \mathbf j)$, и
+$$
+-\frac ec\int A_\mu\,\dd x^\mu = -\frac ec\int A_\mu\frac{\dd x^\mu}{\dd t}\,\dd t = -\frac{1}{c^2}\int A_\mu j^\mu\,\dd^4x .
+$$
+Значит, плотность лагранжиана поля с заданными токами
+$$
+\mathcal L = -\frac{1}{16\pi}F_{\mu\nu}F^{\mu\nu} - \frac1c\,j^\mu A_\mu .
+$$
+Уравнения Эйлера–Лагранжа для четырёх полей $A_\mu$ (функция
+`euler_lagrange` из `gmph.fields`):
+
+```{python}
+j_up = [sp.Function(f"j{m}")(*X) for m in range(4)]
+L_field = -FF / (16 * sp.pi) - sum(j_up[m] * A_low[m] for m in range(4)) / c
+eqs = field_equations(L_field, A_low, X)
+maxwell = [sum(sp.diff(F_up[mu, nu], X[nu]) for nu in range(4)) + 4 * sp.pi / c * j_up[mu] for mu in range(4)]
+print("ЭЛ по A_μ = (1/4π)(∂_ν F^μν + (4π/c) j^μ):",
+      all(sp.simplify(eqs[mu] - maxwell[mu] / (4 * sp.pi)) == 0 for mu in range(4)))
+```
+
+Получилось $\partial_\nu F^{\mu\nu} = -\frac{4\pi}{c}j^\mu$ — неоднородная пара уравнений Максвелла в точности
+со знаком из [конвенций](/conventions.qmd). Однородная пара $\dd F = 0$ из
+действия не следует: она выполнена тождественно, потому что $F = \dd A$, а
+варьируется именно потенциал.
+
+**Сохранение заряда.** При калибровочном преобразовании $A_\mu\to A_\mu - \partial_\mu f$
+член взаимодействия меняется на $\frac{1}{c^2}\int j^\mu\partial_\mu f\,\dd^4x = -\frac{1}{c^2}\int f\,\partial_\mu j^\mu\,\dd^4x$ (плюс
+граничный член). Действие калибровочно инвариантно при любой $f$
+только если $\partial_\mu j^\mu = 0$. Сохранение заряда — не дополнительный закон, а
+условие совместности: левая часть уравнений Максвелла
+бездивергентна тождественно ($\partial_\mu\partial_\nu F^{\mu\nu} = 0$), значит, такой должна быть и
+правая.
+
+```{python}
+print("∂_μ∂_ν F^μν тождественно равно 0:",
+      sp.simplify(sum(sp.diff(F_up[mu, nu], X[mu], X[nu]) for mu in range(4) for nu in range(4))) == 0)
+```
+
+## Гамильтониан заряда
+
+Обобщённый импульс $\mathbf P = \partial L/\partial\mathbf v = \mathbf p + \frac ec\mathbf A$ отличается от кинетического
+$\mathbf p$. Преобразование Лежандра даёт
+$$
+H = \mathbf P\cdot\mathbf v - L = \sqrt{m^2c^4 + c^2\left(\mathbf P - \tfrac ec\mathbf A\right)^2} + e\varphi .
+$$
+Рецепт **минимальной связи**: гамильтониан свободной частицы, в котором
+$\mathbf P\to\mathbf P - \frac ec\mathbf A$ и $H\to H - e\varphi$, то есть $p_\mu\to p_\mu - \frac ecA_\mu$ — та самая
+комбинация, что в ковариантной производной $D_\mu$ квантовой механики
+([конвенции](/conventions.qmd)). Проверим в одном измерении:
+
+```{python}
+v1, P, A1, phi1 = sp.symbols("v P A phi", real=True)
+L1 = -m * c**2 * sp.sqrt(1 - v1**2 / c**2) - e * phi1 + e / c * A1 * v1
+kin = P - e * A1 / c                                                  # кинетический импульс
+v_of_P = c * kin / sp.sqrt(m**2 * c**2 + kin**2)
+print("P = ∂L/∂v при v(P):", sp.simplify(sp.diff(L1, v1).subs(v1, v_of_P) - P) == 0)
+H1 = (P * v1 - L1).subs(v1, v_of_P)
+print("H − (√(m²c⁴ + c²(P − eA/c)²) + eφ) =", sp.simplify(H1 - sp.sqrt(m**2 * c**4 + c**2 * kin**2) - e * phi1))
+```
+
+## Физика: дрейф в скрещенных полях
+
+Однородные поля $\mathbf E = E\mathbf e_y$ и $\mathbf B = B\mathbf e_z$, $E < B$. Нерелятивистская теория
+говорит, что заряд в среднем движется поперёк обоих полей со
+скоростью **дрейфа** $\mathbf v_d = c\,\mathbf E\times\mathbf B/B^2$, $|\mathbf v_d| = cE/B$. Релятивистская формулировка
+объясняет, почему это верно и при скоростях, близких к $c$: инварианты
+$\mathbf B^2 - \mathbf E^2 > 0$ и $\mathbf E\cdot\mathbf B = 0$ позволяют перейти в систему, движущуюся со скоростью
+$\mathbf v_d$, где электрического поля нет, а магнитное равно $\sqrt{B^2 - E^2}$. Там
+заряд просто вращается, а в лабораторной системе его средняя скорость —
+$\mathbf v_d$. Интегрируем уравнение Лоренца численно (единицы $m = e = c = B = 1$, старт
+из покоя):
+
+```{python}
+def lorentz_rhs(t, state, E_field):
+    r, p = state[:3], state[3:]
+    vel = p / np.sqrt(1 + p @ p)                                   # v = p/(mγ), γ = √(1 + p²)
+    return np.r_[vel, np.array([0, E_field, 0]) + np.cross(vel, [0, 0, 1.0])]
+
+T_end = 400.0
+drift_runs = {}
+for E_field in (0.3, 0.6, 0.9):
+    sol = solve_ivp(lorentz_rhs, (0, T_end), np.zeros(6), args=(E_field,), rtol=1e-10, atol=1e-12, dense_output=True)
+    drift_runs[E_field] = sol
+    y_max = sol.y[1].max()
+    print(f"E/B = {E_field}: средняя скорость x(T)/T = {sol.y[0, -1] / T_end:.3f} (cE/B = {E_field}), "
+          f"max y = {y_max:.4f}, 2E/(B² − E²) = {2 * E_field / (1 - E_field**2):.4f}")
+```
+
+Средняя скорость близка к $cE/B$ (расхождение — от неполного последнего
+периода), а наибольшее отклонение вдоль $\mathbf E$ совпадает (с точностью до шага
+вывода решения по времени) с $y_\text{max} = \frac{2mc^2E}{e(B^2 - E^2)}$. Это следует из двух интегралов движения: энергии
+$\gamma mc^2 - eEy$ и обобщённого импульса $P_x$ в калибровке $\mathbf A = (-By, 0, 0)$ (упражнение 4).
+При $E \to B$ отклонение и период растут неограниченно, а при $E > B$ системы
+без электрического поля нет — частица ускоряется без предела.
+
+```{python}
+#| label: fig-crossed-fields
+#| fig-cap: 'Траектории заряда, стартующего из покоя в скрещенных полях E = E e_y, B = e_z (единицы m = e = c = B = 1). При E/B = 0,3 — почти нерелятивистская циклоида; при 0,6 и 0,9 арки (между точками остановки на оси x) удлиняются вдоль дрейфа и растут в высоту: максимальное отклонение 2E/(B² − E²) показано пунктиром.'
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots(figsize=(7.5, 3.6))
+for (E_field, sol), col in zip(drift_runs.items(), ("tab:blue", "tab:orange", "tab:green")):
+    ts = np.linspace(0, T_end, 40000)
+    xs, ys = sol.sol(ts)[:2]
+    keep = xs <= 80
+    ax.plot(xs[keep], ys[keep], color=col, lw=1.5, label=f"E/B = {E_field}")
+    ax.axhline(2 * E_field / (1 - E_field**2), color=col, ls="--", lw=0.8)
+ax.set(xlabel="x (вдоль E×B)", ylabel="y (вдоль E)", xlim=(0, 80), ylim=(-0.3, 10.5))
+ax.legend(loc="upper left", fontsize=9)
+plt.tight_layout()
+plt.show()
+```
+
+## Итоги
+
+- $S = -\sum mc\int\dd s - \sum\frac ec\int A - \frac{1}{16\pi c}\int F_{\mu\nu}F^{\mu\nu}\dd^4x$; плотность лагранжиана поля $\mathcal L = (\mathbf E^2 - \mathbf B^2)/8\pi$, $\mathcal L\,\mathrm{vol} = -F\wedge\hodge F/8\pi$.
+- Вариация по траектории — сила Лоренца $\dot{\mathbf p} = e\mathbf E + \frac ec\mathbf v\times\mathbf B$, ковариантно $mc\,\dot u_\mu = \frac ecF_{\mu\nu}u^\nu$.
+- Вариация по $A_\mu$ с $\mathcal L = -\frac{1}{16\pi}F^2 - \frac1cj^\mu A_\mu$ — уравнения $\partial_\nu F^{\mu\nu} = -\frac{4\pi}{c}j^\mu$; $\dd F = 0$ — тождество.
+- Калибровочная инвариантность взаимодействия равносильна сохранению заряда $\partial_\mu j^\mu = 0$.
+- Гамильтониан $H = \sqrt{m^2c^4 + c^2(\mathbf P - \frac ec\mathbf A)^2} + e\varphi$ — минимальная связь $p_\mu\to p_\mu - \frac ecA_\mu$.
+- В скрещенных полях при $E < B$ — дрейф $c\,\mathbf E\times\mathbf B/B^2$ при любых энергиях.
+
+## Упражнения
+
+1. Найдите лагранжиан поля в терминах $\mathbf E$ и $\mathbf B$ и покажите, что для плоской волны
+   он равен нулю.
+2. Покажите, что $F\wedge F = \dd(A\wedge F)$, поэтому добавка $\theta\,F\wedge F$ к лагранжиану не меняет
+   уравнений.
+3. Получите нерелятивистский предел гамильтониана $H$ до членов порядка $1/c^0$.
+4. Выведите $y_\text{max} = \frac{2mc^2E}{e(B^2 - E^2)}$ для заряда, стартующего из покоя в скрещенных полях.
+5. Найдите частоту обращения заряда с энергией $\mathcal E = \gamma mc^2$ в однородном магнитном
+   поле. Почему классический циклотрон не разгоняет протоны выше
+   нескольких десятков МэВ?
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $\mathcal L = (\mathbf E^2 - \mathbf B^2)/8\pi$; в плоской волне $|\mathbf E| = |\mathbf B|$, поэтому $\mathcal L = 0$ (оба инварианта
+   поля волны равны нулю).
+2. $\dd(A\wedge F) = \dd A\wedge F - A\wedge\dd F = F\wedge F$, так как $\dd F = 0$. Добавка — полный дифференциал
+   3-формы, её интеграл сводится к границе.
+3. $H \approx mc^2 + \frac{1}{2m}\left(\mathbf P - \frac ec\mathbf A\right)^2 + e\varphi$ — нерелятивистский гамильтониан плюс энергия
+   покоя.
+4. Сохраняются $\gamma mc^2 - eEy = mc^2$ и $P_x = p_x - \frac ecBy = 0$ (калибровка $A_x = -By$). В точке
+   поворота $p_y = 0$: $\gamma^2m^2c^2 = m^2c^2 + p_x^2$, то есть $(1 + u E)^2 = 1 + u^2B^2$, $u = \frac{ey}{mc^2}$,
+   откуда $u = \frac{2E}{B^2 - E^2}$.
+5. $\omega = \frac{eBc}{\mathcal E} = \frac{eB}{\gamma mc}$: частота падает с ростом энергии, и частица выходит из
+   резонанса с постоянной частотой ускоряющего поля. Для протона $\gamma - 1$ ~ несколько
+   процентов уже при 20–40 МэВ ($mc^2 \approx 938$ МэВ) — дальше нужны синхроциклотрон
+   (меняющаяся частота) или синхротрон (меняющееся поле).
+:::
