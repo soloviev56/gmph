@@ -1,0 +1,303 @@
+---
+title: "Электромагнитное поле в среде"
+topic: em-media
+order: 8
+description: "Уравнения dF = 0, dG = 4π𝔍 не содержат метрики — вся информация о среде и геометрии в материальном уравнении G = κ(F); в пустоте κ = −⋆; изотропная среда — оператор Ходжа метрики diag(1, −εμ, −εμ, −εμ) с множителем √(ε/μ), конформная инвариантность; анизотропные кристаллы: уравнение Френеля, обыкновенная и необыкновенная волны, лучевая поверхность кальцита и снос луча на 6,2° (рисунок); граничные условия как непрерывность ограничений форм ℰ, ℋ, 𝒟, ℬ на поверхность раздела; формулы Френеля, угол Брюстера и баланс энергии (рисунок); причинность: полюсы ε(ω) модели Лоренца в нижней полуплоскости"
+---
+
+В пустоте уравнения Максвелла связывают два поля, $\mathbf E$ и $\mathbf B$. В среде их
+четыре: $\mathbf E$, $\mathbf D$, $\mathbf B$, $\mathbf H$. Язык форм объясняет, почему это естественно.
+Пары уравнений $\dd F = 0$ и $\dd G = 4\pi\mathfrak J$ ([уравнения Максвелла в
+формах](/physics/electrodynamics/maxwell-forms.qmd)) не содержат ни метрики, ни
+свойств вещества: это законы сохранения потока и заряда, которые
+одинаковы всегда. А всё, что зависит от среды и от геометрии
+пространства, сосредоточено в одном **материальном уравнении**,
+связывающем $F$ (поля $\mathbf E$, $\mathbf B$) с $G$ (поля $\mathbf D$, $\mathbf H$). В пустоте это оператор
+Ходжа; в среде — «оператор Ходжа среды». Из этой точки зрения сразу
+видно, почему свет в стекле ведёт себя как в искривлённом
+пространстве, откуда берётся двойное лучепреломление и откуда —
+граничные условия на поверхности раздела.
+
+Нужны [уравнения Максвелла в формах](/physics/electrodynamics/maxwell-forms.qmd).
+Обозначения — по [конвенциям](/conventions.qmd): $F = \dd x^0\wedge\mathcal E - \mathcal B$, $G = \mathcal D + \dd x^0\wedge\mathcal H$,
+в пустоте $G = -\hodge F$.
+
+## Материальное уравнение как оператор Ходжа
+
+В линейной среде, покоящейся и без пространственной дисперсии,
+$\mathbf D = \hat\varepsilon\,\mathbf E$ и $\mathbf B = \hat\mu\,\mathbf H$, где $\hat\varepsilon$, $\hat\mu$ — симметричные тензоры. Это линейное
+отображение 2-форм $\kappa: F\mapsto G$ в каждой точке. В пустоте $\kappa = -\hodge$, а оператор
+Ходжа на 2-формах в четырёх измерениях **конформно инвариантен**: он не
+меняется при умножении метрики на функцию. Поэтому важна только
+«форма светового конуса», а не масштаб.
+
+Оказывается, изотропная среда с $\varepsilon$, $\mu$ — это просто оператор Ходжа
+другой метрики. Проверим для метрики $g = \operatorname{diag}(a, -b, -b, -b)$ (функция `hodge` из
+`gmph.exterior`):
+
+```{python}
+import numpy as np
+import sympy as sp
+from gmph.exterior import add, hodge, scale, wedge
+
+a, b = sp.symbols("a b", positive=True)
+E = sp.symbols("E_x E_y E_z", real=True)
+B = sp.symbols("B_x B_y B_z", real=True)
+one = lambda v: {(2,): v[0], (3,): v[1], (4,): v[2]}                 # v·dr, индексы 1…4 ↔ x⁰…x³
+two = lambda v: {(3, 4): v[0], (2, 4): -v[1], (2, 3): v[2]}          # v·dS
+dx0 = {(1,): 1}
+F = add(wedge(dx0, one(E)), scale(-1, two(B)))
+G = scale(-1, hodge(F, sp.diag(a, -b, -b, -b)))
+D_coef = sp.simplify(G[(3, 4)] / E[0])
+H_coef = sp.simplify(G[(1, 2)] / B[0])
+print("−⋆F = D·dS + dx⁰∧H·dr с D =", D_coef, "· E,  H =", H_coef, "· B")
+```
+
+Получилось $\mathbf D = \sqrt{b/a}\,\mathbf E$, $\mathbf H = \sqrt{a/b}\,\mathbf B$, то есть $\varepsilon = \mu = \sqrt{b/a}$. Значит, среда с
+$\varepsilon = \mu = n$ **неотличима** от пустоты с метрикой
+$$
+\dd s^2 = c^2\dd t^2 - n^2\,\dd\mathbf r^2 ,
+$$
+в которой свет идёт со скоростью $c/n$. Если $\varepsilon \ne \mu$, то
+$G = -\sqrt{\varepsilon/\mu}\;\hodge_gF$ с $g = \operatorname{diag}(1, -\varepsilon\mu, -\varepsilon\mu, -\varepsilon\mu)$: метрика определяет показатель
+преломления $n = \sqrt{\varepsilon\mu}$, а множитель — волновое сопротивление $\sqrt{\mu/\varepsilon}$, которое
+отвечает за отражение. При $n = n(\mathbf r)$ получается оптическая метрика из
+статьи о [связности Леви-Чивиты](/math/riemann/levi-civita.qmd): лучи —
+геодезические. Обратно, гравитационное поле действует на свет как
+среда с $\varepsilon = \mu = n(\mathbf r)$ (так рассчитывают отклонение света Солнцем), а на этой же
+идее построены «плащи-невидимки» трансформационной оптики.
+
+## Анизотропные кристаллы
+
+В кристалле $\hat\varepsilon$ — симметричный тензор; в главных осях $\hat\varepsilon = \operatorname{diag}(\varepsilon_1, \varepsilon_2, \varepsilon_3)$, $\mu = 1$.
+Плоская волна $e^{i(\mathbf k\cdot\mathbf r - \omega t)}$ с $\mathbf k = \frac\omega c\,n\,\mathbf s$ ($|\mathbf s| = 1$) подчиняется
+$\mathbf k\times(\mathbf k\times\mathbf E) + \frac{\omega^2}{c^2}\hat\varepsilon\mathbf E = 0$, и для каждого направления $\mathbf s$ есть два значения
+показателя $n$ — корни **уравнения Френеля** $\det\left(n^2(\mathbf s\mathbf s^{\mathsf T} - 1) + \hat\varepsilon\right) = 0$. Для
+**одноосного** кристалла $\hat\varepsilon = \operatorname{diag}(n_o^2, n_o^2, n_e^2)$ ($z$ — оптическая ось, $\theta$ — угол $\mathbf s$ с ней):
+
+```{python}
+n, n_o, n_e, theta = sp.symbols("n n_o n_e theta", positive=True)
+eps_tensor = sp.diag(n_o**2, n_o**2, n_e**2)
+s = sp.Matrix([sp.sin(theta), 0, sp.cos(theta)])
+fresnel = sp.factor(sp.trigsimp((n**2 * (s * s.T - sp.eye(3)) + eps_tensor).det()))     # trigsimp: sin² + cos² = 1
+print("det =", fresnel)
+roots = {sp.simplify(r**2) for r in sp.solve(fresnel, n)}
+print("n² ∈", roots)
+extraordinary = 1 / (sp.cos(theta)**2 / n_o**2 + sp.sin(theta)**2 / n_e**2)
+print("1/n² = cos²θ/n_o² + sin²θ/n_e²:", any(sp.simplify(r - extraordinary) == 0 for r in roots))
+```
+
+**Обыкновенная** волна ($\mathbf E\perp$ оси и $\mathbf k$) имеет $n = n_o$ при любом направлении,
+**необыкновенная** — $n(\theta)$, от $n_o$ вдоль оси до $n_e$ поперёк. Неполяризованный
+луч расщепляется на два — **двойное лучепреломление**. У необыкновенной
+волны вектор $\mathbf D$ перпендикулярен $\mathbf k$, а $\mathbf E$ — нет, поэтому поток энергии
+$\mathbf S\propto\mathbf E\times\mathbf H$ идёт не вдоль $\mathbf k$: луч **сносится**. Для исландского шпата (кальцита)
+$n_o = 1{,}658$, $n_e = 1{,}486$ (жёлтый свет) найдём снос при $\theta = 45°$:
+
+```{python}
+n_o_cal, n_e_cal = 1.658, 1.486
+eps_cal = np.diag([n_o_cal**2, n_o_cal**2, n_e_cal**2])
+
+def extraordinary_wave(th):
+    """Показатель, вектор k (в единицах ω/c) и направление луча S необыкновенной волны."""
+    n_th = 1 / np.sqrt(np.cos(th)**2 / n_o_cal**2 + np.sin(th)**2 / n_e_cal**2)
+    k_vec = n_th * np.array([np.sin(th), 0, np.cos(th)])
+    M = np.outer(k_vec, k_vec) - (k_vec @ k_vec) * np.eye(3) + eps_cal
+    vals, vecs = np.linalg.eigh(M)
+    E_vec = vecs[:, np.argmin(np.abs(vals))]                       # ядро M
+    H_vec = np.cross(k_vec, E_vec)                                   # B = H = (c/ω) k×E при μ = 1
+    return n_th, k_vec, np.cross(E_vec, H_vec)
+
+n45, k45, S45 = extraordinary_wave(np.pi / 4)
+walk_off = np.degrees(np.arctan2(S45[0], S45[2])) - 45
+print(f"θ = 45°: n_e(θ) = {n45:.4f}; луч S отклонён от k на {walk_off:.2f}° (от оптической оси)")
+```
+
+Это и есть знаменитое «двоение» изображения сквозь кристалл кальцита:
+два луча идут под разными углами даже при нормальном падении.
+
+```{python}
+#| label: fig-calcite
+#| fig-cap: 'Кальцит: показатель преломления как функция направления волнового вектора в плоскости (x, z), z — оптическая ось (длина радиуса-вектора кривой равна n). Обыкновенная волна — окружность n_o = 1,658, необыкновенная — эллипс с полуосями n_o вдоль оси и n_e = 1,486 поперёк. Стрелки для θ = 45°: волновой вектор k и направление луча S, отклонённое от k на 6,2° в сторону от оптической оси.'
+import matplotlib.pyplot as plt
+
+phis = np.linspace(0, 2 * np.pi, 400)
+n_ext = 1 / np.sqrt(np.cos(phis)**2 / n_o_cal**2 + np.sin(phis)**2 / n_e_cal**2)
+fig, ax = plt.subplots(figsize=(5.2, 5.2))
+ax.plot(n_o_cal * np.sin(phis), n_o_cal * np.cos(phis), color="tab:blue", lw=2, label="обыкновенная, n_o")
+ax.plot(n_ext * np.sin(phis), n_ext * np.cos(phis), color="tab:red", lw=2, label="необыкновенная, n(θ)")
+for vec, col, name in ((k45, "k", "k"), (S45, "tab:green", "S")):
+    d = vec / np.linalg.norm(vec) * 1.25
+    ax.annotate("", xy=(d[0], d[2]), xytext=(0, 0), arrowprops=dict(arrowstyle="->", color=col, lw=1.8))
+    ax.text(d[0] * 1.07, d[2] * 1.07, name, color=col, fontsize=11)
+ax.axvline(0, color="0.7", lw=0.8)
+ax.text(0.04, 1.85, "оптическая ось", fontsize=9, color="0.4")
+ax.set(aspect="equal", xlim=(-2.2, 2.2), ylim=(-2.6, 2.1), xlabel="n sin θ", ylabel="n cos θ")
+ax.legend(loc="lower center", fontsize=9, ncol=2)
+plt.tight_layout()
+plt.show()
+```
+
+## Граничные условия
+
+На границе двух сред материальное уравнение прыгает, но уравнения
+$\dd F = 0$ и $\dd G = 4\pi\mathfrak J$ — нет, они от среды не зависят. Проинтегрируем их по
+плоским тонким «коробочкам» и «рамкам», охватывающим поверхность раздела
+$\Sigma$, и устремим толщину к нулю ([формула Стокса](/math/forms/stokes.qmd)). Получится
+простое правило: **ограничения (обратные образы) форм $\mathcal E$, $\mathcal H$, $\mathcal D$, $\mathcal B$ на $\Sigma$
+непрерывны**, если на границе нет поверхностных зарядов и токов. На
+языке векторов это четыре привычных условия:
+
+| форма | ограничение на $\Sigma$ | условие |
+|---|---|---|
+| $\mathcal E$ (1-форма) | касательная часть $\mathbf E$ | $\mathbf E_\tau$ непрерывна |
+| $\mathcal H$ (1-форма) | касательная часть $\mathbf H$ | $\mathbf H_\tau$ прыгает на $\frac{4\pi}{c}\,\mathbf i\times\mathbf n$ (поверхностный ток $\mathbf i$) |
+| $\mathcal B$ (2-форма) | нормальная часть $\mathbf B$ | $B_n$ непрерывна |
+| $\mathcal D$ (2-форма) | нормальная часть $\mathbf D$ | $D_n$ прыгает на $4\pi\sigma$ |
+
+Ограничение 1-формы на поверхность «видит» только касательные
+векторы, а ограничение 2-формы потока — только нормальную компоненту:
+различие между полями-напряжённостями и полями-потоками
+проявляется именно здесь. Проверим ограничение формы потока на
+плоскость $z = 0$ (функция `pullback`):
+
+```{python}
+from gmph.exterior import pullback
+
+X3 = sp.symbols("x y z", real=True)
+u, v = sp.symbols("u v", real=True)
+D_vec = sp.symbols("D_x D_y D_z", real=True)
+flux_form = {(2, 3): D_vec[0], (1, 3): -D_vec[1], (1, 2): D_vec[2]}           # D·dS в R³
+work_form = {(1,): E[0], (2,): E[1], (3,): E[2]}                                # E·dr
+plane = [u, v, 0]
+print("ограничение D·dS на z = 0:", pullback(flux_form, X3, plane, (u, v)))
+print("ограничение E·dr на z = 0:", pullback(work_form, X3, plane, (u, v)))
+```
+
+**Формулы Френеля.** Плоская волна падает из среды $n_1$ на среду $n_2$ (обе
+немагнитные) под углом $\theta_1$; отражённая и прошедшая волны имеют те же
+частоту и касательную компоненту $\mathbf k$ — отсюда закон Снеллиуса
+$n_1\sin\theta_1 = n_2\sin\theta_2$. Амплитуды найдём, наложив непрерывность $E_x, E_y$ и $H_x, H_y$
+на $z = 0$, — честно решая линейную систему для обеих поляризаций:
+
+```{python}
+n1, n2, th1, th2 = sp.symbols("n_1 n_2 theta_1 theta_2", positive=True)
+r_amp, t_amp = sp.symbols("r t")
+
+def wave(n_med, angle, amplitude, direction, pol):
+    """k (в единицах ω/c) и поля E, H плоской волны; direction = +1 вниз по z, −1 вверх."""
+    k = n_med * sp.Matrix([sp.sin(angle), 0, direction * sp.cos(angle)])
+    if pol == "s":
+        E_w = amplitude * sp.Matrix([0, 1, 0])
+    else:                                                              # p: E в плоскости падения, E ⊥ k
+        E_w = amplitude * sp.Matrix([direction * sp.cos(angle), 0, -sp.sin(angle)])
+    return E_w, k.cross(E_w)                                            # H = (c/ω) k×E при μ = 1
+
+def fresnel_coefficients(pol):
+    E_i, H_i = wave(n1, th1, 1, 1, pol)
+    E_r, H_r = wave(n1, th1, r_amp, -1, pol)
+    E_t, H_t = wave(n2, th2, t_amp, 1, pol)
+    equations = [(E_i + E_r - E_t)[j] for j in (0, 1)] + [(H_i + H_r - H_t)[j] for j in (0, 1)]
+    return sp.solve([e for e in equations if e != 0], [r_amp, t_amp], dict=True)[0]
+
+for pol in ("s", "p"):
+    sol = fresnel_coefficients(pol)
+    print(f"{pol}: r = {sp.simplify(sol[r_amp])},  t = {sp.simplify(sol[t_amp])}")
+```
+
+Для $s$-поляризации $r_s = \frac{n_1\cos\theta_1 - n_2\cos\theta_2}{n_1\cos\theta_1 + n_2\cos\theta_2}$, для $p$ в числителе $n_2\cos\theta_1 - n_1\cos\theta_2$
+(знак $r_p$ зависит от выбора положительного направления $\mathbf E$ отражённой
+волны). $r_p$ обращается в нуль при **угле Брюстера** $\operatorname{tg}\theta_B = n_2/n_1$: отражённый свет
+полностью $s$-поляризован. Проверим баланс энергии $R + T = 1$, где
+$T = \frac{n_2\cos\theta_2}{n_1\cos\theta_1}|t|^2$ (поток через границу), для стекла $n_2 = 1{,}5$:
+
+```{python}
+coeffs = {pol: fresnel_coefficients(pol) for pol in ("s", "p")}
+snell = {th2: sp.asin(n1 * sp.sin(th1) / n2)}
+glass = {n1: 1, n2: sp.Rational(3, 2)}
+R_T = {pol: sp.lambdify(th1, [(c[r_amp]**2).subs(snell).subs(glass),
+                               (n2 * sp.cos(th2) / (n1 * sp.cos(th1)) * c[t_amp]**2).subs(snell).subs(glass)])
+       for pol, c in coeffs.items()}
+angles = np.radians([0, 30, 56.31, 80])
+for pol in ("s", "p"):
+    vals = np.array([R_T[pol](x) for x in angles])
+    print(f"{pol}: R = {np.round(vals[:, 0], 4)}, R + T = {np.round(vals.sum(axis=1), 12)}")
+print(f"угол Брюстера arctg(1,5) = {np.degrees(np.arctan(1.5)):.2f}°")
+```
+
+```{python}
+#| label: fig-fresnel
+#| fig-cap: 'Коэффициенты отражения по мощности для границы воздух–стекло (n = 1,5) в зависимости от угла падения: s-поляризация (E перпендикулярно плоскости падения) и p-поляризация. При нормальном падении R = 4 % для обеих; при угле Брюстера 56,3° отражение p-волны исчезает.'
+th_grid = np.radians(np.linspace(0, 89.9, 400))
+fig, ax = plt.subplots(figsize=(6.8, 3.8))
+for pol, col in (("s", "tab:blue"), ("p", "tab:red")):
+    ax.plot(np.degrees(th_grid), [R_T[pol](x)[0] for x in th_grid], color=col, lw=2, label=f"R_{pol}")
+ax.axvline(np.degrees(np.arctan(1.5)), color="0.5", ls="--", lw=1)
+ax.text(np.degrees(np.arctan(1.5)) + 1, 0.6, "θ_B = 56,3°", color="0.3")
+ax.set(xlabel="угол падения, градусы", ylabel="R", xlim=(0, 90), ylim=(0, 1))
+ax.legend(loc="upper left")
+plt.tight_layout()
+plt.show()
+```
+
+## Дисперсия и причинность
+
+В реальной среде $\varepsilon$ зависит от частоты: $\mathbf D(t) = \mathbf E(t) + \int_0^\infty f(\tau)\,\mathbf E(t - \tau)\,\dd\tau$, где
+интеграл идёт только по прошлому. В пространстве Фурье (по
+[конвенциям](/conventions.qmd), $e^{-i\omega t}$) $\varepsilon(\omega) = 1 + \int_0^\infty f(\tau)e^{i\omega\tau}\dd\tau$ — функция, аналитическая
+в **верхней** полуплоскости $\omega$, как и запаздывающие [функции
+Грина](/math/analysis/green-functions.qmd). Отсюда соотношения Крамерса–Кронига,
+связывающие поглощение $\operatorname{Im}\varepsilon$ с преломлением $\operatorname{Re}\varepsilon$. Простейшая модель —
+электрон на пружинке (модель Лоренца):
+
+```{python}
+w = sp.Symbol("omega")
+w0, wp, gamma = sp.symbols("omega_0 omega_p gamma", positive=True)
+eps_lorentz = 1 + wp**2 / (w0**2 - w**2 - sp.I * gamma * w)
+poles = sp.solve(sp.denom(sp.together(eps_lorentz)), w)
+print("полюсы ε(ω):", poles)
+print("мнимые части при ω₀ = 1, γ = 0.1:", [sp.N(sp.im(p.subs({w0: 1, gamma: sp.Rational(1, 10)})), 4) for p in poles])
+```
+
+Оба полюса в нижней полуплоскости (мнимая часть $-\gamma/2$): отклик среды
+причинный, а затухание $\gamma > 0$ даёт поглощение $\operatorname{Im}\varepsilon > 0$ при $\omega > 0$.
+
+## Итоги
+
+- $\dd F = 0$ и $\dd G = 4\pi\mathfrak J$ не зависят от среды и метрики; вся физика среды — в
+  материальном уравнении $G = \kappa(F)$, в пустоте $\kappa = -\hodge$.
+- Оператор Ходжа на 2-формах в 4D конформно инвариантен; изотропная среда —
+  $G = -\sqrt{\varepsilon/\mu}\,\hodge_gF$ с метрикой $c^2\dd t^2 - \varepsilon\mu\,\dd\mathbf r^2$: показатель $n = \sqrt{\varepsilon\mu}$ — геометрия, $\sqrt{\mu/\varepsilon}$ — сопротивление.
+- Одноосный кристалл: $n = n_o$ и $1/n^2 = \cos^2\theta/n_o^2 + \sin^2\theta/n_e^2$; луч необыкновенной волны
+  сносится (кальцит: $6{,}2°$ при $\theta = 45°$).
+- Граничные условия: ограничения форм $\mathcal E$, $\mathcal H$, $\mathcal D$, $\mathcal B$ на поверхность
+  непрерывны (без поверхностных зарядов и токов).
+- Формулы Френеля, $R + T = 1$, угол Брюстера $\operatorname{tg}\theta_B = n_2/n_1$.
+- Причинность: $\varepsilon(\omega)$ аналитична в верхней полуплоскости.
+
+## Упражнения
+
+1. Найдите коэффициент отражения при нормальном падении из воздуха на
+   воду ($n = 1{,}33$) и на алмаз ($n = 2{,}42$).
+2. Покажите, что среда с $\varepsilon = \mu$ не отражает при нормальном падении из пустоты,
+   хотя $n \ne 1$.
+3. При каком угле падения из стекла ($n = 1{,}5$) в воздух наступает полное
+   внутреннее отражение?
+4. Найдите угол между двумя лучами, выходящими из пластинки кальцита,
+   если свет падает нормально к поверхности, а оптическая ось составляет
+   с нормалью $45°$.
+5. Покажите, что при $\gamma\to0$ в модели Лоренца $\varepsilon(\omega) < 0$ в полосе $\omega_0 < \omega < \sqrt{\omega_0^2 + \omega_p^2}$. Что
+   происходит с волной в этой полосе?
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $R = \left(\frac{n - 1}{n + 1}\right)^2$: вода $\approx 2{,}0\,\%$, алмаз $\approx 17{,}2\,\%$.
+2. При нормальном падении $r = \frac{Z_2 - Z_1}{Z_2 + Z_1}$ с волновым сопротивлением $Z = \sqrt{\mu/\varepsilon}$; при $\varepsilon = \mu$
+   $Z = 1$, как у пустоты, и $r = 0$ — среда «согласована».
+3. $\sin\theta_c = 1/1{,}5$, $\theta_c \approx 41{,}8°$.
+4. Волновые векторы обеих волн направлены по нормали ($n_1\sin\theta_1 = 0$), обыкновенный луч
+   идёт прямо, необыкновенный сносится на $6{,}2°$: угол между лучами $6{,}2°$.
+5. $\varepsilon = 1 + \frac{\omega_p^2}{\omega_0^2 - \omega^2} < 0 \iff \omega^2 - \omega_0^2 < \omega_p^2$ при $\omega > \omega_0$. Показатель
+   $n = \sqrt\varepsilon$ чисто мнимый: волна в среде экспоненциально затухает, а от
+   поверхности отражается полностью (полоса непрозрачности).
+:::
