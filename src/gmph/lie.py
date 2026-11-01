@@ -42,3 +42,22 @@ def killing_form(basis):
     ad = adjoint(basis)
     n = len(basis)
     return sp.Matrix(n, n, lambda a, b: (ad[a] * ad[b]).trace())
+
+
+def spin_matrices(j):
+    """Эрмитовы матрицы (Ĵ_x, Ĵ_y, Ĵ_z) неприводимого представления SU(2) со спином j (ħ = 1).
+
+    Базис |j, m⟩ упорядочен по убыванию m = j, j − 1, …, −j; Ĵ_z = diag(m),
+    Ĵ_+|m⟩ = √((j − m)(j + m + 1)) |m + 1⟩ (фазы Кондона–Шортли).
+    Связь с вещественными генераторами конвенций: Ĵ_k = i ρ(J_k), [Ĵ_x, Ĵ_y] = i Ĵ_z.
+    """
+    j = sp.nsimplify(j)
+    n = int(2 * j + 1)
+    ms = [j - a for a in range(n)]
+    Jz = sp.diag(*ms)
+    Jp = sp.zeros(n, n)
+    for a in range(1, n):
+        m = ms[a]
+        Jp[a - 1, a] = sp.sqrt((j - m) * (j + m + 1))
+    Jm = Jp.T
+    return (Jp + Jm) / 2, (Jp - Jm) / (2 * sp.I), Jz

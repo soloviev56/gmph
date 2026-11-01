@@ -1,0 +1,306 @@
+---
+title: "Представления SU(2)"
+topic: su2-reps
+order: 12
+description: "Все неприводимые представления su(2) из одних коммутационных соотношений: повышающий и понижающий операторы, старший вес, спин j = 0, ½, 1, …, размерность 2j + 1 (функция spin_matrices в gmph.lie); неприводимость через коммутант; j = 1 — векторное представление в сферическом базисе; поворот на 2π даёт (−1)^{2j}, у SO(3) только целые j; характеры sin((2j+1)θ/2)/sin(θ/2) и их ортогональность с мерой Хаара; сложение моментов j₁⊗j₂ = ⊕j и коэффициенты Клебша–Гордана спуском от старшего вектора (сверка с sympy CG); синглет и триплет, сверхтонкое расщепление; d-функции Вигнера и вероятности Штерна–Герлаха (рисунок)"
+---
+
+В квантовой механике момент импульса квантуется: проекция принимает
+значения $m = -j, \dots, j$ с шагом 1, а $j$ бывает целым (орбитальный момент) и
+полуцелым (спин электрона). Откуда это берётся? Не из уравнения
+Шрёдингера и не из конкретного вида волновых функций, а из одной
+только алгебры: коммутационных соотношений $[\hat J_x, \hat J_y] = i\hat J_z$. Любой набор
+операторов с такими соотношениями раскладывается на «кирпичи» —
+неприводимые представления алгебры $\mathfrak{su}(2)$, — и все эти кирпичи можно
+перечислить. Это одна из самых красивых и полезных глав теории
+представлений: на ней держатся спектроскопия атомов и ядер, правила
+отбора и сложение спинов.
+
+Нужны [представления групп и алгебр Ли](/math/lie/lie-representations.qmd) и связь
+[SO(3) и SU(2)](/math/lie/so3-su2.qmd). Генераторы, как в квантовой механике,
+эрмитовы: $\hat J_k = i\rho(J_k)$ ($\hbar = 1$), где $J_k$ — вещественные генераторы из
+[конвенций](/conventions.qmd); тогда $[\hat J_x, \hat J_y] = i\hat J_z$ и поворот на угол $\theta$ вокруг $\mathbf n$
+представлен оператором $e^{-i\theta\,\mathbf n\cdot\hat{\mathbf J}}$.
+
+## Старший вес
+
+Пусть эрмитовы $\hat J_x, \hat J_y, \hat J_z$ действуют на конечномерном пространстве и
+$[\hat J_x, \hat J_y] = i\hat J_z$ (и циклически). Введём **повышающий и понижающий**
+операторы $\hat J_\pm = \hat J_x \pm i\hat J_y$ ($\hat J_- = \hat J_+^\dagger$). Из коммутаторов
+$$
+[\hat J_z, \hat J_\pm] = \pm\hat J_\pm, \qquad [\hat J_+, \hat J_-] = 2\hat J_z, \qquad
+\hat{\mathbf J}^2 = \hat J_-\hat J_+ + \hat J_z^2 + \hat J_z .
+$$
+Первое соотношение означает: если $\hat J_z|m\rangle = m|m\rangle$, то $\hat J_z\hat J_+|m\rangle = (m + 1)\hat J_+|m\rangle$ —
+оператор $\hat J_+$ повышает собственное значение (**вес**) на единицу, $\hat J_-$ понижает.
+
+Пространство конечномерно, поэтому, повышая, мы упрёмся в **старший
+вектор** $|j\rangle$: $\hat J_+|j\rangle = 0$. На нём $\hat{\mathbf J}^2 = j^2 + j = j(j + 1)$. Опускаясь, получим векторы
+$|j\rangle, |j - 1\rangle, \dots$, и цепочка тоже должна оборваться: $\hat J_-|m\rangle = 0$ при некотором $m$.
+Норма $\|\hat J_-|m\rangle\|^2 = \langle m|\hat J_+\hat J_-|m\rangle = j(j + 1) - m(m - 1)$ обращается в нуль только при
+$m = -j$. Значит, $j - (-j) = 2j$ — целое число шагов:
+
+::: {#thm-su2-irreps}
+Неприводимые представления алгебры $\mathfrak{su}(2)$ нумеруются числом
+$j = 0, \frac12, 1, \frac32, \dots$; размерность представления $2j + 1$, базис $|j, m\rangle$, $m = j, j - 1, \dots, -j$,
+$$
+\hat J_z|j, m\rangle = m|j, m\rangle, \qquad \hat J_\pm|j, m\rangle = \sqrt{(j \mp m)(j \pm m + 1)}\,|j, m \pm 1\rangle, \qquad
+\hat{\mathbf J}^2 = j(j + 1).
+$$
+:::
+
+Фазы матричных элементов $\hat J_\pm$ (вещественные положительные) — соглашение
+**Кондона–Шортли**. Функция `spin_matrices` из `gmph.lie` строит эти
+матрицы; проверим соотношения и неприводимость. Коммутант — матрицы,
+перестановочные со всеми генераторами; по лемме Шура у неприводимого
+представления он одномерен (функция `commutant_dimension` из
+[конечных групп](/math/lie/representations-finite.qmd) работает и здесь):
+
+```{python}
+import numpy as np
+import sympy as sp
+from scipy.linalg import expm
+from sympy.physics.quantum.cg import CG
+from gmph.finite_groups import commutant_dimension
+from gmph.lie import spin_matrices
+
+half = sp.Rational(1, 2)
+for j in (half, 1, sp.Rational(3, 2), 2):
+    Jx, Jy, Jz = spin_matrices(j)
+    n = Jz.rows
+    algebra = all(sp.simplify(A * B - B * A - sp.I * C) == sp.zeros(n)
+                  for A, B, C in ((Jx, Jy, Jz), (Jy, Jz, Jx), (Jz, Jx, Jy)))
+    casimir = sp.simplify(Jx**2 + Jy**2 + Jz**2)
+    print(f"j = {j}: размерность {n}, [J_x, J_y] = iJ_z: {algebra}, J² = {casimir[0, 0]}·1: "
+          f"{casimir == casimir[0, 0] * sp.eye(n)}, коммутант {commutant_dimension([Jx, Jy, Jz])}")
+print("j = 1/2: 2J_x, 2J_y, 2J_z — матрицы Паули:", [(2 * M).tolist() for M in spin_matrices(half)])
+```
+
+## Целые и полуцелые j
+
+Алгебра одна, а группы две: $SU(2)$ и $SO(3) = SU(2)/\{\pm1\}$. Поворот на $2\pi$ вокруг оси
+$z$ в представлении $j$ — диагональная матрица $e^{-2\pi im}$, то есть
+$(-1)^{2j}\cdot\mathbb 1$. При полуцелых $j$ это $-1$: представление группы $SU(2)$ есть, а
+группы вращений $SO(3)$ — нет, оно **двузначно**. Это и есть знак спинора при
+повороте на $2\pi$ из статьи о [SO(3) и SU(2)](/math/lie/so3-su2.qmd).
+
+```{python}
+for j in (half, 1, sp.Rational(3, 2), 2):
+    Jz = np.array(spin_matrices(j)[2], dtype=complex)
+    print(f"j = {j}: exp(−2πiJ_z) = {np.round(expm(-2j * np.pi * Jz).diagonal().real, 12) + 0.0}")
+```
+
+Представление $j = 1$ — это обычное векторное представление на $\R^3$,
+только в другом базисе. Собственные векторы $\hat J_z = iJ_z$ — **сферический
+базис** $\mathbf e_{\pm1} = \mp(\mathbf e_x \pm i\mathbf e_y)/\sqrt2$, $\mathbf e_0 = \mathbf e_z$ (знак $\mp$ — снова Кондон–Шортли):
+
+```{python}
+J_real = [sp.Matrix(3, 3, lambda i, k: -sp.LeviCivita(a, i, k)) for a in range(3)]     # (J_a)_ik = −ε_aik
+e_plus, e_zero, e_minus = -sp.Matrix([1, sp.I, 0]) / sp.sqrt(2), sp.Matrix([0, 0, 1]), sp.Matrix([1, -sp.I, 0]) / sp.sqrt(2)
+U = sp.Matrix.hstack(e_plus, e_zero, e_minus)
+print("U унитарна:", sp.simplify(U.H * U) == sp.eye(3))
+print("U†(iJ_k)U = spin_matrices(1)_k:",
+      all(sp.simplify(U.H * (sp.I * J_real[a]) * U - spin_matrices(1)[a]) == sp.zeros(3) for a in range(3)))
+```
+
+## Характеры
+
+Все повороты на один и тот же угол $\theta$ сопряжены, и след матрицы
+представления зависит только от $\theta$. Это **характер**
+$$
+\chi_j(\theta) = \sum_{m=-j}^{j}e^{-im\theta} = \frac{\sin\left((2j + 1)\theta/2\right)}{\sin(\theta/2)} .
+$$
+Как и для [конечных групп](/math/lie/representations-finite.qmd), характеры
+неприводимых представлений ортонормированы, только сумма по группе
+заменяется интегралом с инвариантной **мерой Хаара**. Для функций,
+зависящих только от угла поворота, она равна $\frac1\pi\sin^2(\theta/2)\,\dd\theta$ на $[0, 2\pi]$:
+это площадь «сферы поворотов на угол $\theta$» в $SU(2) = S^3$.
+
+```{python}
+theta = sp.Symbol("theta", real=True)
+
+def chi(j):
+    j = sp.nsimplify(j)
+    return sum(sp.exp(-sp.I * (j - a) * theta) for a in range(int(2 * j + 1)))
+
+def haar_inner(f, g):
+    return sp.simplify(sp.integrate(sp.expand((sp.conjugate(f) * g * sp.sin(theta / 2)**2).rewrite(sp.exp)),
+                                    (theta, 0, 2 * sp.pi)) / sp.pi)
+
+spins = [0, half, 1, sp.Rational(3, 2), 2]
+print("χ_j = sin((2j+1)θ/2)/sin(θ/2):",
+      all(sp.simplify((chi(j) - sp.sin((2 * j + 1) * theta / 2) / sp.sin(theta / 2)).rewrite(sp.exp)) == 0 for j in spins))
+print("матрица ⟨χ_a, χ_b⟩:", [[haar_inner(chi(a), chi(b)) for b in spins] for a in spins])
+```
+
+## Сложение моментов
+
+Тензорное произведение представлений $j_1\otimes j_2$ — система из двух моментов, с
+полным моментом $\hat{\mathbf J} = \hat{\mathbf J}_1\otimes1 + 1\otimes\hat{\mathbf J}_2$. Оно приводимо, и его разложение
+читается по характерам: $\chi_{j_1}\chi_{j_2}$ — сумма экспонент $e^{-i(m_1 + m_2)\theta}$, а их можно
+собрать в «треугольники»:
+$$
+j_1\otimes j_2 = |j_1 - j_2| \oplus (|j_1 - j_2| + 1) \oplus \dots \oplus (j_1 + j_2) .
+$$
+Проверка размерностей: $\sum_{J}(2J + 1) = (2j_1 + 1)(2j_2 + 1)$.
+
+Базис $|J, M\rangle$ строится тем же спуском. Вектор с наибольшим весом
+$|j_1, j_1\rangle\otimes|j_2, j_2\rangle$ — старший для $J = j_1 + j_2$; опускаясь $\hat J_-$, получаем всё
+представление $J = j_1 + j_2$. Старший вектор следующего $J$ лежит в
+подпространстве веса $M = J$ и уничтожается $\hat J_+$, и так далее. Коэффициенты
+разложения $|J, M\rangle = \sum\langle j_1m_1j_2m_2|JM\rangle\,|j_1m_1\rangle|j_2m_2\rangle$ — **коэффициенты Клебша–Гордана**.
+Их общий знак фиксируется условием $\langle j_1j_1\,j_2(J - j_1)|JJ\rangle > 0$. Построим их и
+сверим с `sympy.physics.quantum.cg`:
+
+```{python}
+def total_spin(j1, j2):
+    A, B = spin_matrices(j1), spin_matrices(j2)
+    return [sp.kronecker_product(A[a], sp.eye(B[a].rows)) + sp.kronecker_product(sp.eye(A[a].rows), B[a])
+            for a in range(3)]
+
+def coupled_basis(j1, j2):
+    """Словарь (J, M) → вектор |J, M⟩ в базисе |m₁⟩|m₂⟩ (m₁, m₂ по убыванию)."""
+    j1, j2 = sp.nsimplify(j1), sp.nsimplify(j2)
+    Jx, Jy, Jz = total_spin(j1, j2)
+    J_up, J_down = Jx + sp.I * Jy, Jx - sp.I * Jy
+    basis, J = {}, j1 + j2
+    while J >= abs(j1 - j2):
+        weight = [a for a in range(Jz.rows) if Jz[a, a] == J]          # подпространство M = J
+        P = sp.Matrix.hstack(*[sp.eye(Jz.rows)[:, a] for a in weight])
+        (kernel,) = (J_up * P).nullspace()                             # старший вектор единственен
+        v = P * kernel
+        v = v / sp.sqrt((v.H * v)[0])
+        if next(c for c in v if c != 0).could_extract_minus_sign():    # Кондон–Шортли: m₁ = j₁ первым и > 0
+            v = -v
+        for M in [J - k for k in range(int(2 * J + 1))]:
+            basis[(J, M)] = sp.simplify(v)
+            if M > -J:
+                v = J_down * v / sp.sqrt(J * (J + 1) - M * (M - 1))
+        J -= 1
+    return basis
+
+def agrees_with_sympy(j1, j2):
+    j1, j2 = sp.nsimplify(j1), sp.nsimplify(j2)
+    n2 = int(2 * j2 + 1)
+    for (J, M), v in coupled_basis(j1, j2).items():
+        for a, c in enumerate(v):
+            m1, m2 = j1 - a // n2, j2 - a % n2
+            reference = CG(j1, m1, j2, m2, J, M).doit() if m1 + m2 == M else 0
+            if sp.simplify(c - reference) != 0:
+                return False
+    return True
+
+for j1, j2 in ((half, half), (1, half), (1, 1), (sp.Rational(3, 2), 1)):
+    Js = sorted({J for J, M in coupled_basis(j1, j2)})
+    print(f"{j1} ⊗ {j2} = {' ⊕ '.join(map(str, Js))}: размерности {(2 * j1 + 1) * (2 * j2 + 1)} = "
+          f"{' + '.join(str(2 * J + 1) for J in Js)}, совпадение с sympy CG: {agrees_with_sympy(j1, j2)}")
+```
+
+Две характерные строки таблицы. Орбитальный момент $l = 1$ и спин $\frac12$
+(электрон в $p$-состоянии) дают $j = \frac32$ и $j = \frac12$; состояние $|\frac12, \frac12\rangle$ в
+базисе $|m_l\rangle|m_s\rangle$ и синглет двух моментов $1$:
+
+```{python}
+def show(v, j1, j2):
+    n2 = int(2 * sp.nsimplify(j2) + 1)
+    return " ".join(f"{'+' if c > 0 else '−'}{abs(c)}·|{j1 - a // n2}, {j2 - a % n2}⟩" for a, c in enumerate(v) if c != 0)
+
+print("|1/2, 1/2⟩ из 1⊗1/2:", show(coupled_basis(1, half)[(half, half)], 1, half))
+print("|0, 0⟩ из 1⊗1:     ", show(coupled_basis(1, 1)[(0, 0)], 1, 1))
+```
+
+## Физика: синглет, триплет и опыт Штерна–Герлаха
+
+**Два спина $\frac12$.** $\frac12\otimes\frac12 = 0\oplus1$: синглет (одно состояние) и триплет (три).
+Взаимодействие вида $H = A\,\hat{\mathbf S}_1\cdot\hat{\mathbf S}_2$ коммутирует с полным спином и потому
+диагонально в базисе $|S, M\rangle$: из $\hat{\mathbf S}^2 = \hat{\mathbf S}_1^2 + \hat{\mathbf S}_2^2 + 2\hat{\mathbf S}_1\cdot\hat{\mathbf S}_2$
+$$
+\hat{\mathbf S}_1\cdot\hat{\mathbf S}_2 = \frac12\left(S(S + 1) - \frac32\right) = \begin{cases} \tfrac14, & S = 1,\\ -\tfrac34, & S = 0.\end{cases}
+$$
+Так устроено **сверхтонкое расщепление** основного состояния водорода
+(спины электрона и протона): расстояние между уровнями — ровно $A$, а
+переход между ними — знаменитая радиолиния 21 см.
+
+```{python}
+S1_dot_S2 = sum((sp.kronecker_product(M, M) for M in spin_matrices(half)), sp.zeros(4))
+eigen = S1_dot_S2.eigenvals()
+print("собственные значения S₁·S₂ и кратности:", eigen)
+print("расщепление триплет − синглет:", max(eigen) - min(eigen))
+```
+
+**Поворот оси квантования.** Частица со спином $j$ приготовлена в состоянии
+$|j, j\rangle$ (проекция на ось $z$ максимальна), а прибор Штерна–Герлаха
+повёрнут на угол $\beta$. Вероятности результатов $m$ — квадраты элементов
+**$d$-матрицы Вигнера** $d^j_{mm'}(\beta) = \langle j m|e^{-i\beta\hat J_y}|j m'\rangle$. Для $j = \frac12$ это
+$$
+d^{1/2}(\beta) = \begin{pmatrix}\cos\frac\beta2 & -\sin\frac\beta2\\ \sin\frac\beta2 & \cos\frac\beta2\end{pmatrix}
+$$
+— половинные углы и есть $SU(2)$. Для старшего вектора ответ замечателен:
+$|j, j\rangle$ — это $2j$ спинов $\frac12$, все «вверх», и $|d^j_{mj}|^2$ — биномиальное
+распределение $\binom{2j}{j + m}\cos^{2(j+m)}\frac\beta2\,\sin^{2(j-m)}\frac\beta2$ (каждый спин независимо даёт
+«вверх» с вероятностью $\cos^2\frac\beta2$).
+
+```{python}
+beta = sp.Symbol("beta", real=True)
+print("d^{1/2}(β) =", sp.simplify((-sp.I * beta * spin_matrices(half)[1]).exp()).tolist())
+
+def stern_gerlach(j, b):
+    Jy = np.array(spin_matrices(j)[1], dtype=complex)
+    return np.abs(expm(-1j * b * Jy)[:, 0])**2                    # столбец m' = j; строки m = j, …, −j
+
+j_sg = 2
+betas = np.linspace(0, np.pi, 181)
+probs = np.array([stern_gerlach(j_sg, b) for b in betas])
+from math import comb
+binom = np.array([[comb(2 * j_sg, j_sg + m) * np.cos(b / 2)**(2 * (j_sg + m)) * np.sin(b / 2)**(2 * (j_sg - m))
+                   for m in range(j_sg, -j_sg - 1, -1)] for b in betas])
+print(f"j = {j_sg}: max |d² − бином| = {np.abs(probs - binom).max():.1e}, суммы вероятностей = 1: {np.allclose(probs.sum(1), 1)}")
+```
+
+```{python}
+#| label: fig-stern-gerlach
+#| fig-cap: 'Вероятности результатов m для частицы со спином j = 2 в состоянии m = 2, если ось прибора повёрнута на угол β: |d²_{m2}(β)|² — биномиальное распределение, как у четырёх независимых спинов ½. При β = 90° (вертикальная линия) вероятности 1/16, 4/16, 6/16, 4/16, 1/16.'
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots(figsize=(7, 4))
+for col, m in enumerate(range(j_sg, -j_sg - 1, -1)):
+    ax.plot(np.degrees(betas), probs[:, col], lw=2, label=f"m = {m:+d}" if m else "m = 0")
+ax.axvline(90, color="0.6", lw=0.8)
+ax.set(xlabel="β, градусы", ylabel="вероятность", xlim=(0, 180), ylim=(0, 1.02))
+ax.legend()
+ax.grid(alpha=0.3)
+plt.tight_layout()
+plt.show()
+```
+
+## Итоги
+
+- Из $[\hat J_x, \hat J_y] = i\hat J_z$ следует: $\hat J_\pm$ меняют вес на $\pm1$, неприводимые представления
+  нумеруются $j = 0, \frac12, 1, \dots$, размерность $2j + 1$, $\hat{\mathbf J}^2 = j(j + 1)$ (функция `spin_matrices`).
+- Поворот на $2\pi$ равен $(-1)^{2j}$: полуцелые $j$ — представления $SU(2)$, но не $SO(3)$.
+- $j = 1$ — векторное представление в сферическом базисе $\mathbf e_{\pm1} = \mp(\mathbf e_x \pm i\mathbf e_y)/\sqrt2$, $\mathbf e_0 = \mathbf e_z$.
+- Характеры $\chi_j(\theta) = \sin((2j + 1)\theta/2)/\sin(\theta/2)$ ортонормированы с мерой $\frac1\pi\sin^2\frac\theta2\,\dd\theta$.
+- $j_1\otimes j_2 = |j_1 - j_2|\oplus\dots\oplus(j_1 + j_2)$; коэффициенты Клебша–Гордана — спуском от старшего вектора.
+- $\hat{\mathbf S}_1\cdot\hat{\mathbf S}_2$ равно $\frac14$ на триплете и $-\frac34$ на синглете; $|d^j_{mj}(\beta)|^2$ — биномиальное распределение.
+
+## Упражнения
+
+1. Выпишите матрицы $\hat J_x, \hat J_y, \hat J_z$ для $j = \frac32$ и проверьте $\hat{\mathbf J}^2 = \frac{15}4$.
+2. Найдите $\chi_j(2\pi)$ из формулы для характера и объясните результат.
+3. Разложите $\frac12\otimes\frac12\otimes\frac12$. Сколько раз входит $j = \frac12$?
+4. Найдите синглет $|0, 0\rangle$ в $1\otimes1$. Как он ведёт себя при перестановке двух
+   моментов? Сравните с синглетом $\frac12\otimes\frac12$.
+5. Найдите собственные значения $\hat{\mathbf S}_1\cdot\hat{\mathbf S}_2$ для двух спинов $1$.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $\hat J_z = \operatorname{diag}(\frac32, \frac12, -\frac12, -\frac32)$, ненулевые элементы $\hat J_+$: $\sqrt3, 2, \sqrt3$ над диагональю;
+   $\hat J_x = (\hat J_+ + \hat J_-)/2$, $\hat J_y = (\hat J_+ - \hat J_-)/2i$; $\hat{\mathbf J}^2 = \frac32\cdot\frac52 = \frac{15}{4}$.
+2. $\chi_j(2\pi) = \lim_{\theta\to2\pi}\frac{\sin((2j + 1)\theta/2)}{\sin(\theta/2)} = (-1)^{2j}(2j + 1)$: поворот на $2\pi$ — это $(-1)^{2j}\cdot\mathbb 1$.
+3. $\frac12\otimes\frac12 = 0\oplus1$, затем $0\otimes\frac12 = \frac12$ и $1\otimes\frac12 = \frac12\oplus\frac32$: итого $\frac32\oplus\frac12\oplus\frac12$,
+   размерности $8 = 4 + 2 + 2$; $j = \frac12$ входит дважды.
+4. $|0, 0\rangle = \frac{1}{\sqrt3}\left(|1, -1\rangle - |0, 0\rangle + |-1, 1\rangle\right)$ — симметричен при перестановке, в
+   отличие от антисимметричного синглета $\frac{1}{\sqrt2}(|\uparrow\downarrow\rangle - |\downarrow\uparrow\rangle)$. Общее правило:
+   состояние $J$ в $j\otimes j$ имеет чётность $(-1)^{2j - J}$.
+5. $\hat{\mathbf S}_1\cdot\hat{\mathbf S}_2 = \frac12\left(S(S + 1) - 4\right)$: $-2$ при $S = 0$, $-1$ при $S = 1$, $1$ при $S = 2$.
+:::

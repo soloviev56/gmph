@@ -27,3 +27,16 @@ def test_sl2():
     assert f[0][1] == [0, 2, 0] and f[0][2] == [0, 0, -2] and f[1][2] == [1, 0, 0]
     assert killing_form([H, E, F]) == sp.Matrix([[8, 0, 0], [0, 0, 4], [0, 4, 0]])
     assert coordinates(sp.Matrix([[2, 3], [5, -2]]), [H, E, F]) == [2, 3, 5]
+
+
+def test_spin_matrices():
+    from gmph.lie import spin_matrices
+
+    for j in (sp.Rational(1, 2), 1, sp.Rational(3, 2), 2):
+        Jx, Jy, Jz = spin_matrices(j)
+        assert sp.simplify(Jx * Jy - Jy * Jx - sp.I * Jz) == sp.zeros(Jz.rows)
+        assert sp.simplify(Jy * Jz - Jz * Jy - sp.I * Jx) == sp.zeros(Jz.rows)
+        assert sp.simplify(Jx**2 + Jy**2 + Jz**2 - j * (j + 1) * sp.eye(Jz.rows)) == sp.zeros(Jz.rows)
+        assert Jx.H == Jx and Jy.H == Jy
+    Jx, Jy, Jz = spin_matrices(sp.Rational(1, 2))
+    assert Jx == sp.Matrix([[0, 1], [1, 0]]) / 2 and Jy == sp.Matrix([[0, -sp.I], [sp.I, 0]]) / 2
