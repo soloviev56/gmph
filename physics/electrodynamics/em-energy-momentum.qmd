@@ -1,0 +1,254 @@
+---
+title: "Энергия и импульс электромагнитного поля"
+topic: em-energy-momentum
+order: 6
+description: "Канонический тензор энергии-импульса поля A_μ (gmph.fields.canonical_stress) несимметричен и калибровочно неинвариантен; поправка Белинфанте −(1/4π)∂_λ(F^{μλ}A_ν) даёт симметричный T^{μν} = (1/4π)(−F^{μλ}F^ν_λ + ¼η^{μν}F²) с нулевым следом; T^00 = (E² + B²)/8π, cT^0i = S = (c/4π)E×B, T^ij = −σ_ij (тензор натяжений Максвелла); с источниками ∂_μT^{μν} = −(1/c)F^{νλ}j_λ, теорема Пойнтинга ∂_t u + div S = −j·E; энергия идёт в провод снаружи: коаксиальный кабель с резистивной жилой (рисунок); давление света и солнечный парус"
+---
+
+Свет давит. Давление солнечного света на зеркало — несколько
+микропаскалей, но этого хватает, чтобы разворачивать хвосты комет и
+разгонять солнечные паруса. Значит, электромагнитное поле несёт не только
+энергию, но и импульс. Теорема Нётер для полей даёт рецепт: тензор
+энергии-импульса — ток, соответствующий сдвигам в пространстве-времени.
+Для электромагнитного поля рецепт сначала даёт «неправильный» тензор —
+несимметричный и зависящий от калибровки — и его исправление
+поучительно. Попутно выяснится странная вещь: энергия, которая греет
+провод, приходит в него не по проводу, а снаружи, из поля.
+
+Нужны [действие для поля и заряда](/physics/electrodynamics/em-action.qmd) и
+[теорема Нётер для полей](/physics/fields/field-noether.qmd). Канонический тензор
+$T^\mu{}_\nu$ и его индексы — по [конвенциям](/conventions.qmd) (раздел «Теория поля»),
+единицы гауссовы. В коде $c = 1$.
+
+## Канонический тензор и его исправление
+
+Лагранжиан свободного поля $\mathcal L = -\frac{1}{16\pi}F_{\mu\nu}F^{\mu\nu}$ зависит от четырёх полей $A_\lambda$.
+Канонический тензор $T^\mu{}_\nu = \frac{\partial\mathcal L}{\partial(\partial_\mu A_\lambda)}\partial_\nu A_\lambda - \delta^\mu_\nu\mathcal L$ (функция `canonical_stress`
+из `gmph.fields`) получается равным
+$$
+T^\mu{}_\nu{}^{\text{кан}} = -\frac{1}{4\pi}F^{\mu\lambda}\,\partial_\nu A_\lambda - \delta^\mu_\nu\mathcal L .
+$$
+В него входит потенциал, а не только поле: при калибровочном
+преобразовании он меняется. И он несимметричен:
+
+```{python}
+import numpy as np
+import sympy as sp
+from gmph.fields import canonical_stress
+
+X = sp.symbols("x0:4", real=True)
+eta = sp.diag(1, -1, -1, -1)
+A = [sp.Function(f"A{m}")(*X) for m in range(4)]                         # A_μ
+F = sp.Matrix(4, 4, lambda m, n: sp.diff(A[n], X[m]) - sp.diff(A[m], X[n]))  # F_μν
+F_up = eta * F * eta                                                        # F^μν
+FF = sum(F[m, n] * F_up[m, n] for m in range(4) for n in range(4))
+L = -FF / (16 * sp.pi)
+
+T_can = canonical_stress(L, A, X)                                            # T^μ_ν
+print("T^μν канонический симметричен:", sp.simplify(T_can * eta - (T_can * eta).T) == sp.zeros(4))
+```
+
+Исправление (Белинфанте). Добавим к $T^\mu{}_\nu$ величину $\frac{1}{4\pi}\partial_\lambda(F^{\mu\lambda}A_\nu)$. Она
+бездивергентна тождественно — $\partial_\mu\partial_\lambda(F^{\mu\lambda}A_\nu) = 0$ из-за антисимметрии $F^{\mu\lambda}$ — и не
+меняет сохраняющихся энергии и импульса (это дивергенция по
+пространственным индексам, её интеграл уходит на бесконечность). Для
+свободного поля $\partial_\lambda F^{\mu\lambda} = 0$, и добавка равна $\frac{1}{4\pi}F^{\mu\lambda}\partial_\lambda A_\nu$. В сумме
+$\partial_\nu A_\lambda - \partial_\lambda A_\nu = F_{\nu\lambda}$, и потенциал выпадает:
+
+::: {#def-em-stress}
+**Тензор энергии-импульса электромагнитного поля**
+$$
+T^{\mu\nu} = \frac{1}{4\pi}\left(-F^{\mu\lambda}F^\nu{}_\lambda + \frac14\,\eta^{\mu\nu}F_{\alpha\beta}F^{\alpha\beta}\right)
+$$
+симметричен, калибровочно инвариантен и имеет нулевой след $T^\mu{}_\mu = 0$. Это тензор
+Ландау–Лифшица (т. II, § 33).
+:::
+
+```{python}
+T_sym = sp.Matrix(4, 4, lambda m, n: -sum(F_up[m, l] * F[n, l] for l in range(4)) / (4 * sp.pi)
+                  - (L if m == n else 0))                                   # T^μ_ν
+belinfante = sp.Matrix(4, 4, lambda m, n: sum(F_up[m, l] * sp.diff(A[n], X[l]) for l in range(4)) / (4 * sp.pi))
+print("T_кан + F^μλ∂_λA_ν/4π = T_сим:", sp.simplify(T_can + belinfante - T_sym) == sp.zeros(4))
+T_up = T_sym * eta                                                          # T^μν
+print("T^μν симметричен:", sp.simplify(T_up - T_up.T) == sp.zeros(4), "  след T^μ_μ =", sp.simplify(T_sym.trace()))
+```
+
+Нулевой след — следствие того, что фотон безмассов: у
+электромагнитного поля нет масштаба длины, и действие не меняется при
+растяжениях $x\to\lambda x$ (конформная инвариантность). Для массивного поля
+[Клейна–Гордона](/physics/fields/klein-gordon.qmd) след отличен от нуля.
+
+## Энергия, поток и натяжения
+
+Запишем компоненты через $\mathbf E$ и $\mathbf B$ (поля через потенциал — как в статье о
+[действии](/physics/electrodynamics/em-action.qmd)):
+
+```{python}
+phi, A_vec = A[0], [-A[i] for i in (1, 2, 3)]
+E = [-sp.diff(phi, X[i + 1]) - sp.diff(A_vec[i], X[0]) for i in range(3)]
+B = [sp.diff(A_vec[2], X[2]) - sp.diff(A_vec[1], X[3]),
+     sp.diff(A_vec[0], X[3]) - sp.diff(A_vec[2], X[1]),
+     sp.diff(A_vec[1], X[1]) - sp.diff(A_vec[0], X[2])]
+E2_B2 = sum(e**2 + b**2 for e, b in zip(E, B))
+E_cross_B = [E[1] * B[2] - E[2] * B[1], E[2] * B[0] - E[0] * B[2], E[0] * B[1] - E[1] * B[0]]
+maxwell_stress = lambda i, k: (E[i] * E[k] + B[i] * B[k] - sp.KroneckerDelta(i, k) * E2_B2 / 2) / (4 * sp.pi)
+
+print("T^00 = (E² + B²)/8π:", sp.simplify(T_up[0, 0] - E2_B2 / (8 * sp.pi)) == 0)
+print("T^0i = (E×B)_i/4π:", all(sp.simplify(T_up[0, i + 1] - E_cross_B[i] / (4 * sp.pi)) == 0 for i in range(3)))
+print("T^ik = −σ_ik:", all(sp.simplify(T_up[i + 1, k + 1] + maxwell_stress(i, k)) == 0 for i in range(3) for k in range(3)))
+```
+
+С размерными множителями:
+$$
+T^{00} = u = \frac{\mathbf E^2 + \mathbf B^2}{8\pi}, \qquad cT^{0i} = S^i, \quad \mathbf S = \frac{c}{4\pi}\,\mathbf E\times\mathbf B, \qquad
+T^{ik} = -\sigma_{ik} = -\frac{1}{4\pi}\left(E_iE_k + B_iB_k - \frac12\delta_{ik}(\mathbf E^2 + \mathbf B^2)\right) .
+$$
+Плотность энергии $u$, **вектор Пойнтинга** $\mathbf S$ — поток энергии, плотность импульса
+$\mathbf g = \mathbf S/c^2$ (симметрия $T^{0i} = T^{i0}$ означает «поток энергии = $c^2$ × импульс», как у
+частицы $\mathbf p = \mathcal E\mathbf v/c^2$). Пространственная часть — **тензор натяжений Максвелла** $\sigma_{ik}$:
+сила, с которой поле по одну сторону площадки $\dd\mathbf a$ действует на поле по другую,
+$\dd F_i = \sigma_{ik}\,\dd a_k$. Вдоль силовых линий поле натянуто (натяжение $E^2/8\pi$),
+поперёк — давит с тем же давлением $E^2/8\pi$; так Фарадей и Максвелл
+представляли себе силы между зарядами.
+
+## Сохранение с источниками: теорема Пойнтинга
+
+При наличии зарядов $\partial_\mu T^{\mu\nu}$ не равна нулю: поле обменивается энергией и
+импульсом с веществом. Подставим уравнения Максвелла
+$\partial_\lambda F^{\nu\lambda} = -\frac{4\pi}{c}j^\nu$ (как определение тока через поле) — и получим
+$$
+\partial_\mu T^{\mu\nu} = -\frac1c\,F^{\nu\lambda}j_\lambda .
+$$
+Справа — плотность 4-силы Лоренца со знаком минус: то, что поле
+отдаёт зарядам.
+
+```{python}
+j_up = [-sum(sp.diff(F_up[m, n], X[n]) for n in range(4)) / (4 * sp.pi) for m in range(4)]   # из ∂_νF^μν = −4πj^μ
+j_low = [eta[m, m] * j_up[m] for m in range(4)]
+print("∂_μT^μν + F^νλ j_λ:",
+      [sp.simplify(sum(sp.diff(T_up[m, n], X[m]) for m in range(4)) + sum(F_up[n, l] * j_low[l] for l in range(4)))
+       for n in range(4)])
+```
+
+Компонента $\nu = 0$ — **теорема Пойнтинга**
+$$
+\frac{\partial u}{\partial t} + \operatorname{div}\mathbf S = -\mathbf j\cdot\mathbf E :
+$$
+энергия поля в объёме убывает за счёт потока через границу и работы над
+зарядами. Компоненты $\nu = i$ — то же для импульса: $\partial_tg_i - \partial_k\sigma_{ik} = -(\rho\mathbf E + \frac1c\mathbf j\times\mathbf B)_i$.
+Сила, действующая на заряды в объёме, равна потоку натяжений через
+границу минус рост импульса поля внутри.
+
+## Физика: откуда энергия приходит в провод
+
+Коаксиальный кабель: внутренняя жила радиуса $a$ с сопротивлением $R$ на
+длине $L$, внешняя оболочка радиуса $b$ — идеальный проводник под нулевым
+потенциалом. Источник с напряжением $V_0$ стоит при $z = 0$, при $z = L$ жила
+замкнута на оболочку. По жиле течёт ток $I = V_0/R$, её потенциал падает
+линейно, $V(z) = V_0(1 - z/L)$. В зазоре $a < r < b$ потенциал
+$$
+\varphi(r, z) = V(z)\,\frac{\ln(b/r)}{\ln(b/a)}
+$$
+(гармоничен и принимает нужные значения на жиле и оболочке), магнитное
+поле $B_\varphi = 2I/cr$. Вектор Пойнтинга имеет две составляющие: вдоль кабеля
+$S_z = \frac{c}{4\pi}E_rB_\varphi$ и **внутрь жилы** $S_r = -\frac{c}{4\pi}E_zB_\varphi$. Проверим баланс: поток вдоль
+кабеля через сечение равен $V(z)I$ и убывает ровно на джоулево тепло,
+которое втекает в жилу через её боковую поверхность:
+
+```{python}
+r, z, a, b, L_, V0, I, c = sp.symbols("r z a b L V_0 I c", positive=True)
+V = V0 * (1 - z / L_)
+pot = V * sp.log(b / r) / sp.log(b / a)
+E_r, E_z = -pot.diff(r), -pot.diff(z)
+B_phi = 2 * I / (c * r)
+print("∇²φ = 0 в зазоре:", sp.simplify(pot.diff(r, 2) + pot.diff(r) / r + pot.diff(z, 2)) == 0)
+S_z = c / (4 * sp.pi) * E_r * B_phi
+S_r = -c / (4 * sp.pi) * E_z * B_phi                                       # e_z × e_φ = −e_r
+P_along = sp.simplify(sp.integrate(S_z * 2 * sp.pi * r, (r, a, b)))
+P_into_wire = sp.simplify(-S_r.subs(r, a) * 2 * sp.pi * a)                 # на единицу длины
+print("поток вдоль кабеля через сечение =", P_along)
+print("поток внутрь жилы на единицу длины =", P_into_wire, "= I²R/L при R = V0/I:",
+      sp.simplify(P_into_wire - I**2 * (V0 / I) / L_) == 0)
+```
+
+```{python}
+#| label: fig-poynting-coax
+#| fig-cap: 'Линии вектора Пойнтинга в зазоре коаксиального кабеля с резистивной жилой (a = 1, b = 4, L = 10; источник слева, при z = L жила замкнута на оболочку). Энергия идёт от источника вдоль кабеля по пространству между проводниками и постепенно входит в жилу через её поверхность, где выделяется как тепло. Цвет — модуль |S| (логарифмическая шкала).'
+import matplotlib.pyplot as plt
+from matplotlib.colors import LogNorm
+
+vals = {a: 1.0, b: 4.0, L_: 10.0, V0: 1.0, I: 1.0, c: 1.0}
+Sz_f = sp.lambdify((r, z), S_z.subs(vals), "numpy")
+Sr_f = sp.lambdify((r, z), S_r.subs(vals), "numpy")
+Z, Rr = np.meshgrid(np.linspace(0, 9.99, 300), np.linspace(1.0, 4.0, 120))
+U, W = Sz_f(Rr, Z), Sr_f(Rr, Z)
+fig, ax = plt.subplots(figsize=(7.5, 3.4))
+magnitude = np.hypot(U, W)
+pcm = ax.pcolormesh(Z, Rr, magnitude, norm=LogNorm(vmin=magnitude.min(), vmax=magnitude.max()), cmap="YlOrRd", shading="auto")
+ax.streamplot(Z, Rr, U, W, color="black", density=1.2, linewidth=0.7, arrowsize=0.8,
+              start_points=np.c_[np.full(9, 0.05), np.linspace(1.15, 3.85, 9)])
+ax.axhspan(0, 1, color="tab:gray", alpha=0.6)
+ax.axhspan(4, 4.3, color="tab:gray", alpha=0.9)
+ax.text(5, 0.5, "резистивная жила", ha="center", va="center", color="black")
+ax.set(xlabel="z", ylabel="r", xlim=(0, 10), ylim=(0, 4.3))
+fig.colorbar(pcm, ax=ax, label="|S|")
+plt.tight_layout()
+plt.show()
+```
+
+Внутри проводника с током энергия не течёт вдоль провода: она входит
+снаружи, перпендикулярно поверхности. Провод — направляющая для поля,
+а энергия передаётся полем в пространстве вокруг него.
+
+**Давление света.** Для плоской волны $|\mathbf E| = |\mathbf B|$, $\mathbf S = cu\,\mathbf n$, плотность импульса
+$u\mathbf n/c$. Поглощающая поверхность, на которую волна падает по нормали,
+получает импульс $u$ на единицу площади и времени — давление $P = u = I/c$, где
+$I = |\mathbf S|$ — интенсивность; зеркало — вдвое больше. Тот же ответ даёт тензор
+натяжений: $-\sigma_{zz} = (E^2 + B^2)/8\pi = u$ для волны, бегущей вдоль $z$. Солнечная
+постоянная у Земли $I = 1361$ Вт/м² (в СИ $P = I/c$):
+
+```{python}
+I_sun, c_SI = 1361.0, 2.998e8
+print(f"давление на поглощающую поверхность: {I_sun / c_SI * 1e6:.2f} мкПа, на зеркало: {2 * I_sun / c_SI * 1e6:.2f} мкПа")
+```
+
+## Итоги
+
+- Канонический тензор поля $A_\mu$ несимметричен и неинвариантен; добавка
+  $\frac{1}{4\pi}\partial_\lambda(F^{\mu\lambda}A_\nu)$ даёт $T^{\mu\nu} = \frac{1}{4\pi}(-F^{\mu\lambda}F^\nu{}_\lambda + \frac14\eta^{\mu\nu}F^2)$ — симметричный, инвариантный, $T^\mu{}_\mu = 0$.
+- $T^{00} = (\mathbf E^2 + \mathbf B^2)/8\pi$, $cT^{0i} = \mathbf S = \frac{c}{4\pi}\mathbf E\times\mathbf B$, плотность импульса $\mathbf S/c^2$, $T^{ik} = -\sigma_{ik}$
+  (натяжения Максвелла).
+- С зарядами $\partial_\mu T^{\mu\nu} = -\frac1cF^{\nu\lambda}j_\lambda$; теорема Пойнтинга $\partial_tu + \operatorname{div}\mathbf S = -\mathbf j\cdot\mathbf E$.
+- Джоулево тепло входит в провод снаружи через поверхность; поток вдоль
+  коаксиального кабеля равен $VI$.
+- Давление света $P = I/c$ (поглощение), $2I/c$ (отражение): у Земли 4,5 и 9,1 мкПа.
+
+## Упражнения
+
+1. Покажите, что $u \ge |\mathbf S|/c$, и выясните, когда достигается равенство.
+2. Солнечный парус-зеркало массой 100 кг (вместе с аппаратом) у орбиты Земли.
+   Какая площадь нужна для ускорения 1 мм/с² при нормальном падении?
+3. С помощью тензора натяжений найдите силу притяжения пластин плоского
+   конденсатора на единицу площади при поле $E$ между ними.
+4. Покажите, что для плоской волны, бегущей вдоль $\mathbf n$, $T^{\mu\nu} = u\,n^\mu n^\nu$, где
+   $n^\mu = (1, \mathbf n)$. Почему такой тензор называют «нулевой пылью»?
+5. Найдите энергию поля равномерно заряженного шара радиуса $R$ с зарядом $e$.
+   При каком $R$ она равна $mc^2$ электрона? Сравните с классическим радиусом
+   $r_e = e^2/mc^2$.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $u - |\mathbf S|/c = \frac{1}{8\pi}(E^2 + B^2 - 2|\mathbf E\times\mathbf B|) \ge \frac{1}{8\pi}(|\mathbf E| - |\mathbf B|)^2 \ge 0$; равенство — при $|\mathbf E| = |\mathbf B|$, $\mathbf E\perp\mathbf B$
+   (плоская волна). Энергия не может течь быстрее света.
+2. $a = 2IA/(cm)$, $A = mac/(2I) = 100\cdot10^{-3}\cdot3\cdot10^8/(2\cdot1361) \approx 1{,}1\cdot10^4$ м² — квадрат со
+   стороной около 105 м.
+3. Возьмём площадку внутри металла пластины, где поля нет, и площадку в зазоре.
+   $\sigma_{zz} = \frac{1}{4\pi}(E^2 - \frac12E^2) = \frac{E^2}{8\pi}$: поле тянет пластину к другой с давлением $E^2/8\pi$
+   (равным плотности энергии поля).
+4. В волне $\mathbf E\perp\mathbf B\perp\mathbf n$, $|\mathbf E| = |\mathbf B|$: $T^{00} = u$, $T^{0i} = un^i$, $T^{ik} = un^in^k$ (натяжения $\sigma_{ik} = -un_in_k$:
+   давление только вдоль $\mathbf n$). Это тензор потока безмассовых частиц, движущихся
+   со скоростью света в направлении $\mathbf n$; $n^\mu$ — нулевой (светоподобный) вектор.
+5. $W = \frac{3e^2}{5R}$ (внутри $\frac{e^2}{10R}$, снаружи $\frac{e^2}{2R}$). $W = mc^2$ при $R = \frac35r_e \approx 1{,}7\cdot10^{-13}$ см,
+   $r_e \approx 2{,}82\cdot10^{-13}$ см. На меньших расстояниях классическая электродинамика
+   точечного заряда противоречива.
+:::
