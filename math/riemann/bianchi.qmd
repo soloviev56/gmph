@@ -1,0 +1,306 @@
+---
+title: "Тождества Бианки"
+topic: bianchi
+order: 5
+description: "Первое (алгебраическое) тождество R^i_{[jkl]} = 0 как следствие отсутствия кручения (контрпример со связностью с кручением); второе (дифференциальное) ∇_m R^i_{jkl} + ∇_k R^i_{jlm} + ∇_l R^i_{jmk} = 0 (проверка gmph.riemann); свёртка ∇^j R_jl = ½∂_l R и тензор Эйнштейна с нулевой дивергенцией; в 2D G = 0; аналогия с dF = 0 и неабелево D_[λF_μν] = 0; метрика Фридмана: G_00 = 3ȧ²/a², из ∇_μG^μν = 0 — уравнение непрерывности ε̇ + 3H(ε + p) = 0 и законы a(t) для пыли, излучения и вакуума (рисунок)"
+---
+
+Уравнения Максвелла $\partial_\nu F^{\mu\nu} = -\frac{4\pi}{c}j^\mu$ нельзя решить с произвольным током:
+левая часть бездивергентна тождественно, $\partial_\mu\partial_\nu F^{\mu\nu} = 0$, поэтому ток обязан
+сохраняться ([действие для поля и заряда](/physics/electrodynamics/em-action.qmd)).
+Эйнштейн, отыскивая уравнения гравитационного поля, столкнулся с той же
+задачей: левая часть уравнений, построенная из кривизны, должна быть
+бездивергентной тождественно, потому что тензор энергии-импульса
+материи сохраняется. Нужное тождество было известно геометрам с XIX века —
+это **тождество Бианки**, а бездивергентная комбинация из тензора Риччи —
+**тензор Эйнштейна**. Тождества Бианки — для кривизны то же, что $\dd F = 0$
+для электромагнитного поля.
+
+Нужен [тензор кривизны](/math/riemann/curvature-riemann.qmd). Знаки и порядок
+индексов — по [конвенциям](/conventions.qmd): $R^i{}_{jkl} = \partial_k\Gamma^i_{lj} - \dots$,
+$[\nabla_k, \nabla_l]V^i = R^i{}_{jkl}V^j$, $R_{jl} = R^i{}_{jil}$.
+
+## Первое тождество Бианки
+
+::: {#def-bianchi-1}
+**Первое (алгебраическое) тождество Бианки**: для связности без кручения
+$$
+R^i{}_{jkl} + R^i{}_{klj} + R^i{}_{ljk} = 0 ,
+$$
+то есть сумма по циклическим перестановкам трёх последних индексов равна нулю.
+:::
+
+Это следствие симметрии $\Gamma^i_{jk} = \Gamma^i_{kj}$. Без формул: для полей $X, Y, Z$ с
+нулевыми коммутаторами $\nabla_XY = \nabla_YX$ и так далее, и в циклической сумме
+$R(X, Y)Z + R(Y, Z)X + R(Z, X)Y$ вторые производные попарно сокращаются.
+Проверим на трёхмерной метрике $\dd x^2 + e^{2x}\dd y^2 + (1 + x^2y^2)\,\dd z^2$, у которой
+кривизна не постоянна, — и на связности с кручением, где тождество
+нарушается:
+
+```{python}
+import itertools
+import numpy as np
+import sympy as sp
+from gmph.riemann import christoffel, covariant_derivative, ricci, riemann, scalar_curvature
+
+x, y, z = sp.symbols("x y z", real=True)
+q = (x, y, z)
+g = sp.diag(1, sp.exp(2 * x), 1 + x**2 * y**2)
+Gamma = christoffel(g, q)
+R = riemann(Gamma, q)
+
+def first_bianchi(R):
+    n = len(R)
+    return all(sp.simplify(R[i][j][k][l] + R[i][k][l][j] + R[i][l][j][k]) == 0
+               for i, j, k, l in itertools.product(range(n), repeat=4))
+
+print("Леви-Чивита: первое тождество выполнено:", first_bianchi(R))
+
+# связность с кручением: Γ^i_jk = x·ε_ijk (антисимметрична по нижним индексам)
+Gamma_torsion = [[[x * sp.LeviCivita(i, j, k) for k in range(3)] for j in range(3)] for i in range(3)]
+R_torsion = riemann(Gamma_torsion, q)
+print("связность с кручением: первое тождество выполнено:", first_bianchi(R_torsion))
+print("  например, R^x_yzx + R^x_zxy + R^x_xyz =", sp.simplify(R_torsion[0][1][2][0] + R_torsion[0][2][0][1] + R_torsion[0][0][1][2]))
+```
+
+Вместе с антисимметрией по последней паре первое тождество
+сокращает число независимых компонент тензора Римана до $n^2(n^2 - 1)/12$
+(статья о [тензоре кривизны](/math/riemann/curvature-riemann.qmd)).
+
+## Второе тождество Бианки
+
+::: {#def-bianchi-2}
+**Второе (дифференциальное) тождество Бианки**: для связности без кручения
+$$
+\nabla_mR^i{}_{jkl} + \nabla_kR^i{}_{jlm} + \nabla_lR^i{}_{jmk} = 0 ,
+$$
+циклическая сумма по индексу производной и двум последним индексам.
+:::
+
+Самое короткое доказательство — в нормальных координатах точки $P$, где
+$\Gamma(P) = 0$ ([связность Леви-Чивиты](/math/riemann/levi-civita.qmd)). Там $\nabla_mR = \partial_mR$, в
+производной квадратичные по $\Gamma$ члены не дают вклада, и остаётся
+$\partial_m(\partial_k\Gamma^i_{lj} - \partial_l\Gamma^i_{kj})$ + циклические перестановки — шесть вторых производных
+$\Gamma$, которые попарно сокращаются. Обе части тождества — тензоры, поэтому
+оно верно в любых координатах. Проверим прямым счётом для той же метрики
+(функция `covariant_derivative` ставит индекс производной первым):
+
+```{python}
+DR = covariant_derivative(sp.Array(R), "uddd", Gamma, q)        # DR[m, i, j, k, l] = ∇_m R^i_jkl
+print("второе тождество Бианки:",
+      all(sp.simplify(DR[m, i, j, k, l] + DR[k, i, j, l, m] + DR[l, i, j, m, k]) == 0
+          for i, j, k, l, m in itertools.product(range(3), repeat=5)))
+```
+
+**Смысл.** Сравните с электродинамикой. Там $F = \dd A$, и $\dd F = \dd\dd A = 0$ — в
+компонентах $\partial_\lambda F_{\mu\nu} + \partial_\mu F_{\nu\lambda} + \partial_\nu F_{\lambda\mu} = 0$, та же циклическая сумма. Для
+неабелевой связности $\mathcal A_\mu$ (матрицы, [конвенции](/conventions.qmd), раздел
+«Калибровочные поля») обычная производная уже не годится, но тождество
+выполняется с ковариантной производной $D_\lambda\mathcal F_{\mu\nu} = \partial_\lambda\mathcal F_{\mu\nu} + i[\mathcal A_\lambda, \mathcal F_{\mu\nu}]$.
+Тензор Римана — кривизна связности, у которой «матрицы» действуют на
+касательные векторы ($(\Gamma_k)^i{}_j = \Gamma^i_{kj}$), и второе тождество Бианки — то же
+$D\mathcal F = 0$. Проверим для связности со значениями в $\mathfrak{su}(2)$ в трёх
+измерениях с произвольными функциями $\mathcal A^a_\mu(x)$:
+
+```{python}
+X3 = sp.symbols("x0:3", real=True)
+pauli = [sp.Matrix([[0, 1], [1, 0]]), sp.Matrix([[0, -sp.I], [sp.I, 0]]), sp.Matrix([[1, 0], [0, -1]])]
+A = [sum((sp.Function(f"A{a}{mu}", real=True)(*X3) * pauli[a] / 2 for a in range(3)), sp.zeros(2))
+     for mu in range(3)]
+F = [[A[nu].diff(X3[mu]) - A[mu].diff(X3[nu]) + sp.I * (A[mu] * A[nu] - A[nu] * A[mu]) for nu in range(3)]
+     for mu in range(3)]
+D = lambda lam, M: M.diff(X3[lam]) + sp.I * (A[lam] * M - M * A[lam])
+
+cyclic_D = D(0, F[1][2]) + D(1, F[2][0]) + D(2, F[0][1])
+cyclic_d = F[1][2].diff(X3[0]) + F[2][0].diff(X3[1]) + F[0][1].diff(X3[2])
+print("D_[0 F_12] = 0:", sp.expand(cyclic_D) == sp.zeros(2))
+print("∂_[0 F_12] = 0:", sp.expand(cyclic_d) == sp.zeros(2))
+```
+
+С обычной производной тождество нарушается: коммутатор в $\mathcal F$ даёт
+лишние члены. Это различие станет главным в теме «Поля Янга–Миллса».
+
+## Тензор Эйнштейна
+
+Свернём второе тождество по $i$ и $k$, а затем с $g^{jl}$. Метрика
+ковариантно постоянна, поэтому её можно вносить под $\nabla$, и получается
+**свёрнутое тождество Бианки**
+$$
+\nabla^jR_{jl} = \frac12\,\partial_lR .
+$$
+Тензор Риччи сам по себе не бездивергентен, но комбинация с поправкой —
+да:
+
+::: {#def-einstein-tensor}
+**Тензор Эйнштейна** $G_{jl} = R_{jl} - \frac12\,g_{jl}R$. Он симметричен и
+$$
+\nabla^jG_{jl} = 0
+$$
+тождественно, для любой метрики.
+:::
+
+Проверим оба равенства на той же метрике (дивергенцию считаем как
+свёртку ковариантной производной смешанного тензора $R^j{}_l$):
+
+```{python}
+Ric = ricci(R)
+R_scalar = scalar_curvature(Ric, g)
+g_inv = g.inv()
+
+def divergence_mixed(T):
+    """(∇_j T^j_l) для смешанного тензора T^j_l."""
+    DT = covariant_derivative(sp.Array(T.tolist()), "ud", Gamma, q)
+    return [sp.simplify(sum(DT[j, j, l] for j in range(3))) for l in range(3)]
+
+div_Ric = divergence_mixed(g_inv * Ric)
+print("∇_j R^j_l − ½∂_l R:", [sp.simplify(div_Ric[l] - R_scalar.diff(q[l]) / 2) for l in range(3)])
+print("∇_j R^j_x ≠ 0:", div_Ric[0] != 0)
+Einstein = Ric - g * R_scalar / 2
+print("∇_j G^j_l:", divergence_mixed(g_inv * Einstein))
+```
+
+В двух измерениях тензор Эйнштейна равен нулю тождественно: там
+$R_{jl} = Kg_{jl}$ и $R = 2K$ (упражнение 1). Поэтому двумерной гравитации по
+Эйнштейну нет, а сам $G_{jl}$ содержателен начиная с $n = 3$.
+
+## Физика: сохранение энергии в расширяющейся Вселенной
+
+Уравнения Эйнштейна (тема «Уравнения Эйнштейна») в сигнатуре $(+,-,-,-)$
+и с нашим знаком кривизны имеют вид, как у Ландау и Лифшица:
+$$
+R_{\mu\nu} - \frac12\,g_{\mu\nu}R = \frac{8\pi k}{c^4}\,T_{\mu\nu} .
+$$
+Тождество Бианки делает их **совместными** только при $\nabla_\mu T^{\mu\nu} = 0$ — так же,
+как уравнения Максвелла требуют $\partial_\mu j^\mu = 0$. Но здесь это больше, чем
+закон сохранения: для пылевидной материи $\nabla_\mu T^{\mu\nu} = 0$ — это уравнения
+движения пыли (тема «Движение в гравитационном поле»). Уравнения поля
+сами определяют, как движется источник.
+
+Простейший пример — однородная изотропная Вселенная с пространственно
+плоской метрикой Фридмана (подробно — в теме «Космология»; $c = 1$)
+$$
+\dd s^2 = \dd t^2 - a(t)^2\,(\dd x^2 + \dd y^2 + \dd z^2),
+$$
+заполненная идеальной жидкостью с плотностью энергии $\varepsilon(t)$ и давлением $p(t)$:
+$T^{\mu\nu} = (\varepsilon + p)\,u^\mu u^\nu - p\,g^{\mu\nu}$, $u^\mu = (1, 0, 0, 0)$. Вычислим тензор Эйнштейна и
+дивергенцию тензора энергии-импульса:
+
+```{python}
+t = sp.Symbol("t", real=True)
+k_N = sp.Symbol("k", positive=True)
+a = sp.Function("a", positive=True)(t)
+eps, p = sp.Function("epsilon")(t), sp.Function("p")(t)
+X4 = (t, x, y, z)
+g_frw = sp.diag(1, -a**2, -a**2, -a**2)
+Gamma_frw = christoffel(g_frw, X4)
+Ric_frw = ricci(riemann(Gamma_frw, X4))
+G_frw = sp.simplify(Ric_frw - g_frw * scalar_curvature(Ric_frw, g_frw) / 2)
+print("G_00 =", G_frw[0, 0], "   G_xx =", G_frw[1, 1])
+
+u_up = [1, 0, 0, 0]
+g_frw_inv = g_frw.inv()
+T_up = sp.Matrix(4, 4, lambda m, n: (eps + p) * u_up[m] * u_up[n] - p * g_frw_inv[m, n])
+DT = covariant_derivative(sp.Array(T_up.tolist()), "uu", Gamma_frw, X4)
+print("∇_μ T^μν =", [sp.simplify(sum(DT[m, m, n] for m in range(4))) for n in range(4)])
+```
+
+С $T_{00} = \varepsilon$, $T_{xx} = pa^2$ и $H = \dot a/a$ уравнения Эйнштейна дают **уравнения Фридмана**
+$$
+H^2 = \frac{8\pi k}{3}\,\varepsilon, \qquad 2\frac{\ddot a}{a} + H^2 = -8\pi k\,p ,
+$$
+а $\nabla_\mu T^{\mu 0} = 0$ — **уравнение непрерывности** $\dot\varepsilon + 3H(\varepsilon + p) = 0$: при расширении
+энергия в сопутствующем объёме $a^3$ уменьшается на работу давления,
+$\dd(\varepsilon a^3) = -p\,\dd(a^3)$. Тождество Бианки гарантирует, что третье уравнение
+не независимо: выразим $\varepsilon$ и $p$ из уравнений Фридмана через $a(t)$ и
+подставим в уравнение непрерывности:
+
+```{python}
+H = a.diff(t) / a
+eps_of_a = 3 * H**2 / (8 * sp.pi * k_N)
+p_of_a = -(2 * a.diff(t, 2) / a + H**2) / (8 * sp.pi * k_N)
+print("ε̇ + 3H(ε + p) =", sp.simplify(eps_of_a.diff(t) + 3 * H * (eps_of_a + p_of_a)))
+```
+
+Для уравнения состояния $p = w\varepsilon$ уравнение непрерывности даёт $\varepsilon \propto a^{-3(1 + w)}$
+(упражнение 3): пыль ($w = 0$) разбавляется как $a^{-3}$, излучение ($w = 1/3$) — как
+$a^{-4}$ (каждый фотон ещё и краснеет), а вакуум ($w = -1$) не разбавляется вовсе.
+Подставив в первое уравнение Фридмана, получим $\dot a = H_0\,a^{1 - 3(1 + w)/2}$ при
+$a(0) = 1$, где $H_0$ — сегодняшняя постоянная Хаббла:
+
+```{python}
+#| label: fig-friedmann
+#| fig-cap: 'Масштабный фактор плоской Вселенной, заполненной одной компонентой, при a(0) = 1 и одинаковой сегодняшней скорости расширения H₀ = 1. Пыль: a = (1 + 3t/2)^{2/3}, излучение: a = (1 + 2t)^{1/2}, вакуум: a = eᵗ. Нули a(t) — момент начала расширения: −2/3 и −1/2 в единицах 1/H₀; вакуумная Вселенная начала не имеет.'
+import matplotlib.pyplot as plt
+
+ts = np.linspace(-0.8, 2, 400)
+fig, ax = plt.subplots(figsize=(6.5, 3.8))
+for label, w, color in (("пыль, w = 0", 0, "tab:blue"), ("излучение, w = 1/3", 1 / 3, "tab:orange")):
+    power = 2 / (3 * (1 + w))
+    base = 1 + ts / power
+    ax.plot(ts[base > 0], base[base > 0]**power, color=color, label=label)
+ax.plot(ts, np.exp(ts), color="tab:green", label="вакуум, w = −1")
+ax.axhline(1, color="gray", lw=0.6, ls=":")
+ax.axvline(0, color="gray", lw=0.6, ls=":")
+ax.set(xlabel="t (в единицах 1/H₀)", ylabel="a(t)", ylim=(0, 4))
+ax.legend(loc="upper left")
+plt.tight_layout()
+plt.show()
+```
+
+Чем быстрее разбавляется вещество, тем сильнее торможение и тем меньше
+возраст Вселенной при той же сегодняшней скорости расширения:
+$\frac23 H_0^{-1}$ для пыли, $\frac12 H_0^{-1}$ для излучения:
+
+```{python}
+for name, w in (("пыль", 0), ("излучение", sp.Rational(1, 3))):
+    power = sp.Rational(2, 3) / (1 + w)
+    a_t = (1 + t / power)**power
+    check = sp.simplify(a_t.diff(t) - a_t**(1 - sp.Rational(3, 2) * (1 + w)))
+    print(f"{name}: a = {a_t}, ȧ − a^(1 − 3(1+w)/2) = {check}, возраст {power} в единицах 1/H₀")
+```
+
+## Итоги
+
+- Первое тождество $R^i{}_{[jkl]} = 0$ — алгебраическое, следствие отсутствия кручения; с
+  кручением оно нарушается.
+- Второе тождество $\nabla_mR^i{}_{jkl} + \nabla_kR^i{}_{jlm} + \nabla_lR^i{}_{jmk} = 0$ — аналог $\dd F = 0$; для калибровочных
+  полей $D_{[\lambda}\mathcal F_{\mu\nu]} = 0$ с ковариантной производной.
+- Свёртка: $\nabla^jR_{jl} = \frac12\partial_lR$, тензор Эйнштейна $G_{jl} = R_{jl} - \frac12g_{jl}R$ бездивергентен
+  тождественно; в 2D $G = 0$.
+- Поэтому уравнения Эйнштейна $G_{\mu\nu} = \frac{8\pi k}{c^4}T_{\mu\nu}$ совместны только при $\nabla_\mu T^{\mu\nu} = 0$, и
+  движение материи следует из уравнений поля.
+- Для метрики Фридмана: $H^2 = \frac{8\pi k}{3}\varepsilon$, $\dot\varepsilon + 3H(\varepsilon + p) = 0$, $\varepsilon \propto a^{-3(1 + w)}$; пыль
+  $a\propto t^{2/3}$, излучение $a\propto t^{1/2}$, вакуум $a\propto e^{H_0t}$.
+
+## Упражнения
+
+1. Покажите, что в двух измерениях $G_{jl} = 0$ для любой метрики. Проверьте
+   кодом для $E(u, v)\,\dd u^2 + G(u, v)\,\dd v^2$.
+2. Уравнения Эйнштейна — десять уравнений для десяти компонент $g_{\mu\nu}$.
+   Сколько из них независимы и почему это не недостаток теории?
+3. Решите уравнение непрерывности $\dot\varepsilon + 3H(\varepsilon + p) = 0$ при $p = w\varepsilon$, $w = \mathrm{const}$.
+   Как зависит от времени $a(t)$ для пыли и для излучения?
+4. Пусть в $n \ge 3$ измерениях $R_{jl} = \lambda(x)\,g_{jl}$ (пространство Эйнштейна).
+   Докажите с помощью свёрнутого тождества Бианки, что $\lambda$ — константа.
+   Почему при $n = 2$ это не так?
+5. Найдите тензор Эйнштейна трёхмерной сферы радиуса $a$ и убедитесь, что
+   он бездивергентен.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. В 2D $R_{ijkl} = K(g_{ik}g_{jl} - g_{il}g_{jk})$, отсюда $R_{jl} = Kg_{jl}$, $R = 2K$ и
+   $G_{jl} = Kg_{jl} - \frac12 g_{jl}\cdot 2K = 0$. Код: `ricci` и `scalar_curvature` для `sp.diag(E, G)`
+   с произвольными функциями дают `Ric − g R/2 = 0`.
+2. Независимы шесть: четыре тождества $\nabla_\mu G^{\mu\nu} = 0$ связывают уравнения. Это
+   отражает свободу выбора четырёх координатных функций: метрика
+   определяется уравнениями лишь с точностью до замены координат, как
+   потенциал $A_\mu$ в электродинамике — с точностью до калибровки.
+3. $\dot\varepsilon/\varepsilon = -3(1 + w)\dot a/a$, $\varepsilon = \varepsilon_0a^{-3(1 + w)}$. Тогда $\dot a \propto a^{1 - 3(1 + w)/2}$ и
+   $a \propto t^{2/(3(1 + w))}$: $t^{2/3}$ для пыли, $t^{1/2}$ для излучения (время отсчитывается от $a = 0$).
+4. $\nabla^jR_{jl} = \partial_l\lambda$ (метрика ковариантно постоянна), а $\frac12\partial_lR = \frac12\partial_l(n\lambda) = \frac n2\partial_l\lambda$.
+   Тождество даёт $(\frac n2 - 1)\,\partial_l\lambda = 0$, то есть $\partial_l\lambda = 0$ при $n \ne 2$ (на связном
+   многообразии $\lambda = \mathrm{const}$). В 2D $R_{jl} = K g_{jl}$ всегда, с любой функцией $K$, и тождество
+   ничего не даёт.
+5. $R_{jl} = \frac{2}{a^2}g_{jl}$, $R = \frac{6}{a^2}$, $G_{jl} = -\frac{1}{a^2}\,g_{jl}$; дивергенция равна нулю, так как
+   $\nabla g = 0$.
+:::
