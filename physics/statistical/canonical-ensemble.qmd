@@ -1,0 +1,249 @@
+---
+title: "Каноническое и большое каноническое распределения"
+topic: canonical-ensemble
+order: 5
+description: "Распределение Гиббса e^{−E/T}/Z для системы в термостате; статистическая сумма и свободная энергия F = −T ln Z, U = −∂ln Z/∂β, S = −∂F/∂T совпадает с энтропией Гиббса (проверка SymPy); флуктуации энергии ⟨ΔE²⟩ = T²C; двухуровневая система (аномалия Шоттки) и эйнштейновский кристалл (рисунок); эквивалентность ансамблей: ln Z как преобразование Лежандра энтропии (численно для N осцилляторов); классический идеальный газ и 1/N!; большое каноническое распределение, Ω = −T ln Ξ = −pV, пуассоновская статистика числа частиц, изотерма Ленгмюра"
+---
+
+Микроканонический ансамбль описывает изолированную систему с точно
+известной энергией. На практике системы обмениваются энергией с
+окружением, а иногда и частицами: газ в сосуде при комнатной
+температуре, адсорбированные молекулы на поверхности, электроны в
+металле. Для них удобнее задать не энергию, а температуру (и химический
+потенциал). Распределение тогда экспоненциальное, а все термодинамические
+величины получаются дифференцированием одной функции — статистической
+суммы. Переход от энергии к температуре оказывается тем же
+преобразованием Лежандра, что связывает термодинамические потенциалы.
+
+Нужны [ансамбли Гиббса](/physics/statistical/gibbs-ensembles.qmd) и
+[термодинамические потенциалы](/physics/statistical/thermodynamic-potentials.qmd). Как
+и раньше, $k = 1$: температура в единицах энергии.
+
+## Распределение Гиббса
+
+Пусть система $A$ слабо взаимодействует с большим термостатом $B$, и вместе
+они изолированы с энергией $E_0$. Вероятность найти $A$ в микросостоянии с
+энергией $E$ пропорциональна числу состояний термостата с энергией $E_0 - E$,
+то есть $e^{S_B(E_0 - E)} \approx e^{S_B(E_0)}e^{-E\,\partial S_B/\partial E} = \mathrm{const}\cdot e^{-E/T}$ — разложение до первого
+порядка точно, когда термостат бесконечно велик.
+
+::: {#def-canonical}
+**Каноническое распределение (Гиббса)**: состояние $n$ системы с энергией $E_n$
+при температуре $T = 1/\beta$ имеет вероятность
+$$
+p_n = \frac{e^{-\beta E_n}}{Z}, \qquad Z(\beta) = \sum_ne^{-\beta E_n} .
+$$
+$Z$ — **статистическая сумма**. Для классической системы из $N$ одинаковых частиц
+$Z = \frac{1}{N!}\int e^{-\beta H}\,\frac{\dd\Gamma}{(2\pi\hbar)^{3N}}$.
+:::
+
+Вся термодинамика — в $\ln Z$:
+$$
+F = -T\ln Z, \qquad U = \langle E\rangle = -\frac{\partial\ln Z}{\partial\beta}, \qquad S = -\frac{\partial F}{\partial T} = \frac{U - F}{T}, \qquad
+\langle\Delta E^2\rangle = \frac{\partial^2\ln Z}{\partial\beta^2} = T^2C .
+$$
+Энтропия, вычисленная как $-\partial F/\partial T$, совпадает с энтропией Гиббса $-\sum p_n\ln p_n$
+([энтропия](/physics/statistical/entropy.qmd)), а флуктуации энергии выражаются через
+теплоёмкость $C = \partial U/\partial T$. Проверим всё это на квантовом осцилляторе
+($E_n = \hbar\omega(n + \frac12)$, сумма — геометрическая прогрессия) и на двухуровневой системе:
+
+```{python}
+import numpy as np
+import sympy as sp
+from scipy.special import gammaln
+import matplotlib.pyplot as plt
+
+beta, T, w, eps = sp.symbols("beta T omega epsilon", positive=True)        # ħ = 1
+n = sp.Symbol("n", integer=True, nonnegative=True)
+
+def thermodynamics(Z, energies_probs=None):
+    lnZ = sp.log(Z)
+    U = sp.simplify(-lnZ.diff(beta))
+    F = -lnZ / beta
+    S = sp.simplify((beta**2 * F.diff(beta)).subs(beta, 1 / T))            # −∂F/∂T, ∂/∂T = −β²∂/∂β
+    C = sp.simplify(-beta**2 * U.diff(beta))
+    var = sp.simplify(lnZ.diff(beta, 2))
+    return U, F, S, C, var
+
+Z_osc = sp.exp(-beta * w / 2) / (1 - sp.exp(-beta * w))                  # Σ e^{−βω(n + 1/2)}
+U_osc, F_osc, S_osc, C_osc, var_osc = thermodynamics(Z_osc)
+print("осциллятор: U =", U_osc, "  ⟨ΔE²⟩ − T²C =", sp.simplify(var_osc - C_osc / beta**2))
+# прямые суммы по уровням при β = 0,7, ω = 1 (200 членов)
+levels = np.arange(200) + 0.5
+p_num = np.exp(-0.7 * levels) / np.exp(-0.7 * levels).sum()
+point = {beta: 0.7, w: 1, T: 1 / 0.7}
+print(f"   Z: формула {float(Z_osc.subs(point)):.10f}, сумма {np.exp(-0.7 * levels).sum():.10f}")
+print(f"   S: −∂F/∂T = {float(S_osc.subs(point)):.10f}, −Σ p ln p = {-np.sum(p_num * np.log(p_num)):.10f}")
+print(f"   ⟨ΔE²⟩: T²C = {float((C_osc / beta**2).subs(point)):.10f}, по распределению {p_num @ levels**2 - (p_num @ levels)**2:.10f}")
+
+Z_two = 1 + sp.exp(-beta * eps)
+U_two, F_two, S_two, C_two, var_two = thermodynamics(Z_two)
+print("два уровня 0 и ε: U =", U_two, "  C =", C_two)
+print("   ⟨ΔE²⟩ − T²C =", sp.simplify(var_two - C_two / beta**2))
+```
+
+## Теплоёмкость: замерзание степеней свободы
+
+У осциллятора при высокой температуре $U \to T$ (равнораспределение, по $T/2$ на
+квадратичное слагаемое гамильтониана), а при $T \ll \hbar\omega$ теплоёмкость
+экспоненциально мала: возбудить первый уровень нечем. Эйнштейн (1907)
+объяснил этим падение теплоёмкости кристаллов при низких температурах:
+$3N$ осцилляторов дают $C = 3N\,x^2e^x/(e^x - 1)^2$, $x = \hbar\omega/T$. У двухуровневой системы
+теплоёмкость имеет максимум — **аномалию Шоттки**: при высокой температуре
+оба уровня заселены одинаково, и энергия перестаёт расти.
+
+```{python}
+C_two_f = sp.lambdify(T, C_two.subs(beta, 1 / T).subs(eps, 1), "numpy")
+C_osc_f = sp.lambdify(T, C_osc.subs(beta, 1 / T).subs(w, 1), "numpy")
+Ts = np.linspace(0.02, 3, 600)
+i_max = np.argmax(C_two_f(Ts))
+print(f"максимум Шоттки: T = {Ts[i_max]:.3f} ε, C = {C_two_f(Ts)[i_max]:.4f}")
+print(f"осциллятор при T = 3ħω: C = {C_osc_f(3.0):.4f} (классический предел 1)")
+```
+
+```{python}
+#| label: fig-heat-capacity
+#| fig-cap: 'Теплоёмкость (на одну систему, k = 1) двухуровневой системы с расщеплением ε (аномалия Шоттки: максимум 0,44 при T ≈ 0,42ε) и квантового осциллятора с частотой ω (модель Эйнштейна, T в единицах ħω и ε). При T → 0 обе экспоненциально малы; при высокой температуре осциллятор выходит на классическое значение 1, а двухуровневая система «насыщается», и её теплоёмкость падает как (ε/2T)².'
+fig, ax = plt.subplots(figsize=(6.5, 3.6))
+ax.plot(Ts, C_two_f(Ts), label="два уровня (Шоттки)")
+ax.plot(Ts, C_osc_f(Ts), label="осциллятор (Эйнштейн)")
+ax.axhline(1, color="gray", ls=":", lw=0.8)
+ax.set(xlabel="T / ε,  T / ħω", ylabel="C", ylim=(0, 1.08))
+ax.legend(loc="center right")
+plt.tight_layout()
+plt.show()
+```
+
+## Эквивалентность ансамблей и преобразование Лежандра
+
+Сгруппируем состояния по энергии: $Z = \int e^{S(E) - \beta E}\,\dd E$, где $e^{S(E)}$ — плотность
+состояний. У макроскопической системы $S \propto N$, и интеграл набирается в
+узкой окрестности максимума показателя, где $\partial S/\partial E = \beta$. Поэтому
+$$
+\ln Z \approx \max_E\,\bigl(S(E) - \beta E\bigr), \qquad -\beta F = \max_E(S - \beta E),
+$$
+то есть $F = U - TS$ — **преобразование Лежандра** энтропии, как в
+[термодинамических потенциалах](/physics/statistical/thermodynamic-potentials.qmd). Относительная ширина
+распределения по энергии $\sqrt{\langle\Delta E^2\rangle}/U \sim 1/\sqrt N$, и канонический ансамбль даёт те же
+средние, что микроканонический. Проверим на $N$ классических осцилляторах:
+плотность состояний $\Omega(E) = E^{N-1}/(N - 1)!$ (в единицах $\hbar\omega = 1$), точное $\ln Z = -N\ln\beta$:
+
+```{python}
+beta_val = 0.5
+E_grid = np.linspace(1e-3, 20000, 400001)
+for N_osc in (10, 100, 1000):
+    exponent = (N_osc - 1) * np.log(E_grid) - gammaln(N_osc) - beta_val * E_grid      # S(E) − βE
+    log_Z_exact = -N_osc * np.log(beta_val)
+    E_star = E_grid[np.argmax(exponent)]
+    weights = np.exp(exponent - exponent.max())
+    mean = np.sum(E_grid * weights) / weights.sum()
+    width = np.sqrt(np.sum((E_grid - mean)**2 * weights) / weights.sum())
+    print(f"N = {N_osc:4d}: ln Z = {log_Z_exact:9.3f}, max(S − βE) = {exponent.max():9.3f}, "
+          f"отн. ошибка {abs(exponent.max() - log_Z_exact) / log_Z_exact:.1e};  ΔE/U = {width / mean:.4f}, 1/√N = {1 / np.sqrt(N_osc):.4f}")
+```
+
+Относительная ошибка лежандрова приближения падает примерно как $\ln N/N$: отброшен
+логарифм ширины пика, $\ln Z - \max(S - \beta E) \approx \frac12\ln(2\pi N) + \ln(1/\beta)$ (оценка $2{,}76$ против
+фактических $2{,}72$ при $N = 10$ и $5{,}07$ против $5{,}07$ при $N = 1000$). Относительная ширина пика — точно $1/\sqrt N$.
+
+**Классический идеальный газ.** Интеграл по импульсам гауссов,
+$Z = \frac{V^N}{N!\,\lambda^{3N}}$, $\lambda = \sqrt{2\pi\hbar^2/mT}$ — тепловая длина волны. Отсюда $p = -\partial F/\partial V = NT/V$ и
+энтропия Сакура–Тетроде, экстенсивная благодаря $1/N!$:
+
+```{python}
+N_, V_, m_, hbar = sp.symbols("N V m hbar", positive=True)
+lam = sp.sqrt(2 * sp.pi * hbar**2 / (m_ * T))
+F_gas = -T * (N_ * sp.log(V_) - 3 * N_ * sp.log(lam) - (N_ * sp.log(N_) - N_))     # ln N! по Стирлингу
+print("p =", sp.simplify(-F_gas.diff(V_)))
+S_gas = sp.simplify(sp.expand_log(-F_gas.diff(T), force=True))
+print("S =", S_gas)
+print("S(2N, 2V) − 2S(N, V) =", sp.simplify(S_gas.subs({N_: 2 * N_, V_: 2 * V_}) - 2 * S_gas))
+```
+
+## Большое каноническое распределение
+
+Если система обменивается с резервуаром ещё и частицами, то так же, как
+выше, $\partial S_B/\partial N = -\mu/T$, и вероятность состояния с $N$ частицами и энергией $E_{N,n}$
+$$
+p_{N,n} = \frac{e^{\beta(\mu N - E_{N,n})}}{\Xi}, \qquad \Xi(\beta, \mu) = \sum_Ne^{\beta\mu N}Z_N(\beta) .
+$$
+Термодинамика — в **большом потенциале**
+$$
+\Omega = -T\ln\Xi = F - \mu N = -pV, \qquad \langle N\rangle = -\frac{\partial\Omega}{\partial\mu}, \qquad \langle\Delta N^2\rangle = T\frac{\partial\langle N\rangle}{\partial\mu} .
+$$
+Для классического идеального газа $Z_N = Z_1^N/N!$ и $\Xi = \exp(e^{\beta\mu}Z_1)$: число частиц
+распределено **по Пуассону** со средним $\bar N = e^{\beta\mu}Z_1$, и $\langle\Delta N^2\rangle = \bar N$. А $\Omega = -T\bar N$ — это
+уравнение состояния $pV = \bar NT$:
+
+```{python}
+mu, Z1 = sp.symbols("mu Z_1", positive=True)
+N_sym = sp.Symbol("N", integer=True, nonnegative=True)
+z = sp.Symbol("z", positive=True)                                           # z = e^{βμ} Z₁
+print("Σ z^N/N! =", sp.summation(z**N_sym / sp.factorial(N_sym), (N_sym, 0, sp.oo)))
+Xi = sp.exp(sp.exp(beta * mu) * Z1)
+Omega = -sp.log(Xi) / beta
+N_mean = sp.simplify(-Omega.diff(mu))
+print("Ξ =", Xi, "   ⟨N⟩ =", N_mean)
+print("⟨ΔN²⟩ − ⟨N⟩ =", sp.simplify(N_mean.diff(mu) / beta - N_mean), "   Ω + T⟨N⟩ =", sp.simplify(Omega + N_mean / beta))
+```
+
+## Физика: изотерма Ленгмюра
+
+Поверхность с $M$ местами адсорбции, на каждом — не больше одной молекулы с
+энергией связи $\varepsilon$ (энергия $-\varepsilon$). Места независимы, и каждое — маленькая
+большая каноническая система с двумя состояниями: пусто (вес 1) и занято
+(вес $e^{\beta(\mu + \varepsilon)}$). Доля занятых мест
+$$
+\theta = \frac{e^{\beta(\mu + \varepsilon)}}{1 + e^{\beta(\mu + \varepsilon)}} .
+$$
+Химический потенциал задаёт газ над поверхностью: для идеального газа
+$\mu = T\ln(n\lambda^3) = T\ln(p\lambda^3/T)$. Подставляя, получаем изотерму Ленгмюра
+$\theta = \frac{p}{p + p_0(T)}$ с $p_0 = \frac{T}{\lambda^3}e^{-\varepsilon/T}$: при малом давлении покрытие растёт линейно, при
+большом насыщается.
+
+```{python}
+p_gas = sp.Symbol("p", positive=True)
+mu_gas = T * sp.log(p_gas * lam**3 / T)
+theta = 1 / (1 + sp.exp(-(mu_gas + eps) / T))
+p0 = T / lam**3 * sp.exp(-eps / T)
+print("θ − p/(p + p₀) =", sp.simplify(theta - p_gas / (p_gas + p0)))
+```
+
+## Итоги
+
+- Система в термостате: $p_n = e^{-\beta E_n}/Z$; $F = -T\ln Z$, $U = -\partial_\beta\ln Z$, $S = -\partial_TF$ (= энтропия Гиббса),
+  $\langle\Delta E^2\rangle = T^2C$.
+- Квантовые степени свободы «замерзают» при $T \ll \hbar\omega$; двухуровневая система даёт
+  максимум теплоёмкости (Шоттки) $0{,}44$ при $T \approx 0{,}42\varepsilon$.
+- $\ln Z = \max_E(S - \beta E)$ с точностью $O(\ln N/N)$: канонический и микроканонический ансамбли
+  эквивалентны, $F$ — преобразование Лежандра $S$; ширина $\Delta E/U \sim 1/\sqrt N$.
+- Идеальный газ: $Z = V^N/(N!\lambda^{3N})$, $pV = NT$, экстенсивная энтропия.
+- Большое каноническое: $\Omega = -T\ln\Xi = -pV$; у идеального газа $N$ распределено по Пуассону;
+  изотерма Ленгмюра $\theta = p/(p + p_0)$.
+
+## Упражнения
+
+1. Двухуровневая система с расщеплением $\varepsilon$: найдите $U(T)$, $C(T)$ и положение максимума
+   теплоёмкости.
+2. Найдите $U(T)$ квантового осциллятора и его пределы при $T \ll \hbar\omega$ и $T \gg \hbar\omega$.
+3. Выведите $\langle\Delta E^2\rangle = T^2C$ из $Z(\beta)$.
+4. Покажите, что в большом каноническом ансамбле идеального газа
+   $P(N) = \bar N^Ne^{-\bar N}/N!$. Чему равна относительная флуктуация числа частиц в 1 мкм³
+   воздуха при нормальных условиях ($n \approx 2{,}7\cdot10^{19}$ см⁻³)?
+5. Найдите изотерму Ленгмюра, если каждое место может принять до двух
+   молекул с энергиями связи $\varepsilon$ каждая (без взаимодействия между ними).
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $U = \frac{\varepsilon}{e^{\varepsilon/T} + 1}$, $C = \frac{x^2e^x}{(e^x + 1)^2}$, $x = \varepsilon/T$; максимум $C \approx 0{,}439$ при $x \approx 2{,}40$, то есть
+   $T \approx 0{,}417\varepsilon$.
+2. $U = \frac{\hbar\omega}{2}\operatorname{cth}\frac{\hbar\omega}{2T}$; при $T \ll \hbar\omega$ $U \approx \frac{\hbar\omega}{2} + \hbar\omega e^{-\hbar\omega/T}$, при $T \gg \hbar\omega$
+   $U \approx T + \frac{(\hbar\omega)^2}{12T}$.
+3. $\partial_\beta^2\ln Z = \langle E^2\rangle - \langle E\rangle^2$, а $\partial_\beta^2\ln Z = -\partial_\beta U = T^2\partial_TU = T^2C$.
+4. $P(N) = \frac{e^{\beta\mu N}Z_1^N/N!}{\Xi} = \frac{\bar N^N}{N!}e^{-\bar N}$. В 1 мкм³ $\bar N \approx 2{,}7\cdot10^7$,
+   $\Delta N/\bar N = 1/\sqrt{\bar N} \approx 1{,}9\cdot10^{-4}$.
+5. Каждое место — система с весами $1$, $2z$, $z^2$, где $z = e^{\beta(\mu + \varepsilon)}$ (одну молекулу можно
+   поместить двумя способами — если места на узле различимы). Среднее число
+   молекул на место $\frac{2z + 2z^2}{(1 + z)^2} = \frac{2z}{1 + z}$ — вдвое больше ленгмюровского: две независимые
+   «ячейки» на узле.
+:::
