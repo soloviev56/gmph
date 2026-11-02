@@ -1,0 +1,272 @@
+---
+title: "Сферические функции"
+topic: spherical-harmonics
+order: 13
+description: "Сферические функции Y_lm как собственные функции L̂² = −ħ²Δ_{S²} и L̂_z = −iħ∂_φ (sympy Ynm, фаза Кондона–Шортли); ортонормированность квадратурой Гаусса; L̂_k на {Y_lm} — в точности матрицы spin_matrices(l): L²(S²) = ⊕ представлений целого спина, каждое по разу; повышающий оператор; Y_{l,−m} = (−1)^m Y*_lm, чётность (−1)^l; поворот смешивает Y_lm внутри одного l, теорема сложения Σ_m Y*_lm(n′)Y_lm(n) = (2l + 1)/4π·P_l(n·n′), теорема Унзольда; мультипольное разложение 1/|r − r′| и инвариантная «мощность» мультиполя; вещественные гармоники на сфере (рисунок)"
+---
+
+Где в физике есть сфера и вращения, там появляются сферические функции:
+угловая зависимость атомных орбиталей, мультипольное разложение поля
+зарядов, гравитационное поле Земли, карты реликтового излучения, моды
+колебаний звёзд. Их можно ввести как решения дифференциального
+уравнения (так делает классическая математическая физика), но удобнее —
+как базис неприводимых представлений группы вращений в пространстве
+функций на сфере. Тогда сразу понятно, почему их $2l + 1$, как они
+меняются при повороте и откуда берётся их вырождение.
+
+Нужны [представления SU(2)](/math/lie/su2-reps.qmd) (спин $j$, матрицы `spin_matrices`,
+фаза Кондона–Шортли) и [инвариантные дифференциальные операторы](/math/lie/invariant-operators.qmd)
+(угловая часть лапласиана как оператор Казимира).
+
+## Определение
+
+Поворот $g$ действует на функциях на сфере как $(g\cdot f)(\mathbf n) = f(g^{-1}\mathbf n)$. Генератору
+$J_k$ отвечает векторное поле $-L_k$ (минус из-за $g^{-1}$), где $L_z = x\partial_y - y\partial_x = \partial_\varphi$ и
+циклически ([конвенции](/conventions.qmd), раздел «Многообразия и векторные поля»).
+Квантовомеханические генераторы $\hat L_k = i\hbar\cdot(-L_k)$:
+$$
+\hat L_z = -i\hbar\,\partial_\varphi, \qquad \hat{\mathbf L}^2 = -\hbar^2\Delta_{S^2},
+\qquad \Delta_{S^2} = \frac{1}{\sin\theta}\partial_\theta(\sin\theta\,\partial_\theta) + \frac{1}{\sin^2\theta}\partial_\varphi^2 .
+$$
+
+::: {#def-spherical-harmonics}
+**Сферические функции** $Y_{lm}(\theta, \varphi)$, $l = 0, 1, 2, \dots$, $m = -l, \dots, l$, — общие собственные
+функции операторов $\hat{\mathbf L}^2$ и $\hat L_z$:
+$$
+\hat{\mathbf L}^2Y_{lm} = \hbar^2l(l + 1)\,Y_{lm}, \qquad \hat L_zY_{lm} = \hbar m\,Y_{lm},
+$$
+нормированные условием $\int Y_{lm}^*Y_{l'm'}\,\dd\Omega = \delta_{ll'}\delta_{mm'}$ и с фазами Кондона–Шортли:
+$$
+Y_{lm} = (-1)^m\sqrt{\frac{2l + 1}{4\pi}\frac{(l - m)!}{(l + m)!}}\;P_l^m(\cos\theta)\,e^{im\varphi} \quad (m \ge 0), \qquad
+Y_{l,-m} = (-1)^mY_{lm}^* ,
+$$
+где $P_l^m$ — присоединённые функции Лежандра (без множителя $(-1)^m$).
+:::
+
+Так определены `sympy.Ynm` и `scipy.special.sph_harm_y`. Проверим уравнения на
+собственные значения:
+
+```{python}
+import numpy as np
+import sympy as sp
+from scipy.special import eval_legendre, sph_harm_y
+from gmph.lie import spin_matrices
+
+theta, phi = sp.symbols("theta phi", real=True)
+Y = lambda l, m: sp.Ynm(l, m, theta, phi).expand(func=True)
+
+def sphere_laplacian(f):
+    return sp.diff(sp.sin(theta) * f.diff(theta), theta) / sp.sin(theta) + f.diff(phi, 2) / sp.sin(theta)**2
+
+print("Y_21 =", Y(2, 1))
+print("−Δ_S² Y_lm = l(l+1) Y_lm и −i∂_φ Y_lm = m Y_lm:",
+      all(sp.simplify(-sphere_laplacian(Y(l, m)) - l * (l + 1) * Y(l, m)) == 0
+          and sp.simplify(-sp.I * Y(l, m).diff(phi) - m * Y(l, m)) == 0
+          for l in range(4) for m in range(-l, l + 1)))
+```
+
+Скалярные произведения будем считать квадратурой: узлы Гаусса–Лежандра
+по $\cos\theta$ и равномерная сетка по $\varphi$ интегрируют произведения сферических
+функций невысокой степени точно (с точностью округления):
+
+```{python}
+nodes, weights = np.polynomial.legendre.leggauss(24)
+TH, PH = np.meshgrid(np.arccos(nodes), np.linspace(0, 2 * np.pi, 48, endpoint=False), indexing="ij")
+W = np.outer(weights, np.full(48, 2 * np.pi / 48))                     # dΩ = d(cos θ) dφ
+
+def inner(f_vals, g_vals):
+    return np.sum(np.conj(f_vals) * g_vals * W)
+
+labels = [(l, m) for l in range(4) for m in range(-l, l + 1)]
+vals = {lm: sph_harm_y(*lm, TH, PH) for lm in labels}
+gram = np.array([[inner(vals[a], vals[b]) for b in labels] for a in labels])
+print(f"{len(labels)} функций (l ≤ 3): max |⟨Y|Y'⟩ − δ| = {np.abs(gram - np.eye(len(labels))).max():.1e}")
+```
+
+## Представление группы вращений
+
+Операторы $L_k$ не меняют $l$ — они коммутируют с $\Delta_{S^2}$ — и потому действуют
+в $(2l + 1)$-мерном пространстве $\mathcal H_l = \operatorname{span}\{Y_{lm}\}$. Утверждение: их матрицы в базисе
+$Y_{l,l}, \dots, Y_{l,-l}$ — это **в точности** матрицы спина $j = l$ из
+[представлений SU(2)](/math/lie/su2-reps.qmd), включая знаки. Именно для этого
+нужна фаза Кондона–Шортли. Векторные поля $L_x$, $L_y$ в сферических
+координатах сначала сверим с декартовой записью $L_x = y\partial_z - z\partial_y$:
+
+```{python}
+L_ops = [lambda f: -sp.sin(phi) * f.diff(theta) - sp.cos(theta) / sp.sin(theta) * sp.cos(phi) * f.diff(phi),
+         lambda f: sp.cos(phi) * f.diff(theta) - sp.cos(theta) / sp.sin(theta) * sp.sin(phi) * f.diff(phi),
+         lambda f: f.diff(phi)]
+
+x, y, z = sp.symbols("x y z", real=True)
+test = x**2 * y + z**3 * x + y * z
+on_sphere = {x: sp.sin(theta) * sp.cos(phi), y: sp.sin(theta) * sp.sin(phi), z: sp.cos(theta)}
+cartesian = [y * test.diff(z) - z * test.diff(y), z * test.diff(x) - x * test.diff(z), x * test.diff(y) - y * test.diff(x)]
+print("L_k в сферических = декартовым:",
+      all(sp.simplify(L(test.subs(on_sphere)) - c.subs(on_sphere)) == 0 for L, c in zip(L_ops, cartesian)))
+
+def L_hat_matrices(l):
+    """Матрицы ⟨Y_lm'| −i L_k |Y_lm⟩ (ħ = 1) в базисе m = l, …, −l."""
+    basis = [Y(l, m) for m in range(l, -l - 1, -1)]
+    mats = []
+    for L in L_ops:
+        images = [sp.lambdify((theta, phi), -sp.I * L(f), "numpy") for f in basis]
+        mats.append(np.array([[inner(vals[(l, ma)], images[b](TH, PH) + 0 * TH)
+                               for b in range(2 * l + 1)] for ma in range(l, -l - 1, -1)]))
+    return mats
+
+for l in (1, 2, 3):
+    err = max(np.abs(M - np.array(S, dtype=complex)).max() for M, S in zip(L_hat_matrices(l), spin_matrices(l)))
+    print(f"l = {l}: max |⟨Y|L̂_k|Y⟩ − spin_matrices({l})_k| = {err:.1e}")
+```
+
+Значит, $L^2(S^2) = \bigoplus_{l = 0}^\infty\mathcal H_l$: функции на сфере раскладываются в сумму
+неприводимых представлений целого спина, причём **каждое входит ровно
+один раз**. Полуцелых нет — на функциях действует $SO(3)$, а не $SU(2)$. В
+частности, повышающий оператор $\hat L_+ = \hat L_x + i\hat L_y = \hbar e^{i\varphi}(\partial_\theta + i\operatorname{ctg}\theta\,\partial_\varphi)$
+переводит $Y_{lm}$ в $\hbar\sqrt{l(l + 1) - m(m + 1)}\,Y_{l,m+1}$, а все $Y_{lm}$ получаются из
+$Y_{ll}\propto\sin^l\theta\,e^{il\varphi} \propto (x + iy)^l/r^l$ спуском — это гармонические многочлены из статьи
+об [инвариантных операторах](/math/lie/invariant-operators.qmd).
+
+## Поворот и теорема сложения
+
+Раз $\mathcal H_l$ инвариантно, повёрнутая $Y_{lm}$ — линейная комбинация $Y_{lm'}$ с тем
+же $l$ (коэффициенты — матрица Вигнера $D^l(g)$, унитарная). Отсюда
+сразу следует, что сумма $\sum_mY_{lm}^*(\mathbf n')Y_{lm}(\mathbf n)$ инвариантна: она зависит только от угла
+между $\mathbf n$ и $\mathbf n'$. Подставив $\mathbf n' = \mathbf e_z$ (там отлична от нуля только $Y_{l0}$), получаем
+**теорему сложения**
+$$
+\sum_{m=-l}^lY_{lm}^*(\mathbf n')\,Y_{lm}(\mathbf n) = \frac{2l + 1}{4\pi}\,P_l(\mathbf n\cdot\mathbf n') .
+$$
+При $\mathbf n = \mathbf n'$ — **теорема Унзольда** $\sum_m|Y_{lm}|^2 = \frac{2l + 1}{4\pi}$: заполненная оболочка атома
+сферически симметрична.
+
+```{python}
+rng = np.random.default_rng(3)
+
+def random_direction():
+    v = rng.normal(size=3)
+    v /= np.linalg.norm(v)
+    return np.arccos(v[2]), np.arctan2(v[1], v[0]), v
+
+(t1, p1, n1), (t2, p2, n2) = random_direction(), random_direction()
+for l in range(5):
+    lhs = sum(np.conj(sph_harm_y(l, m, t2, p2)) * sph_harm_y(l, m, t1, p1) for m in range(-l, l + 1))
+    rhs = (2 * l + 1) / (4 * np.pi) * eval_legendre(l, n1 @ n2)
+    unsold = sum(abs(sph_harm_y(l, m, t1, p1))**2 for m in range(-l, l + 1)) * 4 * np.pi / (2 * l + 1)
+    print(f"l = {l}: Σ Y*Y = {lhs.real:+.6f}{lhs.imag:+.1e}i,  (2l+1)P_l/4π = {rhs:+.6f},  4πΣ|Y|²/(2l+1) = {unsold:.6f}")
+```
+
+## Физика: мультипольное разложение
+
+Потенциал заряда $q$ в точке $\mathbf r'$ на расстоянии $r > r'$:
+$$
+\frac{q}{|\mathbf r - \mathbf r'|} = q\sum_l\frac{r'^l}{r^{l+1}}P_l(\mathbf n\cdot\mathbf n')
+= \sum_{l,m}\frac{4\pi}{2l + 1}\,\frac{q_{lm}}{r^{l+1}}\,Y_{lm}(\mathbf n), \qquad q_{lm} = q\,r'^l\,Y_{lm}^*(\mathbf n') .
+$$
+Первое равенство — производящая функция полиномов Лежандра
+([специальные функции](/math/analysis/special-functions.qmd)), второе — теорема
+сложения. Для распределения зарядов $q_{lm} = \int\rho\,r'^lY_{lm}^*\,\dd V$ — **мультипольные
+моменты**: $l = 0$ — заряд, $l = 1$ — диполь, $l = 2$ — квадруполь. При повороте
+распределения моменты одного $l$ перемешиваются унитарно, поэтому
+«мощность» мультиполя $\sum_m|q_{lm}|^2$ от ориентации не зависит. Проверим ряд и
+инвариантность на заряде, сдвинутом из начала координат на $r' = 1$:
+
+```{python}
+def multipoles(charges, l):
+    """q_lm = Σ q r'^l Y*_lm(n') для набора точечных зарядов [(q, r_vec)]."""
+    out = np.zeros(2 * l + 1, dtype=complex)
+    for q, rv in charges:
+        rr = np.linalg.norm(rv)
+        th_, ph_ = np.arccos(rv[2] / rr), np.arctan2(rv[1], rv[0])
+        out += [q * rr**l * np.conj(sph_harm_y(l, m, th_, ph_)) for m in range(-l, l + 1)]
+    return out
+
+r_src = np.array([0.0, 0.0, 1.0])
+r_obs = 2.0 * np.array([np.sin(1.0) * np.cos(0.4), np.sin(1.0) * np.sin(0.4), np.cos(1.0)])
+th_o, ph_o = 1.0, 0.4
+exact = 1 / np.linalg.norm(r_obs - r_src)
+partial = 0.0
+for l in range(9):
+    q_lm = multipoles([(1.0, r_src)], l)
+    partial += sum(4 * np.pi / (2 * l + 1) * q_lm[m + l] / 2.0**(l + 1) * sph_harm_y(l, m, th_o, ph_o)
+                   for m in range(-l, l + 1)).real
+    if l in (0, 1, 2, 4, 8):
+        print(f"до l = {l}: φ = {partial:.8f}, точно {exact:.8f}, ошибка {abs(partial - exact):.1e}")
+
+rot = np.array([[np.cos(0.7), 0, np.sin(0.7)], [0, 1, 0], [-np.sin(0.7), 0, np.cos(0.7)]])
+for l in (1, 2, 3):
+    print(f"l = {l}: Σ|q_lm|² = {np.sum(abs(multipoles([(1.0, r_src)], l))**2):.6f}, "
+          f"после поворота {np.sum(abs(multipoles([(1.0, rot @ r_src)], l))**2):.6f}, (2l+1)/4π = {(2 * l + 1) / (4 * np.pi):.6f}")
+```
+
+Ошибка убывает геометрически, как $(r'/r)^{l+1}$ при $r'/r = 1/2$: от $l = 4$ до $l = 8$ — в 10 раз,
+примерно вдвое на каждый шаг (отдельный член может оказаться мал из-за
+значения $P_l(\cos\gamma)$, как при $l = 2$). Именно так
+описывают гравитационное поле Земли (главная поправка — квадрупольная,
+сплюснутость) и анизотропию реликтового излучения (спектр мощности $C_l$).
+
+```{python}
+#| label: fig-real-harmonics
+#| fig-cap: 'Вещественные сферические функции √2·Re Y_lm (m > 0) и Y_l0 на единичной сфере, l = 0…3 (строки), m = 0…l (столбцы); красное — положительные значения, синее — отрицательные. Число узловых окружностей равно l: из них m — меридианы (по φ), l − m — параллели (по θ).'
+import matplotlib.pyplot as plt
+from matplotlib.colors import TwoSlopeNorm
+
+th_g, ph_g = np.meshgrid(np.linspace(0, np.pi, 60), np.linspace(0, 2 * np.pi, 90), indexing="ij")
+X_, Y_, Z_ = np.sin(th_g) * np.cos(ph_g), np.sin(th_g) * np.sin(ph_g), np.cos(th_g)
+fig = plt.figure(figsize=(7.5, 7.2))
+for l in range(4):
+    for m in range(l + 1):
+        values = sph_harm_y(l, m, th_g, ph_g)
+        values = np.sqrt(2) * values.real if m > 0 else values.real
+        bound = np.abs(values).max()
+        ax = fig.add_subplot(4, 4, 4 * l + m + 1, projection="3d")
+        ax.plot_surface(X_, Y_, Z_, facecolors=plt.cm.coolwarm(TwoSlopeNorm(0, -bound, bound)(values)),
+                        rstride=1, cstride=1, linewidth=0, shade=False)
+        ax.set_box_aspect((1, 1, 1), zoom=1.35)
+        ax.view_init(elev=20, azim=35)
+        ax.set_axis_off()
+        ax.set_proj_type("ortho")
+        ax.set_title(f"l = {l}, m = {m}", fontsize=10, y=0.98)
+plt.subplots_adjust(left=0, right=1, bottom=0, top=0.97, wspace=0, hspace=0.02)
+plt.show()
+```
+
+## Итоги
+
+- $Y_{lm}$ — собственные функции $\hat{\mathbf L}^2 = -\hbar^2\Delta_{S^2}$ ($\hbar^2l(l + 1)$) и $\hat L_z = -i\hbar\partial_\varphi$ ($\hbar m$), ортонормированные,
+  с фазой Кондона–Шортли (как `sympy.Ynm`, `scipy.special.sph_harm_y`).
+- Матрицы $\hat L_k$ на $\{Y_{lm}\}$ — в точности матрицы спина $l$: $L^2(S^2) = \bigoplus_l\mathcal H_l$, каждое
+  целое $l$ по разу.
+- $Y_{l,-m} = (-1)^mY_{lm}^*$, $Y_{lm}(-\mathbf n) = (-1)^lY_{lm}(\mathbf n)$.
+- Теорема сложения $\sum_mY_{lm}^*(\mathbf n')Y_{lm}(\mathbf n) = \frac{2l + 1}{4\pi}P_l(\mathbf n\cdot\mathbf n')$; теорема Унзольда.
+- Мультипольное разложение $\frac{1}{|\mathbf r - \mathbf r'|} = \sum\frac{4\pi}{2l + 1}\frac{r'^l}{r^{l+1}}Y_{lm}^*(\mathbf n')Y_{lm}(\mathbf n)$; $\sum_m|q_{lm}|^2$ инвариантна относительно поворотов.
+
+## Упражнения
+
+1. Разложите $\cos^2\theta$ по сферическим функциям.
+2. Покажите, что $Y_{l,-m} = (-1)^mY_{lm}^*$ и что $Y_{lm}(\pi - \theta, \varphi + \pi) = (-1)^lY_{lm}(\theta, \varphi)$.
+   Какова чётность дипольного момента? Может ли у системы, симметричной
+   относительно отражения $\mathbf r\to-\mathbf r$, быть дипольный момент?
+3. Сколько независимых вещественных компонент у мультипольного момента
+   порядка $l$? Сравните с числом компонент симметричного бесследового
+   тензора ранга $l$ в $\R^3$ для $l = 2$.
+4. Найдите $\langle\hat L_x^2\rangle$ в состоянии $Y_{lm}$.
+5. Докажите, что $\sum_{m}|Y_{lm}|^2$ не зависит от направления, не вычисляя функций, а
+   только из того, что поворот действует на $\mathcal H_l$ унитарно.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $\cos^2\theta = \frac{\sqrt{4\pi}}{3}Y_{00} + \frac43\sqrt{\frac\pi5}\,Y_{20}$ (проверено SymPy: $Y_{00} = 1/\sqrt{4\pi}$, $Y_{20} = \sqrt{5/16\pi}\,(3\cos^2\theta - 1)$).
+2. Первое — из явной формулы ($e^{-im\varphi} = (e^{im\varphi})^*$ и множитель $(-1)^m$); второе — так как
+   $P_l^m(-x) = (-1)^{l+m}P_l^m(x)$, $e^{im\pi} = (-1)^m$. Диполь ($l = 1$) нечётен; у центрально-симметричной
+   системы все нечётные моменты равны нулю — поэтому у молекулы CO₂ нет дипольного момента, а у
+   H₂O он есть.
+3. $2l + 1$ (комплексные $q_{lm}$ связаны условием $q_{l,-m} = (-1)^mq_{lm}^*$). Для $l = 2$: 5 — столько же,
+   сколько у симметричного бесследового тензора $3\times3$ ($6 - 1 = 5$), это тензор
+   квадрупольного момента $Q_{ik}$.
+4. $\langle\hat L_x^2\rangle = \frac{\hbar^2}{2}\left(l(l + 1) - m^2\right)$: по симметрии $\langle\hat L_x^2\rangle = \langle\hat L_y^2\rangle$, а
+   $\hat L_x^2 + \hat L_y^2 = \hat{\mathbf L}^2 - \hat L_z^2$ (сверено с диагональю `spin_matrices(l)[0]**2` для $l = 1, 2, 3$).
+5. $F(\mathbf n) = \sum_m|Y_{lm}(\mathbf n)|^2 = \|v(\mathbf n)\|^2$, где $v(\mathbf n) = (Y_{lm}(\mathbf n))_m$. При повороте $v(g^{-1}\mathbf n) = D(g)^Tv(\mathbf n)$
+   с унитарной $D$, норма сохраняется: $F(g^{-1}\mathbf n) = F(\mathbf n)$ для всех $g$, а повороты действуют на
+   сфере транзитивно. Константа равна $(2l + 1)/4\pi$ — интегрированием по сфере.
+:::
