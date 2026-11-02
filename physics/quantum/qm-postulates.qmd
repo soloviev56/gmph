@@ -1,0 +1,317 @@
+---
+title: "Постулаты квантовой механики"
+topic: qm-postulates
+order: 1
+description: "Состояние — луч в гильбертовом пространстве (кубит: сфера Блоха, |⟨ψ|φ⟩|² = (1 + n·m)/2); наблюдаемые — самосопряжённые операторы; правило Борна p_k = ⟨ψ|P_k|ψ⟩ и проекция состояния, последовательные опыты Штерна–Герлаха методом Монте-Карло; совместимые наблюдаемые коммутируют; эволюция iħψ̇ = Ĥψ — унитарная группа и одновременно гамильтонов поток с H = ⟨ψ|Ĥ|ψ⟩ и ω = −2ħ Im⟨·|·⟩ (проверка SymPy); картины Шрёдингера и Гейзенберга, {f, g} ↔ [f̂, ĝ]/iħ, прецессия спина Ṡ = γS×B; осцилляции Раби: формула и «измеренные» частоты (рисунок)"
+---
+
+Пропустим пучок атомов серебра через магнит Штерна–Герлаха, ориентированный
+вдоль $z$, и оставим только верхний пучок. Повторный магнит вдоль $z$
+пропускает его целиком: проекция спина известна. Магнит вдоль $x$ делит
+пучок пополам. Но если после него снова поставить магнит вдоль $z$, пучок
+опять разделится пополам — измерение $S_x$ «стёрло» знание $S_z$. Никакое
+распределение по классическим состояниям (точкам фазового пространства)
+так себя не ведёт. Квантовая механика заменяет фазовое пространство
+гильбертовым, а функции на нём — операторами. Удивительно, что при этом
+геометрия механики сохраняется: уравнение Шрёдингера оказывается
+уравнениями Гамильтона на гильбертовом пространстве.
+
+Нужны [гильбертовы пространства](/math/analysis/hilbert-spaces.qmd) и
+[операторы и спектр](/math/analysis/operators-spectrum.qmd). Скалярное
+произведение антилинейно по первому аргументу ([конвенции](/conventions.qmd),
+раздел «Комплексные пространства»).
+
+## Состояния
+
+::: {#def-qm-state}
+**Постулат 1 (состояния).** Чистое состояние квантовой системы задаётся
+ненулевым вектором $\psi$ гильбертова пространства $\mathcal H$, причём $\psi$ и $c\psi$ при любом
+$c \in \mathbb C\setminus\{0\}$ описывают одно и то же состояние. Пространство состояний —
+множество **лучей**, проективное пространство $\mathbb{CP}(\mathcal H)$. Обычно берут
+нормированный представитель, $\langle\psi|\psi\rangle = 1$; он определён с точностью до фазы $e^{i\alpha}$.
+:::
+
+Простейший пример — **кубит**, $\mathcal H = \mathbb C^2$: спин $\frac12$, поляризация фотона,
+два уровня атома. Нормированный вектор с точностью до фазы — это
+$\psi = (\cos\frac\theta2,\ e^{i\varphi}\sin\frac\theta2)$, то есть точка сферы с углами $\theta, \varphi$: $\mathbb{CP}^1 = S^2$ —
+**сфера Блоха**. Точка сферы — вектор $\mathbf n = \langle\psi|\boldsymbol\sigma|\psi\rangle$ (матрицы Паули), а
+«перекрытие» двух состояний выражается через угол между ними:
+$$
+|\langle\psi|\varphi\rangle|^2 = \frac{1 + \mathbf n\cdot\mathbf m}{2} = \cos^2\frac{\angle(\mathbf n, \mathbf m)}{2} .
+$$
+Ортогональные состояния — противоположные точки сферы, а не
+перпендикулярные векторы. Проверим на случайных состояниях:
+
+```{python}
+import numpy as np
+import sympy as sp
+from scipy.linalg import expm
+
+rng = np.random.default_rng(1)
+pauli = np.array([[[0, 1], [1, 0]], [[0, -1j], [1j, 0]], [[1, 0], [0, -1]]])
+
+def random_state(dim=2):
+    v = rng.normal(size=dim) + 1j * rng.normal(size=dim)
+    return v / np.linalg.norm(v)
+
+def bloch(psi):
+    return np.real([psi.conj() @ s @ psi for s in pauli])
+
+for _ in range(3):
+    psi, phi_ = random_state(), random_state()
+    n, m = bloch(psi), bloch(phi_)
+    print(f"|n| = {np.linalg.norm(n):.6f}   |⟨ψ|φ⟩|² = {abs(psi.conj() @ phi_)**2:.6f}   (1 + n·m)/2 = {(1 + n @ m) / 2:.6f}")
+```
+
+## Наблюдаемые и измерение
+
+::: {#def-qm-observable}
+**Постулат 2 (наблюдаемые).** Измеримой величине соответствует
+самосопряжённый оператор $\hat A$ на $\mathcal H$. Возможные результаты измерения — точки
+его спектра; в дискретном случае — собственные значения $a_k$,
+$\hat A = \sum_k a_k\hat P_k$, где $\hat P_k$ — проекторы на собственные подпространства.
+
+**Постулат 3 (правило Борна).** В состоянии $\psi$ ($\langle\psi|\psi\rangle = 1$) результат $a_k$ получается
+с вероятностью
+$$
+p_k = \langle\psi|\hat P_k|\psi\rangle = \|\hat P_k\psi\|^2 ,
+$$
+и после измерения система находится в состоянии $\hat P_k\psi/\|\hat P_k\psi\|$.
+:::
+
+Самосопряжённость нужна для того, чтобы результаты были вещественными,
+а проекторы на разные собственные значения — ортогональными, $\sum_kp_k = 1$
+(спектральная теорема). Среднее значение
+$$
+\langle A\rangle = \sum_ka_kp_k = \langle\psi|\hat A|\psi\rangle
+$$
+не требует знания собственных векторов. Вторая половина постулата 3 —
+**проекция состояния** — объясняет опыт из введения. Смоделируем его
+методом Монте-Карло: каждый атом проходит три магнита, и каждый раз
+результат разыгрывается по правилу Борна:
+
+```{python}
+def measure(psi, observable):
+    """Одно измерение: случайный результат по правилу Борна и новое состояние."""
+    values, vectors = np.linalg.eigh(observable)
+    probs = np.abs(vectors.conj().T @ psi)**2
+    k = rng.choice(len(values), p=probs / probs.sum())
+    return values[k], vectors[:, k]
+
+up_z = np.array([1, 0], dtype=complex)
+N = 20000
+counts = {"z": 0, "x": 0, "z снова": 0}
+for _ in range(N):
+    psi = up_z                                   # верхний пучок первого магнита (вдоль z)
+    sx, psi = measure(psi, pauli[0])             # магнит вдоль x
+    sz, psi = measure(psi, pauli[2])             # снова вдоль z
+    counts["x"] += sx > 0
+    counts["z снова"] += sz > 0
+print(f"доля S_x = +ħ/2 после фильтра S_z = +ħ/2:       {counts['x'] / N:.3f}")
+print(f"доля S_z = +ħ/2 после фильтров z и x (без отбора по x): {counts['z снова'] / N:.3f}")
+```
+
+Обе доли близки к $\frac12$: статистическая погрешность $\sqrt{p(1 - p)/N} = 1/(2\sqrt N) \approx 0{,}004$.
+
+**Совместимые наблюдаемые.** Если $[\hat A, \hat B] = 0$, у операторов есть общий
+собственный базис, и измерение $B$ не портит результата $A$: проекция на
+собственное подпространство $A$ переходит в себя. Таковы $\hat L^2$ и $\hat L_z$, $\hat x$ и
+$\hat y$. Несовместимы $\hat S_x$ и $\hat S_z$, $\hat x$ и $\hat p$ (тема «Соотношения
+неопределённостей»). Полный набор совместимых наблюдаемых нумерует
+базис — так возникают квантовые числа.
+
+## Эволюция
+
+::: {#def-qm-evolution}
+**Постулат 4 (эволюция).** Между измерениями состояние меняется по
+**уравнению Шрёдингера**
+$$
+i\hbar\,\frac{\dd\psi}{\dd t} = \hat H\psi ,
+$$
+где $\hat H$ — самосопряжённый оператор энергии (гамильтониан). Решение
+$\psi(t) = \hat U(t)\psi(0)$, $\hat U(t) = e^{-i\hat Ht/\hbar}$ — однопараметрическая группа **унитарных**
+операторов.
+:::
+
+Унитарность сохраняет вероятности: $\langle\hat U\psi|\hat U\varphi\rangle = \langle\psi|\varphi\rangle$. Обратно, по
+**теореме Стоуна** всякая (сильно непрерывная) однопараметрическая
+унитарная группа имеет вид $e^{-i\hat Ht/\hbar}$ с самосопряжённым $\hat H$ — поэтому
+так важно отличать самосопряжённые операторы от просто симметричных
+([операторы и спектр](/math/analysis/operators-spectrum.qmd)).
+
+**Уравнение Шрёдингера — уравнения Гамильтона.** Запишем компоненты $\psi$ в базисе через
+вещественные координаты, $\psi_k = (q_k + ip_k)/\sqrt{2\hbar}$, и возьмём в качестве
+классической функции Гамильтона среднее значение энергии
+$H(q, p) = \langle\psi|\hat H|\psi\rangle$. Утверждается, что уравнения Гамильтона
+$\dot q_k = \partial H/\partial p_k$, $\dot p_k = -\partial H/\partial q_k$ (в соглашениях [конвенций](/conventions.qmd)) — это в
+точности уравнение Шрёдингера. Проверим для произвольного эрмитова
+гамильтониана двухуровневой системы:
+
+```{python}
+hbar = sp.Symbol("hbar", positive=True)
+a_, d_ = sp.symbols("a d", real=True)
+b_ = sp.Symbol("b")
+H_op = sp.Matrix([[a_, b_], [sp.conjugate(b_), d_]])                  # общий эрмитов 2×2
+q = sp.symbols("q0:2", real=True)
+p = sp.symbols("p0:2", real=True)
+psi = sp.Matrix([(q[k] + sp.I * p[k]) / sp.sqrt(2 * hbar) for k in range(2)])
+H_cl = sp.simplify(sp.expand((psi.H * H_op * psi)[0]))
+print("Im H(q, p) =", sp.simplify(sp.im(H_cl)))
+# ψ̇ из уравнений Гамильтона: q̇ = ∂H/∂p, ṗ = −∂H/∂q
+psi_dot = sp.Matrix([(H_cl.diff(p[k]) - sp.I * H_cl.diff(q[k])) / sp.sqrt(2 * hbar) for k in range(2)])
+print("ψ̇ − Ĥψ/iħ =", sp.simplify(sp.expand(psi_dot - H_op * psi / (sp.I * hbar))).T)
+```
+
+Симплектическая форма $\omega = \sum_k\dd p_k\wedge\dd q_k$ в этих координатах выражается через
+скалярное произведение: $\omega(u, v) = -2\hbar\,\operatorname{Im}\langle u|v\rangle$ для касательных векторов $u, v$
+(в конвенциях $\operatorname{Im}\langle u|v\rangle = \sum\dd x\wedge\dd y$ при $\psi = x + iy$, а $x = q/\sqrt{2\hbar}$, $y = p/\sqrt{2\hbar}$):
+
+```{python}
+def omega(u, v):                                  # u = (δq, δp), Σ dp∧dq
+    n = len(u) // 2
+    return sum(u[n + k] * v[k] - u[k] * v[n + k] for k in range(n))
+
+def to_psi(u, hbar_val):                          # δψ = (δq + iδp)/√(2ħ)
+    n = len(u) // 2
+    return (u[:n] + 1j * u[n:]) / np.sqrt(2 * hbar_val)
+
+u, v, hbar_val = rng.normal(size=4), rng.normal(size=4), 0.37
+print(f"ω(u, v) = {omega(u, v):.6f},  −2ħ Im⟨u|v⟩ = {-2 * hbar_val * np.imag(to_psi(u, hbar_val).conj() @ to_psi(v, hbar_val)):.6f}")
+```
+
+Квантовая механика — гамильтонова система, но очень специальная:
+фазовое пространство линейно, гамильтониан квадратичен, и потому
+уравнения линейны. Нелинейность классической механики возвращается
+через выбор наблюдаемых и через измерение.
+
+## Картины Шрёдингера и Гейзенберга
+
+Средние $\langle\psi(t)|\hat A|\psi(t)\rangle = \langle\psi|\hat U^\dagger\hat A\hat U|\psi\rangle$ можно вычислять двумя способами: менять
+состояние и держать оператор (**картина Шрёдингера**) или держать состояние и
+менять оператор $\hat A_H(t) = \hat U^\dagger\hat A\hat U$ (**картина Гейзенберга**). Дифференцируя,
+получаем **уравнение Гейзенберга**
+$$
+\frac{\dd\hat A_H}{\dd t} = \frac{i}{\hbar}\,[\hat H, \hat A_H] = \frac{1}{i\hbar}\,[\hat A_H, \hat H]
+$$
+(для операторов без явной зависимости от времени). Сравните с
+$\dot f = \{f, H\}$: классическая скобка Пуассона соответствует коммутатору,
+делённому на $i\hbar$,
+$$
+\{f, g\} \;\longleftrightarrow\; \frac{1}{i\hbar}\,[\hat f, \hat g] ,
+$$
+и $\{x, p\} = 1$ переходит в $[\hat x, \hat p] = i\hbar$. Пример — спин в магнитном поле,
+$\hat H = -\gamma\,\mathbf B\cdot\hat{\mathbf S}$, $\hat{\mathbf S} = \frac\hbar2\boldsymbol\sigma$. Уравнение Гейзенберга должно дать ту же
+ларморову прецессию $\dot{\mathbf S} = \gamma\,\mathbf S\times\mathbf B$, что и классическая механика со
+скобкой $\{S_x, S_y\} = S_z$ ([конвенции](/conventions.qmd)):
+
+```{python}
+gamma = sp.Symbol("gamma", real=True)
+B = sp.symbols("B_x B_y B_z", real=True)
+sigma = [sp.Matrix([[0, 1], [1, 0]]), sp.Matrix([[0, -sp.I], [sp.I, 0]]), sp.Matrix([[1, 0], [0, -1]])]
+S = [hbar / 2 * s for s in sigma]
+H_spin = -gamma * sum((B[i] * S[i] for i in range(3)), sp.zeros(2))
+S_cross_B = [S[1] * B[2] - S[2] * B[1], S[2] * B[0] - S[0] * B[2], S[0] * B[1] - S[1] * B[0]]
+print("(i/ħ)[Ĥ, Ŝ] − γ Ŝ×B = 0:",
+      all(sp.simplify(sp.I / hbar * (H_spin * S[i] - S[i] * H_spin) - gamma * S_cross_B[i]) == sp.zeros(2)
+          for i in range(3)))
+print("[Ŝ_x, Ŝ_y] / iħ = Ŝ_z:", sp.simplify((S[0] * S[1] - S[1] * S[0]) / (sp.I * hbar) - S[2]) == sp.zeros(2))
+```
+
+Для операторов, линейных по образующим алгебры (как спин или $\hat x$, $\hat p$ при
+квадратичном гамильтониане), квантовые уравнения для средних совпадают
+с классическими. В общем случае — только приближённо (теорема Эренфеста).
+
+## Физика: осцилляции Раби
+
+Двухуровневый атом в резонансном поле частоты, отстроенной от
+перехода на $\Delta$. Во вращающейся системе отсчёта гамильтониан не зависит
+от времени: $\hat H = \frac\hbar2(\Delta\,\sigma_z + \Omega\,\sigma_x)$, где $\Omega$ — частота Раби (амплитуда поля).
+Если атом в начальный момент в состоянии $|{\uparrow}\rangle$, вероятность найти его в
+$|{\downarrow}\rangle$ —
+$$
+P(t) = \frac{\Omega^2}{\Omega^2 + \Delta^2}\,\sin^2\frac{\sqrt{\Omega^2 + \Delta^2}\;t}{2} .
+$$
+На сфере Блоха это прецессия вокруг оси $(\Omega, 0, \Delta)$: при точном резонансе
+вектор проходит через южный полюс, при отстройке — нет. Сравним формулу
+с эволюцией $e^{-i\hat Ht/\hbar}$ и с «экспериментом»: в каждый момент времени готовим
+200 атомов, измеряем и считаем долю $|{\downarrow}\rangle$:
+
+```{python}
+def rabi_formula(t, Om, Det):
+    W = np.hypot(Om, Det)
+    return Om**2 / W**2 * np.sin(W * t / 2)**2
+
+def evolve(t, Om, Det):                            # ħ = 1
+    return expm(-0.5j * t * (Det * pauli[2] + Om * pauli[0])) @ up_z
+
+Om = 1.0
+t_grid = np.linspace(0, 12, 25)
+experiments = {}
+for Det in (0.0, 1.0, 2.0):
+    exact = np.array([abs(evolve(t, Om, Det)[1])**2 for t in t_grid])
+    states = [evolve(t, Om, Det) for t in t_grid]
+    experiments[Det] = np.array([np.mean([measure(st, pauli[2])[0] < 0 for _ in range(200)]) for st in states])
+    print(f"Δ/Ω = {Det}: max |e^(−iHt) − формула| = {np.abs(exact - rabi_formula(t_grid, Om, Det)).max():.1e}, "
+          f"амплитуда Ω²/(Ω² + Δ²) = {Om**2 / (Om**2 + Det**2):.2f}")
+```
+
+```{python}
+#| label: fig-rabi
+#| fig-cap: 'Осцилляции Раби при Ω = 1 и отстройках Δ = 0, 1, 2. Линии — формула P(t) = Ω²/(Ω² + Δ²)·sin²(√(Ω² + Δ²)t/2), точки — доли атомов, найденных в нижнем состоянии в 200 «измерениях» на каждый момент времени. С ростом отстройки осцилляции ускоряются, а их амплитуда падает (1; 0,5; 0,2).'
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots(figsize=(7, 3.8))
+t_fine = np.linspace(0, 12, 600)
+for (Det, freq), color in zip(experiments.items(), ("tab:blue", "tab:orange", "tab:green")):
+    ax.plot(t_fine, rabi_formula(t_fine, Om, Det), color=color, label=f"Δ/Ω = {Det:g}")
+    ax.plot(t_grid, freq, "o", color=color, ms=4)
+ax.set(xlabel="Ωt", ylabel="вероятность |↓⟩", ylim=(-0.03, 1.08))
+ax.legend(loc="upper right", fontsize=9)
+plt.tight_layout()
+plt.show()
+```
+
+Точки разбросаны вокруг кривых на величину порядка $\sqrt{P(1 - P)/200} \le 0{,}035$:
+отдельное измерение даёт только «да» или «нет», и вероятность видна лишь
+в статистике. На осцилляциях Раби основаны ЯМР, атомные часы и
+управление кубитами: импульс длительностью $\pi/\Omega$ при $\Delta = 0$ («$\pi$-импульс»)
+переворачивает спин.
+
+## Итоги
+
+- Состояние — луч в $\mathcal H$; для кубита — точка сферы Блоха, $|\langle\psi|\varphi\rangle|^2 = (1 + \mathbf n\cdot\mathbf m)/2$.
+- Наблюдаемая — самосопряжённый оператор $\hat A = \sum a_k\hat P_k$; результат $a_k$ с вероятностью
+  $\langle\psi|\hat P_k|\psi\rangle$, после чего состояние проецируется; $\langle A\rangle = \langle\psi|\hat A|\psi\rangle$.
+- Совместимые наблюдаемые коммутируют и имеют общий базис.
+- Эволюция $\psi(t) = e^{-i\hat Ht/\hbar}\psi$ унитарна; это гамильтонов поток с функцией
+  $H = \langle\psi|\hat H|\psi\rangle$ и формой $\omega = -2\hbar\operatorname{Im}\langle\cdot|\cdot\rangle$.
+- Картина Гейзенберга: $\dot{\hat A} = \frac{1}{i\hbar}[\hat A, \hat H]$; соответствие $\{f, g\}\leftrightarrow\frac{1}{i\hbar}[\hat f, \hat g]$;
+  спин прецессирует по классическому закону $\dot{\mathbf S} = \gamma\mathbf S\times\mathbf B$.
+- Осцилляции Раби: $P = \frac{\Omega^2}{\Omega^2 + \Delta^2}\sin^2\frac{\sqrt{\Omega^2 + \Delta^2}\,t}{2}$.
+
+## Упражнения
+
+1. Спин $\frac12$ в состоянии $(|{\uparrow}\rangle + i|{\downarrow}\rangle)/\sqrt2$. Найдите вероятности результатов
+   измерения $S_x$, $S_y$, $S_z$ и вектор Блоха.
+2. Покажите, что состоянию $(\cos\frac\theta2,\ e^{i\varphi}\sin\frac\theta2)$ соответствует вектор Блоха
+   $(\sin\theta\cos\varphi, \sin\theta\sin\varphi, \cos\theta)$.
+3. Свободная частица, $\hat H = \hat p^2/2m$. Найдите $\hat x_H(t)$ и коммутатор $[\hat x_H(t), \hat x_H(0)]$.
+4. При какой отстройке наибольшая вероятность перехода в осцилляциях Раби
+   равна $\frac12$? В какой момент она впервые достигается?
+5. Спин $\frac12$ с гиромагнитным отношением $\gamma$ в поле $\mathbf B = B\mathbf e_x$, в начальный момент
+   $|{\uparrow}\rangle$. Найдите $\langle S_y\rangle(t)$ и $\langle S_z\rangle(t)$ и сравните с $\dot{\mathbf S} = \gamma\mathbf S\times\mathbf B$.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $S_y = +\frac\hbar2$ с вероятностью 1 (это собственный вектор $\sigma_y$); $S_x$ и $S_z$ дают $\pm\frac\hbar2$
+   с вероятностями $\frac12$. Вектор Блоха $(0, 1, 0)$.
+2. $\langle\psi|\sigma_x|\psi\rangle = 2\cos\frac\theta2\sin\frac\theta2\cos\varphi = \sin\theta\cos\varphi$, аналогично для $\sigma_y$;
+   $\langle\psi|\sigma_z|\psi\rangle = \cos^2\frac\theta2 - \sin^2\frac\theta2 = \cos\theta$.
+3. $\dot{\hat x}_H = \hat p_H/m$, $\dot{\hat p}_H = 0$, поэтому $\hat x_H(t) = \hat x + \hat pt/m$ и
+   $[\hat x_H(t), \hat x_H(0)] = \frac tm[\hat p, \hat x] = -\frac{i\hbar t}{m}$: положения в разные моменты
+   несовместимы.
+4. $\Omega^2/(\Omega^2 + \Delta^2) = \frac12$ при $|\Delta| = \Omega$; впервые при $t = \pi/\sqrt{\Omega^2 + \Delta^2} = \pi/(\sqrt2\,\Omega)$.
+5. $\langle S_z\rangle = \frac\hbar2\cos\gamma Bt$, $\langle S_y\rangle = \frac\hbar2\sin\gamma Bt$, $\langle S_x\rangle = 0$. Из $\dot{\mathbf S} = \gamma\mathbf S\times\mathbf B$:
+   $\dot S_z = -\gamma BS_y$, $\dot S_y = \gamma BS_z$ — то же решение: спин вращается в плоскости $yz$ с
+   частотой $\gamma B$.
+:::
