@@ -1,0 +1,221 @@
+---
+title: "Излучение"
+topic: radiation
+order: 9
+description: "Запаздывающие потенциалы как свёртка с запаздывающей функцией Грина; потенциалы Лиенара–Вихерта e/(R − R·v/c); поля движущегося заряда: «кулоновская» часть ∝ 1/R² и поле излучения ∝ 1/R; дипольное приближение: потенциалы диполя, калибровка Лоренца, волновое уравнение и поток Пойнтинга на бесконечности d̈² sin²θ/4πc³ для произвольного d(t) (проверка SymPy); формула Лармора 2e²a²/3c³; релятивистское излучение при круговом движении: угловое распределение, γ⁴ и «прожектор» (рисунок); коллапс классического атома за 1,6·10⁻¹¹ с; голубое небо и ω⁴; синхротронные потери"
+---
+
+Покоящийся заряд создаёт кулоновское поле, равномерно движущийся —
+сжатое лоренцевым преобразованием кулоновское поле. Ни то ни другое не
+уносит энергию на бесконечность. Ускоренный заряд излучает: часть его
+поля отрывается и уходит со скоростью света, убывая как $1/R$, так что поток
+энергии через большую сферу не стремится к нулю. Этим объясняются
+работа антенн, синий цвет неба, синхротронный свет ускорителей — и
+неустойчивость классической модели атома, с которой началась
+квантовая механика.
+
+Нужны [электромагнитные волны](/physics/electrodynamics/em-waves.qmd) и [функции
+Грина](/math/analysis/green-functions.qmd); энергия поля и вектор Пойнтинга — из статьи
+[энергия и импульс электромагнитного поля](/physics/electrodynamics/em-energy-momentum.qmd).
+Единицы гауссовы, знаки — по [конвенциям](/conventions.qmd).
+
+## Запаздывающие потенциалы
+
+В калибровке Лоренца $\partial_\mu A^\mu = 0$ уравнения Максвелла распадаются на волновые
+уравнения для каждой компоненты:
+$$
+\left(\frac{1}{c^2}\partial_t^2 - \nabla^2\right)\varphi = 4\pi\rho, \qquad
+\left(\frac{1}{c^2}\partial_t^2 - \nabla^2\right)\mathbf A = \frac{4\pi}{c}\,\mathbf j .
+$$
+Запаздывающая функция Грина этого оператора — $\delta(t - r/c)/4\pi r$ (статья о
+[функциях Грина](/math/analysis/green-functions.qmd), знак — по
+[конвенциям](/conventions.qmd)). Свёртка с источником даёт
+
+::: {#def-retarded-potentials}
+**Запаздывающие потенциалы**
+$$
+\varphi(t, \mathbf r) = \int\frac{\rho(t - R/c, \mathbf r')}{R}\,\dd V', \qquad
+\mathbf A(t, \mathbf r) = \frac1c\int\frac{\mathbf j(t - R/c, \mathbf r')}{R}\,\dd V', \qquad R = |\mathbf r - \mathbf r'| :
+$$
+потенциал в точке наблюдения определяется состоянием источников в
+момент, когда свет вышел из них.
+:::
+
+Для точечного заряда $e$, движущегося по траектории $\mathbf r_0(t)$, интеграл с
+$\delta$-функцией даёт множитель $1/(1 - \mathbf n\cdot\mathbf v/c)$ от якобиана: **потенциалы
+Лиенара–Вихерта**
+$$
+\varphi = \frac{e}{R - \mathbf R\cdot\mathbf v/c}\bigg|_{t'}, \qquad \mathbf A = \frac{e\mathbf v/c}{R - \mathbf R\cdot\mathbf v/c}\bigg|_{t'}, \qquad
+t' + \frac{|\mathbf r - \mathbf r_0(t')|}{c} = t .
+$$
+Дифференцирование даёт поле из двух частей: «кулоновской», которая
+убывает как $1/R^2$ и зависит только от скорости, и **поля излучения**
+$$
+\mathbf E_\text{изл} = \frac{e}{c^2}\,\frac{\mathbf n\times\bigl((\mathbf n - \boldsymbol\beta)\times\dot{\boldsymbol\beta}c\bigr)}{\kappa^3R}\bigg|_{t'}, \qquad \mathbf B = \mathbf n\times\mathbf E, \qquad
+\kappa = 1 - \mathbf n\cdot\boldsymbol\beta ,
+$$
+пропорционального ускорению и убывающего как $1/R$ (ЛЛ, т. II, § 63).
+
+## Дипольное излучение
+
+Если размеры системы малы по сравнению с длиной волны, запаздыванием
+внутри системы можно пренебречь, и потенциалы выражаются через
+дипольный момент $\mathbf d(t) = \sum e\mathbf r$:
+$$
+\mathbf A = \frac{\dot{\mathbf d}(t - r/c)}{cr}, \qquad \varphi = -\operatorname{div}\frac{\mathbf d(t - r/c)}{r} .
+$$
+Проверим для диполя вдоль $z$ с **произвольной** зависимостью $d(t)$: калибровка
+Лоренца и волновое уравнение выполнены, а поток энергии через
+удалённую сферу на единицу телесного угла (берём $r^2\,\mathbf S\cdot\mathbf n$ при фиксированном
+запаздывающем времени $u = t - r/c$ и $r\to\infty$) не зависит от $r$:
+
+```{python}
+import numpy as np
+import sympy as sp
+from scipy.integrate import dblquad
+import matplotlib.pyplot as plt
+
+t, x, y, z = sp.symbols("t x y z", real=True)
+c = sp.Symbol("c", positive=True)
+X = (x, y, z)
+r = sp.sqrt(x**2 + y**2 + z**2)
+d = sp.Function("d")
+A = [sp.S(0), sp.S(0), d(t - r / c).diff(t) / (c * r)]
+phi = -sp.diff(d(t - r / c) / r, z)
+print("калибровка Лоренца:", sp.simplify(phi.diff(t) / c + sum(A[i].diff(X[i]) for i in range(3))))
+print("волновое уравнение для φ:", sp.simplify(phi.diff(t, 2) / c**2 - sum(phi.diff(v, 2) for v in X)))
+
+E = [-phi.diff(X[i]) - A[i].diff(t) / c for i in range(3)]
+B = [A[2].diff(y) - A[1].diff(z), A[0].diff(z) - A[2].diff(x), A[1].diff(x) - A[0].diff(y)]
+R_, theta, u = sp.symbols("R theta u", positive=True)
+n = [sp.sin(theta), 0, sp.cos(theta)]
+ExB = [E[1] * B[2] - E[2] * B[1], E[2] * B[0] - E[0] * B[2], E[0] * B[1] - E[1] * B[0]]
+flux = c / (4 * sp.pi) * sum(ni * s for ni, s in zip(n, ExB))
+on_sphere = {x: R_ * sp.sin(theta), y: 0, z: R_ * sp.cos(theta)}
+dI_dOmega = sp.limit(sp.simplify((flux.subs(on_sphere).subs(t, u + R_ / c) * R_**2).doit()), R_, sp.oo)
+print("dI/dΩ =", sp.simplify(dI_dOmega))
+print("I =", sp.simplify(sp.integrate(dI_dOmega * 2 * sp.pi * sp.sin(theta), (theta, 0, sp.pi))))
+```
+
+Получилось
+$$
+\frac{\dd I}{\dd\Omega} = \frac{\ddot d^2\sin^2\theta}{4\pi c^3}, \qquad I = \frac{2\ddot{\mathbf d}^2}{3c^3}
+$$
+в момент $u = t - r/c$: диполь не излучает вдоль своей оси, сильнее всего — в
+экваториальной плоскости. Для одного заряда $\ddot{\mathbf d} = e\mathbf a$ — **формула Лармора**
+$I = 2e^2a^2/3c^3$. Излучает только ускоренный заряд.
+
+## Релятивистский заряд: прожектор
+
+При скоростях, близких к $c$, множитель $\kappa^{-3}$ в поле излучения резко
+усиливает излучение вперёд. Для заряда на окружности (ускорение
+перпендикулярно скорости) мощность на единицу телесного угла,
+отнесённая ко времени излучения $t'$ (поток через сферу, умноженный на
+$\dd t/\dd t' = \kappa$), равна
+$$
+\frac{\dd P}{\dd\Omega} = \frac{e^2a^2}{4\pi c^3}\,\frac{(1 - \beta\cos\theta)^2 - (1 - \beta^2)\sin^2\theta\cos^2\phi}{(1 - \beta\cos\theta)^5},
+$$
+где $\theta$ отсчитывается от скорости, а $\phi$ — от плоскости $(\mathbf v, \mathbf a)$. Сверим эту
+формулу с полем излучения $R^2c\,|\mathbf E_\text{изл}|^2\kappa/4\pi$ в случайных направлениях и
+проинтегрируем по сфере. По Лиенару полная мощность $\frac{2e^2a^2}{3c^3}\gamma^4$ (единицы
+$e = c = a = 1$):
+
+```{python}
+def rad_pattern(th, ph, beta):
+    k = 1 - beta * np.cos(th)
+    return ((k**2 - (1 - beta**2) * np.sin(th)**2 * np.cos(ph)**2) / k**5) / (4 * np.pi)
+
+def from_field(th, ph, beta):
+    """R²|E_изл|² κ / 4π для β ∥ z, β̇ ∥ x, |β̇| = 1."""
+    nvec = np.array([np.sin(th) * np.cos(ph), np.sin(th) * np.sin(ph), np.cos(th)])
+    b, bdot = np.array([0, 0, beta]), np.array([1.0, 0, 0])
+    kappa = 1 - nvec @ b
+    E_rad = np.cross(nvec, np.cross(nvec - b, bdot)) / kappa**3
+    return E_rad @ E_rad * kappa / (4 * np.pi)
+
+rng = np.random.default_rng(5)
+checks = [(rng.uniform(0, np.pi), rng.uniform(0, 2 * np.pi), rng.uniform(0, 0.99)) for _ in range(5)]
+print("max |формула − поле| =", max(abs(rad_pattern(*a) - from_field(*a)) for a in checks))
+for beta in (0.1, 0.5, 0.9, 0.99):
+    total = dblquad(lambda th, ph: rad_pattern(th, ph, beta) * np.sin(th), 0, 2 * np.pi, 0, np.pi,
+                    epsabs=1e-12, epsrel=1e-10)[0]
+    gamma = 1 / np.sqrt(1 - beta**2)
+    print(f"β = {beta}: ∫dP/dΩ = {total:.6g},  (2/3)γ⁴ = {2 / 3 * gamma**4:.6g}")
+```
+
+```{python}
+#| label: fig-beaming
+#| fig-cap: 'Угловое распределение излучения заряда на окружности в плоскости орбиты, нормированное на максимум: скорость направлена вдоль 0°, ускорение (к центру) — вдоль 90°. Нули лежат под углом arccos β к скорости (84° при β = 0,1, 60° при β = 0,5, 26° при β = 0,9); уже при β = 0,1 вперёд излучается почти вдвое больше, чем назад, а при β = 0,9 (γ = 2,3) излучение собрано в узкий конус вдоль скорости.'
+fig, axes = plt.subplots(1, 3, figsize=(10, 3.4), subplot_kw={"projection": "polar"})
+angles = np.linspace(0, 2 * np.pi, 2000)
+for ax, beta in zip(axes, (0.1, 0.5, 0.9)):
+    # в плоскости орбиты: θ — угол от скорости, ускорение при угле 90° (φ = 0 в формуле)
+    vals = rad_pattern(np.abs(np.angle(np.exp(1j * angles))), 0.0, beta)
+    ax.plot(angles, vals / vals.max(), color="tab:blue")
+    ax.set_title(f"β = {beta}", pad=12)
+    ax.set_yticklabels([])
+plt.tight_layout()
+plt.show()
+```
+
+Полная мощность растёт как $\gamma^4$, а излучение собирается в конус с
+углом раствора порядка $1/\gamma$. Наблюдатель видит короткие вспышки, когда
+конус проходит через него, — поэтому спектр синхротронного излучения
+простирается до частот в $\gamma^3$ раз выше частоты обращения.
+
+## Физика: почему атом не падает и почему небо голубое
+
+**Классический атом.** Электрон на круговой орбите радиуса $r$ вокруг протона
+излучает по Лармору $\frac{2e^2}{3c^3}\left(\frac{e^2}{mr^2}\right)^2$, а его энергия $-e^2/2r$. Приравнивая скорость
+убывания энергии к мощности, получаем $\dot r = -\frac{4}{3}\frac{r_e^2c}{r^2}$ ($r_e = e^2/mc^2$) и время
+падения с боровского радиуса $a_0$: $t = \frac{a_0^3}{4r_e^2c}$.
+
+```{python}
+r_e, a0, c_SI = 2.8179403e-15, 5.29177e-11, 2.99792458e8
+print(f"время падения электрона на ядро: {a0**3 / (4 * r_e**2 * c_SI):.2e} с")
+```
+
+Атом прожил бы около $10^{-11}$ с. Устойчивость атомов — квантовый эффект.
+
+**Рассеяние света.** Электрон, связанный в молекуле с собственной частотой $\omega_0$,
+под действием волны $E_0\cos\omega t$ колеблется с амплитудой $eE_0/m(\omega_0^2 - \omega^2)$ и
+переизлучает. При $\omega \ll \omega_0$ (видимый свет и молекулы воздуха, $\omega_0$ — в
+ультрафиолете) $\ddot d \propto \omega^2$ и рассеянная мощность $\propto\omega^4$ — закон Рэлея.
+Синий свет (450 нм) рассеивается в $(700/450)^4 \approx 5{,}9$ раза сильнее красного (700 нм):
+небо голубое, а Солнце на закате красное.
+
+## Итоги
+
+- Запаздывающие потенциалы $\varphi = \int\rho_\text{ret}/R$, $\mathbf A = \frac1c\int\mathbf j_\text{ret}/R$ — свёртка с запаздывающей
+  функцией Грина; для точечного заряда — потенциалы Лиенара–Вихерта.
+- Поле ускоренного заряда содержит часть $\propto\dot{\mathbf v}/R$ — поле излучения, уносящее
+  энергию на бесконечность.
+- Дипольное излучение: $\dd I/\dd\Omega = \ddot d^2\sin^2\theta/4\pi c^3$, $I = 2\ddot{\mathbf d}^2/3c^3$; формула Лармора $2e^2a^2/3c^3$.
+- Релятивистский заряд на окружности излучает в $\gamma^4$ раз сильнее, в узкий конус
+  шириной $\sim1/\gamma$ вдоль скорости.
+- Классический атом сколлапсировал бы за $\sim1{,}6\cdot10^{-11}$ с; рэлеевское рассеяние $\propto\omega^4$.
+
+## Упражнения
+
+1. Найдите среднюю за период мощность излучения диполя $d = d_0\cos\omega t$.
+2. Короткая антенна длины $l \ll \lambda$ с током $I_0\cos\omega t$ (дипольный момент $\dot d = Il$). Найдите
+   сопротивление излучения $R_\text{изл}$ ($\langle P\rangle = \frac12R_\text{изл}I_0^2$) и выразите его в омах через $l/\lambda$.
+3. Оцените время падения электрона на ядро в классической модели атома
+   водорода.
+4. Во сколько раз синий свет (450 нм) рассеивается в атмосфере сильнее
+   красного (700 нм)?
+5. Энергия, теряемая электроном за оборот в синхротроне, $\Delta E = \frac{4\pi}{3}\frac{e^2}{R}\beta^3\gamma^4$. Найдите её
+   для электронов с энергией 100 ГэВ при радиусе поворота 3,1 км (коллайдер LEP).
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $\ddot d = -\omega^2d_0\cos\omega t$, $\langle\ddot d^2\rangle = \omega^4d_0^2/2$, $\langle I\rangle = \frac{\omega^4d_0^2}{3c^3}$.
+2. $\ddot d = -\omega lI_0\sin\omega t$, $\langle P\rangle = \frac{\omega^2l^2I_0^2}{3c^3}$, $R_\text{изл} = \frac{2}{3c}\left(\frac{\omega l}{c}\right)^2 = \frac{2}{3c}\left(\frac{2\pi l}{\lambda}\right)^2$
+   в гауссовых единицах; так как $1/c$ соответствует $30$ Ом, $R_\text{изл} \approx 789\,(l/\lambda)^2$ Ом —
+   около 8 Ом при $l = 0{,}1\lambda$.
+3. $t = a_0^3/(4r_e^2c) \approx 1{,}6\cdot10^{-11}$ с.
+4. $(700/450)^4 \approx 5{,}9$.
+5. $\Delta E\,[\text{ГэВ}] \approx 8{,}85\cdot10^{-5}\,E^4[\text{ГэВ}]/R[\text{м}] \approx 2{,}9$ ГэВ за оборот: при 100 ГэВ
+   электрон теряет почти 3 % энергии на каждом обороте — поэтому круговые
+   электронные коллайдеры не строят на энергии много выше.
+:::
