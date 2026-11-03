@@ -1,0 +1,248 @@
+---
+title: "Момент импульса"
+topic: angular-momentum-qm
+order: 7
+description: "Момент импульса как генератор вращений: Û = e^{−iθn·Ĵ/ħ}, на функциях L̂ = −iħ r×∇ (проверка [L̂_x, L̂_y] = iħL̂_z и поворота линейных функций); спектр j(j + 1)ħ², mħ и почему орбитальный момент целый; «вектор» длины ħ√(j(j + 1)); сложение моментов J = L + S, L·S = (J² − L² − S²)/2 и тонкое расщепление; эффект Зеемана: слабое поле и множитель Ланде g_J, сильное поле (Пашен–Бак), точная диагонализация для p-уровня (рисунок); D-дублет натрия"
+---
+
+В классической механике момент импульса сохраняется, если система
+симметрична относительно вращений ([теорема Нётер](/physics/mechanics/noether.qmd)); он
+порождает вращения через скобку Пуассона. В квантовой механике эта связь
+становится определением: **момент импульса — это генератор унитарного
+представления группы вращений** на пространстве состояний. Отсюда сразу
+следуют и коммутационные соотношения, и спектр, и правила сложения — они
+уже получены в статье о [неприводимых представлениях SU(2)](/math/lie/su2-reps.qmd). Здесь мы
+посмотрим, как эта алгебра работает в физике атома.
+
+## Генератор вращений
+
+::: {#def-angular-momentum}
+Пусть на гильбертовом пространстве $\mathcal H$ действует унитарное представление
+$R \mapsto \hat U(R)$ группы вращений (или SU(2)). **Оператор момента импульса**
+$\hat{\mathbf J}$ определяется равенством
+$$
+\hat U(R_{\mathbf n}(\theta)) = e^{-i\theta\,\mathbf n\cdot\hat{\mathbf J}/\hbar},
+$$
+где $R_{\mathbf n}(\theta)$ — поворот на угол $\theta$ вокруг единичного вектора $\mathbf n$.
+:::
+
+Так как $\hat U$ — представление, генераторы удовлетворяют соотношениям алгебры
+Ли: $[\hat J_x, \hat J_y] = i\hbar\hat J_z$ (и циклически). В соглашениях пособия
+([конвенции](/conventions.qmd), раздел «Группы Ли») $\hat J_k = i\hbar\,\rho(J_k)$, где $J_k$ — вещественные
+генераторы. Для частицы без спина $\mathcal H = L^2(\R^3)$, а представление действует
+на функции как $(\hat U(R)\psi)(\mathbf r) = \psi(R^{-1}\mathbf r)$. Из-за $R^{-1}$ матрице $J_k$ отвечает поле $-L_k$
+([инвариантные дифференциальные операторы](/math/lie/invariant-operators.qmd)), и
+$$
+\hat{\mathbf L} = -i\hbar\,\mathbf r\times\nabla = \mathbf r\times\hat{\mathbf p}, \qquad \hat L_z = -i\hbar\,\partial_\varphi .
+$$
+Проверим коммутаторы на произвольной функции и само утверждение «$\hat L_z$
+порождает поворот»: на линейных функциях $x, y, z$ оператор $\hat L_z$ действует
+матрицей, и её экспонента должна совпадать с $\psi \mapsto \psi(R^{-1}\mathbf r)$.
+
+```{python}
+import numpy as np
+import sympy as sp
+from gmph.lie import spin_matrices
+
+hbar = sp.Symbol("hbar", positive=True)
+x, y, z, alpha = sp.symbols("x y z alpha", real=True)
+r = sp.Matrix([x, y, z])
+f = sp.Function("f")(x, y, z)
+
+def L_hat(k, psi):
+    """L̂ = −iħ r × ∇, k-я компонента."""
+    grad = sp.Matrix([psi.diff(v) for v in (x, y, z)])
+    return -sp.I * hbar * r.cross(grad)[k]
+
+comm = sp.expand(L_hat(0, L_hat(1, f)) - L_hat(1, L_hat(0, f)) - sp.I * hbar * L_hat(2, f))
+print("[L̂x, L̂y] − iħL̂z на произвольной f:", sp.simplify(comm))
+
+# матрица L̂z на базисе (x, y, z): L̂z(базис_j) = Σ_i M_ij базис_i
+basis = [x, y, z]
+Mz = sp.Matrix(3, 3, lambda i, j: sp.expand(L_hat(2, basis[j])).coeff(basis[i]))
+U = sp.simplify((-sp.I * alpha * Mz / hbar).exp())
+rotated = sp.Matrix(basis).T * U                         # образы x, y, z под e^{−iαL̂z/ħ}
+Rz = sp.Matrix([[sp.cos(alpha), -sp.sin(alpha), 0], [sp.sin(alpha), sp.cos(alpha), 0], [0, 0, 1]])
+expected = (Rz.T * r).T                                  # ψ(R⁻¹r) для ψ = x, y, z
+print("e^{−iαL̂z/ħ} ψ = ψ(R⁻¹r) на x, y, z:", sp.simplify(rotated - expected) == sp.zeros(1, 3))
+```
+
+## Спектр
+
+Спектр следует из одной алгебры ([неприводимые представления SU(2)](/math/lie/su2-reps.qmd)):
+в каждом неприводимом подпространстве
+$$
+\hat{\mathbf J}^2 = \hbar^2j(j + 1), \qquad \hat J_z = \hbar m, \quad m = -j, \dots, j, \qquad j = 0, \tfrac12, 1, \dots
+$$
+Полуцелые $j$ — представления SU(2), но не SO(3): поворот на $2\pi$ умножает
+состояние на $(-1)^{2j}$. Для **орбитального** момента допустимы только целые
+$l$: собственные функции $\hat L_z = -i\hbar\partial_\varphi$ — это $e^{im\varphi}$, а однозначность волновой
+функции требует целого $m$. Полуцелые моменты в природе есть — это спин, и
+он не сводится к движению в пространстве (тема «Спин»). Собственные
+функции орбитального момента — [сферические функции](/math/lie/spherical-harmonics.qmd) $Y_{lm}$.
+
+**«Длина» момента.** Собственное значение $\hbar^2j(j + 1)$ больше $\hbar^2j^2$: вектор
+момента не может быть направлен точно вдоль оси. Наглядная (векторная)
+модель: в состоянии $|j, m\rangle$ «вектор» длины $\hbar\sqrt{j(j + 1)}$ прецессирует по
+конусу вокруг оси $z$ с проекцией $\hbar m$, а $\langle J_x\rangle = \langle J_y\rangle = 0$, $\langle J_x^2\rangle = \langle J_y^2\rangle = \frac{\hbar^2}{2}(j(j + 1) - m^2)$
+(см. [соотношения неопределённостей](/physics/quantum/uncertainty.qmd)). Угол раствора конуса при $m = j$
+стремится к нулю лишь при $j \to \infty$ — это и есть классический предел.
+
+## Сложение моментов
+
+Электрон в атоме обладает орбитальным моментом $\hat{\mathbf L}$ и спином $\hat{\mathbf S}$. Пространство
+состояний — тензорное произведение, и вращения действуют на оба
+сомножителя: генератор $\hat{\mathbf J} = \hat{\mathbf L}\otimes1 + 1\otimes\hat{\mathbf S}$. Произведение представлений
+раскладывается в сумму неприводимых, $l\otimes s = |l - s|\oplus\dots\oplus(l + s)$, а переход
+от базиса $|l, m_l\rangle|s, m_s\rangle$ к базису $|j, m_j\rangle$ задают коэффициенты Клебша–Гордана.
+
+Зачем менять базис? Взаимодействие спина с орбитой (релятивистская
+поправка, тема «Атом водорода») пропорционально $\hat{\mathbf L}\cdot\hat{\mathbf S}$. Этот оператор не
+коммутирует ни с $\hat L_z$, ни с $\hat S_z$, но коммутирует с $\hat{\mathbf J}$ и диагонален в
+связанном базисе:
+$$
+\hat{\mathbf L}\cdot\hat{\mathbf S} = \tfrac12\bigl(\hat{\mathbf J}^2 - \hat{\mathbf L}^2 - \hat{\mathbf S}^2\bigr) = \frac{\hbar^2}{2}\bigl(j(j + 1) - l(l + 1) - s(s + 1)\bigr).
+$$
+Проверим на $p$-электроне ($l = 1$, $s = \frac12$, $\hbar = 1$):
+
+```{python}
+def coupled_operators(l, s):
+    """L, S, J в пространстве (2l + 1)(2s + 1) как матрицы numpy."""
+    L = [np.array(M, dtype=complex) for M in spin_matrices(l)]
+    S = [np.array(M, dtype=complex) for M in spin_matrices(s)]
+    I_l, I_s = np.eye(len(L[0])), np.eye(len(S[0]))
+    L_full = [np.kron(M, I_s) for M in L]
+    S_full = [np.kron(I_l, M) for M in S]
+    return L_full, S_full, [a + b for a, b in zip(L_full, S_full)]
+
+L6, S6, J6 = coupled_operators(1, sp.Rational(1, 2))
+LS = sum(a @ b for a, b in zip(L6, S6))
+J2 = sum(M @ M for M in J6)
+print("собственные значения J²:  ", np.round(np.linalg.eigvalsh(J2), 6))
+print("собственные значения L·S: ", np.round(np.linalg.eigvalsh(LS), 6))
+print("[L·S, Jz] = 0:", np.allclose(LS @ J6[2], J6[2] @ LS), "   [L·S, Lz] = 0:", np.allclose(LS @ L6[2], L6[2] @ LS))
+```
+
+Шесть состояний $p$-электрона распадаются на квартет $j = \frac32$ ($\mathbf L\cdot\mathbf S = +\frac{\hbar^2}{2}$) и
+дублет $j = \frac12$ ($\mathbf L\cdot\mathbf S = -\hbar^2$). При энергии $\xi\,\mathbf L\cdot\mathbf S/\hbar^2$ расщепление равно $\frac32\xi$ — это
+**тонкая структура**. У натрия переходы $3p_{3/2}\to3s$ и $3p_{1/2}\to3s$ дают знаменитый
+жёлтый **D-дублет**:
+
+```{python}
+hc_eV_nm = 1239.84193
+lam_D2, lam_D1 = 588.995, 589.592                   # нм
+dE = hc_eV_nm / lam_D2 - hc_eV_nm / lam_D1
+mu_B = 5.7883818e-5                                 # магнетон Бора, эВ/Тл
+print(f"тонкое расщепление 3p натрия: ΔE = {dE * 1e3:.3f} мэВ,  ξ = 2ΔE/3 = {2 * dE / 3 * 1e3:.3f} мэВ")
+print(f"поле, при котором μ_B·B = ΔE: {dE / mu_B:.0f} Тл")
+```
+
+## Физика: эффект Зеемана
+
+В магнитном поле $B$ вдоль $z$ к энергии добавляется $\mu_BB(\hat L_z + 2\hat S_z)/\hbar$ — у спина
+вдвое больший магнитный момент. Гамильтониан $p$-уровня
+$$
+\hat H = \frac{\xi}{\hbar^2}\,\hat{\mathbf L}\cdot\hat{\mathbf S} + \frac{\mu_BB}{\hbar}\,(\hat L_z + 2\hat S_z)
+$$
+содержит два слагаемых, диагональных в **разных** базисах, и потому
+интересен.
+
+- **Слабое поле** ($\mu_BB \ll \xi$). Состояния $|j, m_j\rangle$ почти не меняются, сдвиг равен
+  среднему: $\Delta E = g_J\mu_BBm_j$ с **множителем Ланде**
+  $$
+  g_J = 1 + \frac{j(j + 1) + s(s + 1) - l(l + 1)}{2j(j + 1)} .
+  $$
+  Он возникает потому, что внутри мультиплета $j$ любой векторный оператор
+  пропорционален $\hat{\mathbf J}$, а $\hat{\mathbf L} + 2\hat{\mathbf S} = \hat{\mathbf J} + \hat{\mathbf S}$ — сумма двух разных векторов.
+- **Сильное поле** ($\mu_BB \gg \xi$, эффект **Пашена–Бака**). Спин и орбита «расцепляются»,
+  хорошие квантовые числа — $m_l, m_s$: $E = \mu_BB(m_l + 2m_s) + \xi m_lm_s$.
+
+Диагонализуем $\hat H$ точно и проверим оба предела:
+
+```{python}
+def zeeman_levels(b, xi=1.0):
+    """Уровни p-электрона при μ_B B = b (ħ = 1), отсортированные."""
+    return np.linalg.eigvalsh(xi * LS + b * (L6[2] + 2 * S6[2]))
+
+def lande(j, l=1, s=0.5):
+    return 1 + (j * (j + 1) + s * (s + 1) - l * (l + 1)) / (2 * j * (j + 1))
+
+b_small = 1e-5
+slopes = np.sort((zeeman_levels(b_small) - zeeman_levels(0)) / b_small)
+expected = np.sort([lande(j) * mj for j in (0.5, 1.5) for mj in np.arange(-j, j + 1)])
+print("наклоны при B → 0:      ", np.round(slopes, 4))
+print("g_J·m_j:                ", np.round(expected, 4), f"  (g_3/2 = {lande(1.5):.4f}, g_1/2 = {lande(0.5):.4f})")
+
+b_big = 1e4
+strong = np.sort([b_big * (ml + 2 * ms) + ml * ms for ml in (-1, 0, 1) for ms in (-0.5, 0.5)])
+print("сильное поле, max |точно − (μ_B B(m_l + 2m_s) + ξ m_l m_s)| =", f"{np.abs(zeeman_levels(b_big) - strong).max():.1e}  (поправки порядка ξ²/μ_B B)")
+```
+
+```{python}
+#| label: fig-zeeman
+#| fig-cap: 'Уровни p-электрона (l = 1, s = ½) в магнитном поле, энергия и поле в единицах константы тонкой структуры ξ (сплошные линии — точная диагонализация). При B = 0 — квартет j = 3/2 (E = ξ/2) и дублет j = 1/2 (E = −ξ); оранжевые пунктиры — линейный закон слабого поля E_j + g_J μ_B B m_j с g = 4/3 и 2/3. Серые пунктиры — прямые сильного поля μ_B B(m_l + 2m_s) + ξ m_l m_s, к которым уровни приближаются при μ_B B ≫ ξ; два из них (m_l = ±1, m_s = ∓½) совпадают. Пересекаются только уровни с разными m_j = m_l + m_s.'
+import matplotlib.pyplot as plt
+
+b_max = 8
+b_grid = np.linspace(0, b_max, 400)
+levels = np.array([zeeman_levels(b) for b in b_grid])
+fig, ax = plt.subplots(figsize=(7.5, 4.8))
+ax.plot(b_grid, levels, color="tab:blue")
+weak = b_grid[b_grid < 0.8]
+for j, E0 in ((1.5, 0.5), (0.5, -1.0)):
+    for mj in np.arange(-j, j + 1):
+        ax.plot(weak, E0 + lande(j) * mj * weak, "--", color="tab:orange", lw=1.2)
+strong_b = b_grid[b_grid > 2]
+labels = {}
+for ml in (-1, 0, 1):
+    for ms in (-0.5, 0.5):
+        E_end = b_max * (ml + 2 * ms) + ml * ms
+        ax.plot(strong_b, strong_b * (ml + 2 * ms) + ml * ms, ":", color="0.4", lw=1.2)
+        labels.setdefault(round(E_end, 6), []).append(f"m_l = {('−1', '0', '+1')[ml + 1]}, m_s = {'+' if ms > 0 else '−'}½")
+for E_end, text in labels.items():
+    ax.annotate("\n".join(text), (b_max, E_end), xytext=(5, 0), textcoords="offset points", fontsize=8, va="center")
+ax.set(xlabel="μ_B B / ξ", ylabel="E / ξ", xlim=(0, b_max + 3))
+plt.tight_layout()
+plt.show()
+```
+
+Для натрия переход от линейного эффекта Зеемана к режиму Пашена–Бака
+происходит при полях порядка $\Delta E/\mu_B \approx 37$ Тл (вычислено выше) — это поля
+сильнейших лабораторных магнитов. Для лёгких атомов с маленьким
+расщеплением (водород, литий) режим Пашена–Бака достигается легко. На
+солнечных пятнах (поля порядка 0,1–0,3 Тл) наблюдается слабое поле:
+расщепление спектральных линий по множителям Ланде позволяет измерять
+магнитное поле Солнца.
+
+## Итоги
+
+- Момент импульса — генератор вращений: $\hat U = e^{-i\theta\mathbf n\cdot\hat{\mathbf J}/\hbar}$, $[\hat J_x, \hat J_y] = i\hbar\hat J_z$; на
+  функциях $\hat{\mathbf L} = -i\hbar\,\mathbf r\times\nabla$.
+- Спектр $\hbar^2j(j + 1)$, $\hbar m$; орбитальный момент целый из-за однозначности $e^{im\varphi}$.
+- Сложение $\hat{\mathbf J} = \hat{\mathbf L} + \hat{\mathbf S}$ — разложение тензорного произведения представлений; $\hat{\mathbf L}\cdot\hat{\mathbf S}$
+  диагонален в связанном базисе, отсюда тонкая структура ($p$: $+\frac12$ и $-1$ в единицах $\hbar^2$).
+- Эффект Зеемана: в слабом поле $g_J\mu_BBm_j$, в сильном $\mu_BB(m_l + 2m_s) + \xi m_lm_s$; между ними —
+  точная диагонализация.
+
+## Упражнения
+
+1. Найдите собственные значения $\hat{\mathbf L}\cdot\hat{\mathbf S}$ для $d$-электрона ($l = 2$, $s = \frac12$) и тонкое
+   расщепление в единицах $\xi$.
+2. Вычислите множители Ланде для уровней $^2S_{1/2}$, $^2P_{1/2}$, $^2P_{3/2}$, $^2D_{5/2}$.
+3. Покажите, используя только коммутаторы $[\hat L_i, \hat L_j] = i\hbar\varepsilon_{ijk}\hat L_k$, что $[\hat{\mathbf L}^2, \hat L_z] = 0$.
+4. Электрон в состоянии $|{\uparrow}\rangle$ повернули на угол $\theta$ вокруг оси $y$. С какой
+   вероятностью измерение $S_z$ даст $+\hbar/2$? Чему равен результат поворота на
+   $2\pi$?
+5. Разложите состояние двух частиц со спином 1, $|1, 1\rangle|1, -1\rangle$, по состояниям
+   с определённым полным моментом $|J, 0\rangle$.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $j = \frac52$: $\mathbf L\cdot\mathbf S = \hbar^2$; $j = \frac32$: $-\frac32\hbar^2$. Расщепление $\frac52\xi$ (в общем случае $\xi(l + \frac12)$).
+2. $g(^2S_{1/2}) = 2$, $g(^2P_{1/2}) = \frac23$, $g(^2P_{3/2}) = \frac43$, $g(^2D_{5/2}) = \frac65$.
+3. $[\hat L_x^2, \hat L_z] = \hat L_x[\hat L_x, \hat L_z] + [\hat L_x, \hat L_z]\hat L_x = -i\hbar(\hat L_x\hat L_y + \hat L_y\hat L_x)$,
+   $[\hat L_y^2, \hat L_z] = +i\hbar(\hat L_y\hat L_x + \hat L_x\hat L_y)$, $[\hat L_z^2, \hat L_z] = 0$; сумма равна нулю.
+4. $e^{-i\theta\sigma_y/2}|{\uparrow}\rangle = \cos\frac\theta2|{\uparrow}\rangle + \sin\frac\theta2|{\downarrow}\rangle$, вероятность $\cos^2\frac\theta2$. При $\theta = 2\pi$ состояние
+   переходит в $-|{\uparrow}\rangle$: физически то же, но фаза $-1$ наблюдаема в интерференции.
+5. $|1, 1\rangle|1, -1\rangle = \frac{1}{\sqrt6}|2, 0\rangle + \frac{1}{\sqrt2}|1, 0\rangle + \frac{1}{\sqrt3}|0, 0\rangle$ (фазы Кондона–Шортли).
+:::
