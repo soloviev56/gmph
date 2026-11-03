@@ -1,0 +1,283 @@
+---
+title: "Кинематика сплошной среды"
+topic: continuum-kinematics
+order: 1
+description: "Движение среды как семейство диффеоморфизмов x = φ_t(X); описания Лагранжа и Эйлера, поле скоростей и материальная производная D/Dt = ∂_t + v·∇; градиент деформации F, тензор Коши–Грина C = FᵀF = φ*g и тензор деформаций Грина E = ½(φ*g − g); поворот не деформирует (E = 0, хотя линейный ε ≠ 0); главные удлинения простого сдвига; скорость деформации D = ½ L_v g (функция lie_metric): твёрдое вращение и потенциальный вихрь; J = det F, dJ/dt = J div v, несжимаемость и уравнение непрерывности как L(ρ vol) = 0; материальный круг в ячеистом течении: площадь сохраняется, периметр растёт (рисунок)"
+---
+
+Жидкость или упругое тело состоят из огромного числа частиц, но
+описываем мы их полями: скоростью, плотностью, деформацией. Механика
+сплошной среды начинается с вопроса, что такое «движение среды»
+математически. Ответ — это поток: семейство диффеоморфизмов, которое
+переносит каждую частицу из начального положения в текущее. Тогда
+деформация — это то, насколько поток портит метрику, скорость
+деформации — производная Ли метрики вдоль поля скоростей, а сохранение
+массы — инвариантность формы $\rho\,\mathrm{vol}$. Язык [потоков](/math/forms/flows.qmd) и
+[производной Ли](/math/forms/interior-lie.qmd) оказывается для сплошной среды родным.
+
+## Описания Лагранжа и Эйлера
+
+::: {#def-motion}
+**Движение** среды — семейство гладких обратимых отображений $x = \varphi_t(X)$ области
+$B$ (отсчётной конфигурации) в пространство; $X$ — **лагранжевы** (материальные)
+координаты частицы, $x$ — её **эйлеровы** (пространственные) координаты в момент $t$.
+**Поле скоростей** — эйлерово поле
+$$
+\mathbf v(x, t) = \partial_t\varphi_t\bigl(\varphi_t^{-1}(x)\bigr),
+$$
+скорость той частицы, которая в момент $t$ находится в точке $x$.
+:::
+
+Величину можно описывать как функцию частицы $F(X, t)$ (Лагранж) или
+как функцию точки $f(x, t)$ (Эйлер). Скорость изменения величины у
+движущейся частицы — **материальная производная**
+$$
+\frac{Df}{Dt} = \pd{f}{t} + \mathbf v\cdot\nabla f = \pd{f}{t} + \Lie{v}f .
+$$
+Это производная Ли вдоль поля $\partial_t + \mathbf v$ в пространстве-времени. Проверим на
+простом сдвиге $x = X + \gamma tY$, $y = Y$: найдём эйлерову скорость и убедимся, что
+поле, «вмороженное» в частицы, имеет нулевую материальную производную:
+
+```{python}
+import numpy as np
+import sympy as sp
+from gmph.riemann import lie_metric
+
+t, gamma = sp.symbols("t gamma", real=True)
+X, Y, x, y = sp.symbols("X Y x y", real=True)
+
+def eulerian_velocity(motion, lagr, eul):
+    """v(x, t): ∂_t φ, выраженная через эйлеровы координаты."""
+    inverse = sp.solve([sp.Eq(e, m) for e, m in zip(eul, motion)], lagr, dict=True)[0]
+    return [sp.simplify(sp.diff(m, t).subs(inverse)) for m in motion], inverse
+
+shear = [X + gamma * t * Y, Y]
+v_shear, inv = eulerian_velocity(shear, (X, Y), (x, y))
+print("v =", v_shear)
+f_frozen = sp.sin(X) * Y**2                                   # метка частицы
+f_euler = f_frozen.subs(inv)                                  # та же величина как функция (x, t)
+material = sp.diff(f_euler, t) + sum(vi * sp.diff(f_euler, xi) for vi, xi in zip(v_shear, (x, y)))
+print("D f/Dt =", sp.simplify(material))
+```
+
+## Деформация
+
+Расстояния между близкими частицами меняются: вектор $\dd X$ переходит в
+$\dd x = F\,\dd X$, где $F = \partial x/\partial X$ — **градиент деформации** (касательное отображение
+$\varphi_{t*}$). Квадрат длины
+$$
+|\dd x|^2 = \dd X^{\mathsf T}\,C\,\dd X, \qquad C = F^{\mathsf T}F = \varphi_t^*g ,
+$$
+так что **тензор Коши–Грина** $C$ — это просто обратный образ евклидовой метрики:
+метрика, которую «видит» отсчётная конфигурация после движения.
+
+::: {#def-strain}
+**Тензор деформаций Грина–Лагранжа** $E = \frac12(C - I) = \frac12(\varphi^*g - g)$. Через перемещение
+$\mathbf u = x - X$
+$$
+E_{ij} = \tfrac12\left(\partial_iu_j + \partial_ju_i + \partial_iu_k\,\partial_ju_k\right),
+$$
+и при малых градиентах — **линейный** тензор деформаций $\varepsilon_{ij} = \frac12(\partial_iu_j + \partial_ju_i)$.
+:::
+
+Квадратичный член важен. При повороте тела как целого расстояния не
+меняются, и $E = 0$ точно — но $\varepsilon \neq 0$: линейная теория путает большой
+поворот с деформацией. Собственные значения $C$ — квадраты **главных
+удлинений** $\lambda_i$ (во сколько раз растягиваются главные направления):
+
+```{python}
+theta = sp.Symbol("theta", real=True)
+rotation = sp.Matrix([[sp.cos(theta), -sp.sin(theta)], [sp.sin(theta), sp.cos(theta)]])
+F_rot = rotation                                               # x = R X
+E_rot = sp.simplify((F_rot.T * F_rot - sp.eye(2)) / 2)
+eps_rot = sp.simplify(((F_rot - sp.eye(2)) + (F_rot - sp.eye(2)).T) / 2)
+print("поворот: E =", E_rot.tolist(), "   линейный ε =", eps_rot.tolist())
+
+F_shear = sp.Matrix(2, 2, lambda i, j: sp.diff(shear[i], (X, Y)[j])).subs(t, 1)
+C_shear = F_shear.T * F_shear
+stretches = [sp.sqrt(lam) for lam in C_shear.eigenvals()]
+print("простой сдвиг: C =", C_shear.tolist())
+print("главные удлинения при γ = 1:", [round(float(s.subs(gamma, 1)), 4) for s in stretches],
+      "  произведение² = det C =", sp.simplify(C_shear.det()))
+```
+
+Произведение главных удлинений равно $\det F = 1$: простой сдвиг сохраняет
+площадь, растягивая одно направление и во столько же раз сжимая другое.
+
+## Скорость деформации и производная Ли
+
+Продифференцируем $C = \varphi_t^*g$ по времени: производная обратного образа вдоль
+потока — это обратный образ производной Ли ([производная Ли](/math/forms/interior-lie.qmd)),
+$$
+\frac{\dd}{\dd t}\varphi_t^*g = \varphi_t^*\bigl(\Lie{v}g\bigr) .
+$$
+
+::: {#def-rate-of-strain}
+**Тензор скоростей деформаций** $D = \frac12\Lie{v}g$, в декартовых координатах
+$D_{ij} = \frac12(\partial_iv_j + \partial_jv_i)$. Антисимметричная часть градиента скорости
+$W_{ij} = \frac12(\partial_iv_j - \partial_jv_i)$ описывает локальное вращение (**завихренность**, тема
+«Завихренность»).
+:::
+
+Поле скоростей не деформирует среду тогда и только тогда, когда $D = 0$, то
+есть $\mathbf v$ — поле Киллинга: движение твёрдого тела. Функция `lie_metric` из
+`gmph.riemann` считает $\Lie{v}g$ в любых координатах. Сравним в полярных
+координатах два вихря: твёрдое вращение $\mathbf v = \Omega\,\partial_\varphi$ и потенциальный
+вихрь $\mathbf v = \frac{\Gamma}{2\pi r^2}\partial_\varphi$ (скорость $\Gamma/2\pi r$ — как у смерча вдали от оси):
+
+```{python}
+r, ph = sp.symbols("r phi", positive=True)
+Omega, Gam = sp.symbols("Omega Gamma", positive=True)
+g_polar = sp.diag(1, r**2)
+for name, v in {"твёрдое вращение": [0, Omega], "потенциальный вихрь": [0, Gam / (2 * sp.pi * r**2)]}.items():
+    D = lie_metric(v, g_polar, (r, ph)) / 2
+    print(f"{name}: D =", D.tolist())
+```
+
+Твёрдое вращение не деформирует ничего. Потенциальный вихрь, у которого
+нет завихренности (это проверяется в теме «Завихренность»), сдвигает слои
+друг относительно друга: $D_{r\varphi} = -\Gamma/2\pi r$ в координатном базисе, в
+ортонормированном ($\hat e_\varphi = \partial_\varphi/r$) — $-\Gamma/2\pi r^2$. Вращение и деформация — разные
+вещи: в первом случае частицы поворачиваются, не деформируясь, во
+втором деформируются, не поворачиваясь.
+
+## Объём и масса
+
+Элемент объёма меняется в $J = \det F$ раз. Так как форма объёма тоже
+переносится потоком, $\frac{\dd}{\dd t}\varphi_t^*\mathrm{vol} = \varphi_t^*(\Lie{v}\mathrm{vol})$, а $\Lie{v}\mathrm{vol} = (\operatorname{div}\mathbf v)\,\mathrm{vol}$, получаем
+**формулу Эйлера**
+$$
+\frac{DJ}{Dt} = J\operatorname{div}\mathbf v .
+$$
+Движение **несжимаемо** ($J = 1$), когда $\operatorname{div}\mathbf v = 0$. Масса частицы постоянна, то есть
+форма массы $\rho\,\mathrm{vol}$ переносится потоком: $\rho J = \rho_0$, или в эйлеровой записи
+$$
+\left(\partial_t + \Lie{v}\right)(\rho\,\mathrm{vol}) = 0 \iff \pd{\rho}{t} + \operatorname{div}(\rho\mathbf v) = 0 .
+$$
+Проверим формулу Эйлера на нелинейном движении $x = Xe^t$, $y = Y + tX^2$:
+
+```{python}
+motion = [X * sp.exp(t), Y + t * X**2]
+v_m, inv_m = eulerian_velocity(motion, (X, Y), (x, y))
+F_m = sp.Matrix(2, 2, lambda i, j: sp.diff(motion[i], (X, Y)[j]))
+J = F_m.det()
+div_v = sum(sp.diff(vi, xi) for vi, xi in zip(v_m, (x, y)))
+print("v =", v_m, "  J =", J, "  div v =", sp.simplify(div_v))
+print("dJ/dt − J div v =", sp.simplify(sp.diff(J, t) - J * div_v.subs({x: motion[0], y: motion[1]})))
+```
+
+## Физика: перемешивание в несжимаемом течении
+
+Возьмём стационарное **ячеистое течение** $\mathbf v = (-\sin\pi x\cos\pi y,\ \cos\pi x\sin\pi y)$ — модель
+конвективных ячеек. Оно несжимаемо ($\operatorname{div}\mathbf v = 0$), поэтому площадь любого
+материального пятна сохраняется. Но форма пятна меняется: оно
+вытягивается в длинную нить, наматывающуюся на ячейку. Проследим за
+материальным кругом — переносим потоком точки его границы:
+
+```{python}
+from scipy.integrate import solve_ivp
+
+def cellular(t_, z):
+    n = len(z) // 2
+    xs, ys = z[:n], z[n:]
+    return np.concatenate([-np.sin(np.pi * xs) * np.cos(np.pi * ys), np.cos(np.pi * xs) * np.sin(np.pi * ys)])
+
+print("div v =", sp.simplify(sp.diff(-sp.sin(sp.pi * x) * sp.cos(sp.pi * y), x) + sp.diff(sp.cos(sp.pi * x) * sp.sin(sp.pi * y), y)))
+
+def advect_boundary(center, radius, times, n0=400, max_gap=0.01):
+    """Граница материального круга в моменты times; точки добавляются там, где она растягивается."""
+    s = np.linspace(0, 2 * np.pi, n0, endpoint=False)
+    pts = np.column_stack([center[0] + radius * np.cos(s), center[1] + radius * np.sin(s)])
+    shapes, t_prev = [], 0.0
+    for t_next in times:
+        while t_prev < t_next:
+            step = min(0.05, t_next - t_prev)
+            sol = solve_ivp(cellular, (0, step), np.concatenate([pts[:, 0], pts[:, 1]]), rtol=1e-9, atol=1e-11)
+            n = len(pts)
+            pts = np.column_stack([sol.y[:n, -1], sol.y[n:, -1]])
+            t_prev += step
+            # уточнение: вставить середины слишком длинных отрезков (на следующем шаге они уже на потоке)
+            nxt = np.roll(pts, -1, axis=0)
+            gaps = np.linalg.norm(nxt - pts, axis=1)
+            new = []
+            for p_, q_, gp in zip(pts, nxt, gaps):
+                new.append(p_)
+                if gp > max_gap:
+                    new.append((p_ + q_) / 2)
+            pts = np.array(new)
+        shapes.append(pts.copy())
+    return shapes
+
+def area_and_perimeter(pts):
+    xs, ys = pts[:, 0], pts[:, 1]
+    area = 0.5 * abs(np.dot(xs, np.roll(ys, -1)) - np.dot(ys, np.roll(xs, -1)))
+    return area, np.sum(np.linalg.norm(np.roll(pts, -1, axis=0) - pts, axis=1))
+
+times = [0.0, 2.0, 5.0, 10.0]
+shapes = advect_boundary((0.3, 0.5), 0.15, times)
+for t_, pts in zip(times, shapes):
+    A, P = area_and_perimeter(pts)
+    print(f"t = {t_:3.1f}: площадь = {A:.5f}, периметр = {P:.3f}, точек на границе {len(pts)}")
+```
+
+```{python}
+#| label: fig-mixing
+#| fig-cap: 'Материальный круг (радиус 0,15) в ячеистом течении v = (−sin πx cos πy, cos πx sin πy) в моменты t = 0, 2, 5, 10 (тонкие линии — линии тока). Течение несжимаемо: площадь пятна остаётся равной π·0,15² ≈ 0,0707, а граница вытягивается в нить, наматывающуюся вокруг центра ячейки (0,5; 0,5); её длина растёт от 0,94 до 4,6.'
+import matplotlib.pyplot as plt
+
+fig, axes = plt.subplots(1, 4, figsize=(11, 3.1))
+gx, gy = np.meshgrid(np.linspace(0, 1, 60), np.linspace(0, 1, 60))
+psi = np.sin(np.pi * gx) * np.sin(np.pi * gy) / np.pi        # функция тока: v = (−∂ψ/∂y, ∂ψ/∂x)
+for ax, t_, pts in zip(axes, times, shapes):
+    ax.contour(gx, gy, psi, levels=8, colors="0.8", linewidths=0.6, linestyles="solid")
+    closed = np.vstack([pts, pts[:1]])
+    ax.fill(closed[:, 0], closed[:, 1], color="tab:blue", alpha=0.35)
+    ax.plot(closed[:, 0], closed[:, 1], color="tab:blue", lw=0.8)
+    ax.set(xlim=(0, 1), ylim=(0, 1), aspect="equal", title=f"t = {t_:g}", xticks=[], yticks=[])
+plt.tight_layout()
+plt.show()
+```
+
+Площадь постоянна (с точностью дискретизации границы), а периметр
+растёт — так несжимаемое течение перемешивает: оно не может сжать
+примесь, но вытягивает её в тонкие слои, по которым затем работает
+диффузия. В этом стационарном течении после короткого начального участка
+периметр растёт почти равномерно, примерно на 0,4 за единицу времени:
+частицы разных линий тока обходят ячейку за разное время, и нить
+наматывается спиралью. В нестационарных и трёхмерных течениях он бывает экспоненциальным —
+**хаотическое перемешивание**.
+
+## Итоги
+
+- Движение среды — поток $x = \varphi_t(X)$; эйлерова скорость $\mathbf v = \partial_t\varphi\circ\varphi^{-1}$; материальная
+  производная $D/Dt = \partial_t + \mathbf v\cdot\nabla$.
+- Деформация — изменение метрики: $C = F^{\mathsf T}F = \varphi^*g$, $E = \frac12(\varphi^*g - g)$; при повороте $E = 0$
+  точно, линейный $\varepsilon$ — нет.
+- Скорость деформации $D = \frac12\Lie{v}g$; $D = 0$ — движение твёрдого тела (поле Киллинга).
+- $DJ/Dt = J\operatorname{div}\mathbf v$; несжимаемость — $\operatorname{div}\mathbf v = 0$; масса: $\partial_t\rho + \operatorname{div}(\rho\mathbf v) = 0$, то есть
+  форма $\rho\,\mathrm{vol}$ переносится потоком.
+- Несжимаемое течение сохраняет площадь, но вытягивает материальные линии —
+  механизм перемешивания.
+
+## Упражнения
+
+1. Для простого сдвига $x = X + \gamma Y$, $y = Y$ найдите главные удлинения как функции $\gamma$.
+2. Течение $\mathbf v = (kx, -ky)$. Найдите траектории частиц, $D$, $W$ и проверьте
+   несжимаемость. Во сколько раз за время $t$ растянется отрезок, лежащий
+   вдоль оси $x$?
+3. Покажите, что для твёрдого движения $\mathbf v = \mathbf V + \boldsymbol\Omega\times\mathbf r$ тензор $D$ равен нулю.
+4. Докажите эквивалентность $\rho J = \rho_0$ и уравнения непрерывности.
+5. Источник на плоскости $\mathbf v = \frac{Q}{2\pi r}\mathbf e_r$. Проверьте, что $\operatorname{div}\mathbf v = 0$ при $r > 0$, и найдите
+   главные значения $D$.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $\lambda_\pm = \sqrt{1 + \frac{\gamma^2}{2}\pm\gamma\sqrt{1 + \frac{\gamma^2}{4}}} = \sqrt{1 + \frac{\gamma^2}{4}}\pm\frac{\gamma}{2}$, $\lambda_+\lambda_- = 1$.
+2. $x = Xe^{kt}$, $y = Ye^{-kt}$; $D = \operatorname{diag}(k, -k)$, $W = 0$, $\operatorname{div}\mathbf v = 0$. Отрезок вдоль $x$ растягивается в
+   $e^{kt}$ раз.
+3. $\partial_iv_j = \varepsilon_{jki}\Omega^k$ — антисимметричная матрица, её симметричная часть равна нулю.
+4. $\frac{D}{Dt}(\rho J) = J\left(\frac{D\rho}{Dt} + \rho\operatorname{div}\mathbf v\right) = J\left(\partial_t\rho + \operatorname{div}(\rho\mathbf v)\right)$; равенство нулю одного
+   выражения равносильно равенству нулю другого (при $J > 0$).
+5. $\operatorname{div}\mathbf v = \frac1r\partial_r\left(r\frac{Q}{2\pi r}\right) = 0$. В ортонормированном базисе $D = \frac{Q}{2\pi r^2}\operatorname{diag}(-1, 1)$:
+   растяжение по окружности, сжатие по радиусу.
+:::
