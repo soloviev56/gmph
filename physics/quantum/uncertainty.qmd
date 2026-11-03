@@ -1,0 +1,306 @@
+---
+title: "Соотношения неопределённостей"
+topic: uncertainty
+order: 2
+description: "Дисперсия наблюдаемой как квадрат длины составляющей Âψ, ортогональной ψ; неравенство Робертсона ΔAΔB ≥ |⟨[Â, B̂]⟩|/2 и его усиление Шрёдингера с ковариацией (проверка на случайных матрицах); каноническое квантование {x, p} = 1 → [x̂, p̂] = iħ; гауссов пакет с чирпом: ΔxΔp = (ħ/2)√(1 + c²), а неравенство Шрёдингера обращается в равенство; спин: ΔJ_xΔJ_y в состоянии |j, m⟩; метрика Фубини–Штуди и скорость ΔE/ħ движения луча, неравенство Мандельштама–Тамма (рисунок); оценки энергии основного состояния атома водорода и осциллятора"
+---
+
+Измерение $S_x$ портит знание $S_z$ ([постулаты квантовой механики](/physics/quantum/qm-postulates.qmd)).
+Насколько сильно? Ответ даёт неравенство, которое следует из одного
+лишь неравенства Коши–Буняковского в гильбертовом пространстве: разброс
+результатов двух наблюдаемых ограничен снизу средним значением их
+коммутатора. Для координаты и импульса это знаменитое $\Delta x\,\Delta p \ge \hbar/2$.
+У этого неравенства есть и геометрическая сторона: дисперсия энергии —
+это скорость, с которой состояние движется по пространству лучей, и она
+ограничивает время, за которое состояние может измениться.
+
+## Дисперсия
+
+::: {#def-dispersion}
+**Неопределённость** (среднеквадратичное отклонение) наблюдаемой $\hat A$ в
+нормированном состоянии $\psi$:
+$$
+(\Delta A)^2 = \langle\psi|(\hat A - \langle A\rangle)^2|\psi\rangle = \langle A^2\rangle - \langle A\rangle^2, \qquad \langle A\rangle = \langle\psi|\hat A|\psi\rangle .
+$$
+:::
+
+Геометрический смысл: разложим вектор $\hat A\psi$ на составляющие вдоль $\psi$ и
+ортогональную ей. Первая равна $\langle A\rangle\psi$, поэтому вторая — $(\hat A - \langle A\rangle)\psi$, и
+$$
+\Delta A = \bigl\|\hat A\psi - \langle A\rangle\psi\bigr\| .
+$$
+$\Delta A = 0$ тогда и только тогда, когда $\hat A\psi$ параллелен $\psi$, то есть $\psi$ —
+собственный вектор: только тогда результат измерения предсказуем.
+
+## Неравенства Робертсона и Шрёдингера
+
+::: {#thm-robertson}
+## Робертсон, Шрёдингер
+Для самосопряжённых $\hat A, \hat B$ и нормированного $\psi$ (из области определения
+произведений)
+$$
+(\Delta A)^2(\Delta B)^2 \;\ge\; \left|\tfrac12\langle\{\hat A, \hat B\}\rangle - \langle A\rangle\langle B\rangle\right|^2 + \left|\tfrac{1}{2i}\langle[\hat A, \hat B]\rangle\right|^2
+\;\ge\; \tfrac14\,\bigl|\langle[\hat A, \hat B]\rangle\bigr|^2 ,
+$$
+где $\{\hat A, \hat B\} = \hat A\hat B + \hat B\hat A$.
+:::
+
+*Доказательство.* Пусть $u = (\hat A - \langle A\rangle)\psi$, $v = (\hat B - \langle B\rangle)\psi$. По Коши–Буняковскому
+$\|u\|^2\|v\|^2 \ge |\langle u|v\rangle|^2 = (\operatorname{Re}\langle u|v\rangle)^2 + (\operatorname{Im}\langle u|v\rangle)^2$. Действительная часть
+$\langle u|v\rangle$ — симметризованная ковариация $\frac12\langle\{\hat A, \hat B\}\rangle - \langle A\rangle\langle B\rangle$, мнимая —
+$\frac{1}{2i}\langle[\hat A, \hat B]\rangle$. Отбросив первое слагаемое, получаем неравенство
+Робертсона $\Delta A\,\Delta B \ge \frac12|\langle[\hat A, \hat B]\rangle|$. $\square$
+
+Обратите внимание на структуру: $\operatorname{Re}\langle u|v\rangle$ — это метрика, а $\operatorname{Im}\langle u|v\rangle$ —
+симплектическая форма комплексного пространства ([конвенции](/conventions.qmd), раздел
+«Комплексные пространства»). Коммутатор отвечает за симплектическую часть,
+ковариация — за метрическую. Проверим оба неравенства на случайных
+эрмитовых матрицах и случайных состояниях:
+
+```{python}
+import numpy as np
+import sympy as sp
+from scipy.linalg import expm
+from gmph.lie import spin_matrices
+
+rng = np.random.default_rng(3)
+
+def random_hermitian(n):
+    a = rng.normal(size=(n, n)) + 1j * rng.normal(size=(n, n))
+    return (a + a.conj().T) / 2
+
+def random_state(n):
+    v = rng.normal(size=n) + 1j * rng.normal(size=n)
+    return v / np.linalg.norm(v)
+
+def mean(op, psi):
+    return psi.conj() @ op @ psi
+
+def spread(op, psi):
+    return np.sqrt(mean(op @ op, psi).real - mean(op, psi).real**2)
+
+worst_rob, worst_schr = np.inf, np.inf
+for _ in range(2000):
+    A, B, psi = random_hermitian(5), random_hermitian(5), random_state(5)
+    lhs = (spread(A, psi) * spread(B, psi))**2
+    comm = abs(mean(A @ B - B @ A, psi))**2 / 4
+    cov = (mean(A @ B + B @ A, psi).real / 2 - mean(A, psi).real * mean(B, psi).real)**2
+    worst_rob = min(worst_rob, lhs - comm)
+    worst_schr = min(worst_schr, lhs - comm - cov)
+print(f"min[(ΔAΔB)² − |⟨[A,B]⟩|²/4]          = {worst_rob:.3e}")
+print(f"min[(ΔAΔB)² − |⟨[A,B]⟩|²/4 − cov²]   = {worst_schr:.3e}")
+```
+
+Оба минимума положительны: для случайных состояний неравенства строгие, а равенство
+требует особых состояний — они появятся ниже.
+
+## От скобок Пуассона к коммутаторам
+
+Классическая механика сопоставляет функциям на фазовом пространстве
+скобку Пуассона, квантовая — операторам коммутатор. Правило **канонического
+квантования** Дирака: $\{f, g\} \to \frac{1}{i\hbar}[\hat f, \hat g]$, в частности
+$$
+\{x, p\} = 1 \quad\longrightarrow\quad [\hat x, \hat p] = i\hbar, \qquad \hat p = -i\hbar\,\frac{\dd}{\dd x} .
+$$
+Тогда неравенство Робертсона даёт $\Delta x\,\Delta p \ge \hbar/2$. Это соответствие точно
+только для функций не выше второй степени по $(x, p)$: по теореме
+Грёневолда–ван Хова согласовать скобку и коммутатор для всех многочленов
+нельзя, и квантование — это выбор, а не вычисление.
+
+Посмотрим, когда достигается равенство. Возьмём гауссов пакет с
+«чирпом» (линейно меняющейся фазой волнового числа)
+$\psi = e^{-(1 - ic)x^2/2\sigma^2}$. Такой вид принимает свободно расплывающийся пакет:
+$c$ растёт со временем.
+
+```{python}
+x = sp.Symbol("x", real=True)
+sigma, hbar = sp.symbols("sigma hbar", positive=True)
+c = sp.Symbol("c", real=True)
+psi_g = sp.exp(-(1 - sp.I * c) * x**2 / (2 * sigma**2))
+
+def bracket(f):
+    """⟨ψ|f⟩ для f = (многочлен)·ψ: подынтегральное выражение — многочлен на e^{−x²/σ²}."""
+    poly = sp.expand(sp.simplify(f / psi_g))
+    return sp.integrate(poly * sp.exp(-x**2 / sigma**2), (x, -sp.oo, sp.oo))
+
+p_op = lambda f: -sp.I * hbar * f.diff(x)
+norm = bracket(psi_g)
+X2 = sp.simplify(bracket(x**2 * psi_g) / norm)                       # ⟨x⟩ = ⟨p⟩ = 0 по чётности
+P2 = sp.simplify(bracket(p_op(p_op(psi_g))) / norm)
+cov = sp.simplify((bracket(x * p_op(psi_g)) + bracket(p_op(x * psi_g))) / (2 * norm))
+comm = sp.simplify((bracket(x * p_op(psi_g)) - bracket(p_op(x * psi_g))) / norm)
+print("Δx² =", X2, "   Δp² =", P2, "   ковариация =", cov, "   ⟨[x, p]⟩ =", comm)
+print("ΔxΔp =", sp.simplify(sp.sqrt(X2 * P2)))
+print("Δx²Δp² − cov² =", sp.simplify(X2 * P2 - cov**2))
+```
+
+Без чирпа ($c = 0$) $\Delta x\,\Delta p = \hbar/2$ — гауссов пакет минимален. С чирпом произведение
+больше в $\sqrt{1 + c^2}$ раз, но неравенство Шрёдингера по-прежнему обращается в
+равенство: вся «лишняя» неопределённость — корреляция координаты с
+импульсом (быстрые части пакета впереди). Эллипс неопределённости на
+фазовой плоскости повёрнут и вытянут, но его площадь, пропорциональная
+$\sqrt{\Delta x^2\Delta p^2 - \mathrm{cov}^2}$, остаётся минимальной: свободная эволюция линейна и
+симплектична и площадь сохраняет.
+
+**Спин.** Для компонент момента $[\hat J_x, \hat J_y] = i\hbar\hat J_z$, поэтому $\Delta J_x\Delta J_y \ge \frac\hbar2|\langle J_z\rangle|$.
+В состоянии $|j, m\rangle$ ($\hbar = 1$, матрицы из [неприводимых представлений SU(2)](/math/lie/su2-reps.qmd)):
+
+```{python}
+def spin_spread(j, m):
+    Jx, Jy, Jz = spin_matrices(j)
+    vec = sp.zeros(int(2 * j + 1), 1)
+    vec[int(j - m)] = 1                                   # базис упорядочен по убыванию m
+    ev = lambda op: (vec.H * op * vec)[0]
+    dx2 = sp.simplify(ev(Jx**2) - ev(Jx)**2)
+    dy2 = sp.simplify(ev(Jy**2) - ev(Jy)**2)
+    return sp.sqrt(dx2 * dy2), abs(ev(Jz)) / 2
+
+for j in (sp.Rational(1, 2), 1, sp.Rational(3, 2)):
+    rows = [f"m = {m}: ΔJxΔJy = {d}, граница {b}" for m in [j - k for k in range(int(2 * j + 1))]
+            for d, b in [spin_spread(j, m)]]
+    print(f"j = {j}:  " + ";  ".join(rows))
+```
+
+Равенство достигается только при $|m| = j$: состояния с наибольшей проекцией
+— самые «классические», вектор момента наиболее точно направлен вдоль оси.
+
+## Геометрия: скорость движения луча
+
+Пространство состояний — пространство лучей $\mathbb{CP}(\mathcal H)$. На нём есть
+естественное расстояние — **метрика Фубини–Штуди**: угол между лучами
+$$
+\theta(\psi, \varphi) = \arccos|\langle\psi|\varphi\rangle| \in [0, \pi/2]
+$$
+(для кубита — половина угла между точками сферы Блоха). Пусть состояние
+эволюционирует, $\psi(t) = e^{-i\hat Ht/\hbar}\psi$. Разлагая $|\langle\psi|\psi(t)\rangle|^2$ по $t$, получаем
+$1 - (\Delta E)^2t^2/\hbar^2 + \dots$, то есть луч движется со скоростью
+$$
+\frac{\dd\theta}{\dd t} = \frac{\Delta E}{\hbar} .
+$$
+Это и есть смысл дисперсии энергии: составляющая $\hat H\psi$, ортогональная $\psi$, —
+скорость в «горизонтальном» направлении, а составляющая вдоль $\psi$
+только меняет фазу. Отсюда немедленно следует **неравенство
+Мандельштама–Тамма**: угол не больше пройденного пути,
+$\theta(\psi, \psi(t)) \le \Delta E\,t/\hbar$, то есть
+$$
+|\langle\psi|\psi(t)\rangle| \ge \cos\frac{\Delta E\,t}{\hbar}\quad (t \le \tfrac{\pi\hbar}{2\Delta E}), \qquad
+\tau_\perp \ge \frac{\pi\hbar}{2\Delta E} ,
+$$
+где $\tau_\perp$ — время до первого ортогонального состояния. Это точный смысл
+«соотношения неопределённостей время–энергия»: время — не наблюдаемая, а
+$\Delta t$ — время заметного изменения состояния. Проверим скорость и
+неравенство для случайных систем:
+
+```{python}
+def survival(H, psi, times, hbar_=1.0):
+    vals, vecs = np.linalg.eigh(H)
+    c = vecs.conj().T @ psi
+    return np.array([abs(np.sum(np.abs(c)**2 * np.exp(-1j * vals * t / hbar_))) for t in times])
+
+systems = {}
+for n in (2, 4, 30):
+    H, psi = random_hermitian(n), random_state(n)
+    dE = spread(H, psi)
+    systems[n] = (H, psi, dE)
+    h = 1e-4
+    speed = np.arccos(min(1.0, survival(H, psi, [h])[0])) / h
+    times = np.linspace(0, np.pi / (2 * dE), 400)[1:]          # t > 0
+    margin = (survival(H, psi, times) - np.cos(dE * times)).min()
+    print(f"n = {n:2d}: ΔE = {dE:.3f}, dθ/dt при t → 0 = {speed:.3f}, min по 0 < t ≤ πħ/2ΔE (|⟨ψ|ψ(t)⟩| − cos ΔEt) = {margin:.2e}")
+
+# кубит в равной суперпозиции двух уровней — неравенство обращается в равенство
+H2, psi2 = np.diag([0.0, 1.0]), np.array([1, 1]) / np.sqrt(2)
+times = np.linspace(0, np.pi, 50)
+print("кубит, равная суперпозиция: max | |⟨ψ|ψ(t)⟩| − cos(ΔE t) | =",
+      f"{np.abs(survival(H2, psi2, times) - np.cos(spread(H2, psi2) * times)).max():.1e}")
+```
+
+```{python}
+#| label: fig-mandelstam-tamm
+#| fig-cap: 'Перекрытие |⟨ψ|ψ(t)⟩| для случайных гамильтонианов размерности 2, 4 и 30 и случайных начальных состояний (сплошные линии) и граница Мандельштама–Тамма cos(ΔE t/ħ) (пунктир), время в единицах πħ/2ΔE. Все кривые лежат выше границы; кривая двухуровневой системы ближе всех к ней, но касается её только при t = 0.'
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots(figsize=(7, 3.8))
+s = np.linspace(0, 1.6, 400)                            # t в единицах πħ/2ΔE
+for (n, (H, psi, dE)), color in zip(systems.items(), ("tab:blue", "tab:orange", "tab:green")):
+    ax.plot(s, survival(H, psi, s * np.pi / (2 * dE)), color=color, label=f"n = {n}, ΔE = {dE:.2f}")
+ax.plot(s[s <= 1], np.cos(s[s <= 1] * np.pi / 2), "k--", label="cos(ΔE t/ħ)")
+ax.axvline(1, color="0.6", lw=0.8)
+ax.set(xlabel="t / (πħ/2ΔE)", ylabel="|⟨ψ|ψ(t)⟩|", ylim=(-0.02, 1.05))
+ax.legend(fontsize=9, loc="upper right")
+plt.tight_layout()
+plt.show()
+```
+
+Граница достигается на двухуровневой системе в равной суперпозиции:
+вектор Блоха вращается по большому кругу с наибольшей возможной
+скоростью. Это ограничение на скорость любых квантовых вычислений: одна
+логическая операция, переводящая состояние в ортогональное, требует
+времени не меньше $\pi\hbar/2\Delta E$.
+
+## Физика: размеры и энергии
+
+Неравенство $\Delta x\,\Delta p \ge \hbar/2$ объясняет, почему атом не падает на ядро.
+Электрон, локализованный в области размера $r$, имеет импульс порядка $\hbar/r$ и
+кинетическую энергию порядка $\hbar^2/2mr^2$. Полная энергия
+$$
+E(r) \approx \frac{\hbar^2}{2mr^2} - \frac{e^2}{r}
+$$
+ограничена снизу, в отличие от классической. Найдём минимум:
+
+```{python}
+r, m_e, e = sp.symbols("r m e", positive=True)
+E_r = hbar**2 / (2 * m_e * r**2) - e**2 / r
+r_min = sp.solve(E_r.diff(r), r)[0]
+print("r* =", r_min, "  E(r*) =", sp.simplify(E_r.subs(r, r_min)))
+
+a0_cm = (1.054571817e-27)**2 / (9.1093837e-28 * (4.80320471e-10)**2)
+E_eV = -9.1093837e-28 * (4.80320471e-10)**4 / (2 * (1.054571817e-27)**2) / 1.602176634e-12
+print(f"r* = {a0_cm:.4e} см,  E = {E_eV:.2f} эВ")
+```
+
+Оценка случайно даёт точные боровский радиус и энергию основного
+состояния: так получается, если трактовать $\hbar/r$ как импульс буквально
+(при честном $\Delta p \ge \hbar/2\Delta x$ и $\langle1/r\rangle$ вместо $1/r$ числа меняются, но масштаб тот
+же). Для осциллятора $E = \frac{\langle p^2\rangle}{2m} + \frac{m\omega^2\langle x^2\rangle}{2} \ge \frac{\hbar^2}{8m\Delta x^2} + \frac{m\omega^2\Delta x^2}{2} \ge \frac{\hbar\omega}{2}$ — это уже
+строгая нижняя граница, и она достигается на гауссовом пакете.
+
+## Итоги
+
+- $\Delta A = \|\hat A\psi - \langle A\rangle\psi\|$ — длина составляющей $\hat A\psi$, ортогональной $\psi$; $\Delta A = 0$ только на
+  собственных векторах.
+- Робертсон: $\Delta A\,\Delta B \ge \frac12|\langle[\hat A, \hat B]\rangle|$; Шрёдингер добавляет ковариацию. Коммутатор —
+  симплектическая часть $\langle u|v\rangle$, ковариация — метрическая.
+- Каноническое квантование $\{x, p\} = 1 \to [\hat x, \hat p] = i\hbar$ даёт $\Delta x\Delta p \ge \hbar/2$; гауссов пакет
+  минимален, с чирпом минимален по Шрёдингеру.
+- Дисперсия энергии — скорость луча в метрике Фубини–Штуди, $\dot\theta = \Delta E/\hbar$; отсюда
+  $\tau_\perp \ge \pi\hbar/2\Delta E$ (Мандельштам–Тамм).
+- Оценки $E \sim \hbar^2/2mr^2 - e^2/r$ и $E \ge \hbar\omega/2$ объясняют устойчивость атома и нулевые колебания.
+
+## Упражнения
+
+1. Найдите $\Delta x$ и $\Delta p$ для состояния $\psi = (2\pi\sigma^2)^{-1/4}e^{-x^2/4\sigma^2 + ik_0x}$.
+2. Спин $\frac12$ в состоянии $|{\uparrow}\rangle$. Найдите $\Delta S_x$, $\Delta S_y$, $\Delta S_z$ и проверьте неравенство
+   Робертсона для пар $(S_x, S_y)$ и $(S_y, S_z)$.
+3. В состоянии $|j, m\rangle$ найдите $\Delta J_x$ и $\Delta J_y$. Когда достигается граница $\Delta J_x\Delta J_y = \frac{\hbar^2}{2}|m|$?
+4. Двухуровневая система с уровнями $E_1, E_2$ в состоянии $\cos\alpha\,|1\rangle + \sin\alpha\,|2\rangle$.
+   Найдите $\Delta E$ и время, за которое состояние впервые становится
+   ортогональным исходному. При каких $\alpha$ это вообще происходит?
+5. Частица в бесконечно глубокой яме ширины $L$. Оцените снизу энергию
+   основного состояния из $\Delta p \ge \hbar/2\Delta x$ и $\Delta x \le L/2$ и сравните с точным
+   $E_1 = \pi^2\hbar^2/2mL^2$.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $|\psi|^2$ — гауссово распределение с дисперсией $\sigma^2$, поэтому $\Delta x = \sigma$; $\langle p\rangle = \hbar k_0$,
+   $\Delta p = \hbar/2\sigma$; $\Delta x\Delta p = \hbar/2$.
+2. $\Delta S_z = 0$, $\Delta S_x = \Delta S_y = \hbar/2$. Для $(S_x, S_y)$: $\hbar^2/4 \ge \frac\hbar2|\langle S_z\rangle| = \hbar^2/4$ — равенство;
+   для $(S_y, S_z)$: $0 \ge \frac\hbar2|\langle S_x\rangle| = 0$ — тоже равенство.
+3. $\langle J_x\rangle = \langle J_y\rangle = 0$, $\langle J_x^2\rangle = \langle J_y^2\rangle = \frac{\hbar^2}{2}\bigl(j(j + 1) - m^2\bigr)$, так что
+   $\Delta J_x\Delta J_y = \frac{\hbar^2}{2}(j(j + 1) - m^2)$. Это не меньше $\frac{\hbar^2}{2}|m|$, равенство при $|m| = j$.
+4. $\Delta E = |E_2 - E_1|\,|\sin\alpha\cos\alpha| = \frac12|E_2 - E_1|\,|\sin2\alpha|$. $|\langle\psi|\psi(t)\rangle|^2 = 1 - \sin^22\alpha\,\sin^2\frac{(E_2 - E_1)t}{2\hbar}$
+   обращается в нуль только при $\sin^22\alpha = 1$, то есть $\alpha = \pi/4$ (равная суперпозиция), в момент
+   $t = \pi\hbar/|E_2 - E_1| = \pi\hbar/2\Delta E$ — граница Мандельштама–Тамма достигается.
+5. $\Delta p \ge \hbar/L$, $E \ge \langle p^2\rangle/2m \ge \hbar^2/2mL^2$ — примерно в $\pi^2 \approx 10$ раз меньше точного
+   значения: оценка верна, но груба.
+:::
