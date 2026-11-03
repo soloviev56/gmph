@@ -81,6 +81,18 @@ def christoffel(g, coords):
               for k in range(n)] for j in range(n)] for i in range(n)]
 
 
+def lie_metric(xi, g, coords):
+    """Производная Ли метрики (L_ξ g)_ij = ξ^k ∂_k g_ij + g_kj ∂_i ξ^k + g_ik ∂_j ξ^k.
+
+    Поле ξ — поле Киллинга, если результат — нулевая матрица.
+    """
+    g = sp.Matrix(g)
+    n = len(coords)
+    return sp.Matrix(n, n, lambda i, j: sp.simplify(sum(
+        xi[k] * sp.diff(g[i, j], coords[k]) + g[k, j] * sp.diff(xi[k], coords[i])
+        + g[i, k] * sp.diff(xi[k], coords[j]) for k in range(n))))
+
+
 def numeric_connection(Gamma, coords):
     """Функция x ↦ массив numpy Γ[i, j, k] для численного интегрирования."""
     import numpy as np

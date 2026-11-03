@@ -1,6 +1,6 @@
 import sympy as sp
 
-from gmph.riemann import covariant_derivative, flat_connection, torsion
+from gmph.riemann import christoffel, covariant_derivative, flat_connection, lie_metric, torsion
 
 r, phi = sp.symbols("r phi", positive=True)
 POLAR = [r * sp.cos(phi), r * sp.sin(phi)]
@@ -84,3 +84,21 @@ def test_commutator_of_covariant_derivatives():
             for i in range(2):
                 rhs = sum(R[i][j][k][l] * V[j] for j in range(2))
                 assert sp.simplify(DDV[k, l, i] - DDV[l, k, i] - rhs) == 0
+
+
+def test_lie_metric_killing_fields():
+    # сфера: поворот L_x — поле Киллинга, а «растяжение» по θ — нет
+    th, ph = sp.symbols("theta phi")
+    g = sp.diag(1, sp.sin(th)**2)
+    L_x = [-sp.sin(ph), -sp.cos(th) / sp.sin(th) * sp.cos(ph)]
+    assert lie_metric(L_x, g, (th, ph)) == sp.zeros(2)
+    assert lie_metric([sp.sin(th), 0], g, (th, ph)) != sp.zeros(2)
+    # совпадение с ∇_i ξ_j + ∇_j ξ_i в полярных координатах плоскости
+    r, f = sp.symbols("r phi", positive=True)
+    gp = sp.diag(1, r**2)
+    xi = [sp.Function("a")(r, f), sp.Function("b")(r, f)]
+    Gam = christoffel(gp, (r, f))
+    lower = [sum(gp[i, k] * xi[k] for k in range(2)) for i in range(2)]
+    nabla = lambda i, j: sp.diff(lower[j], (r, f)[i]) - sum(Gam[k][i][j] * lower[k] for k in range(2))
+    expected = sp.Matrix(2, 2, lambda i, j: nabla(i, j) + nabla(j, i))
+    assert sp.simplify(lie_metric(xi, gp, (r, f)) - expected) == sp.zeros(2)
