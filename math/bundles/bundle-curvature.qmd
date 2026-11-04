@@ -1,0 +1,325 @@
+---
+title: "Кривизна связности и голономия"
+topic: bundle-curvature
+order: 3
+description: "Кривизна F = dA + A∧A как 2-форма со значениями в End E: F(X, Y) = [∇_X, ∇_Y] − ∇_[X,Y], тензорный закон F → gFg⁻¹ (проверка SymPy), связь с физической записью 𝓕 = d𝒜 + i𝒜∧𝒜; тензор Римана как кривизна TM (сфера в ортонормированном репере); тождество Бианки DF = 0 для неабелевой связности; голономия малой петли 1 − εηF(u, v) с ошибкой O(ε³) (рисунок); абелев случай: голономия = exp(−∫F), роль регулярной калибровки на сфере; голономия любой окружности на сфере равна охваченной площади (рисунок); плоские связности: чистая калибровка −dg g⁻¹ и топологическая голономия на проколотой плоскости; постоянная SU(2)-связность с ненулевой кривизной"
+---
+
+Связность ([связность в векторном расслоении](/math/bundles/bundle-connections.qmd))
+позволяет переносить векторы слоёв вдоль кривых. Вопрос, зависит ли
+результат от пути, ведёт к главному инварианту связности — **кривизне**.
+Для касательного расслоения это тензор Римана, для электромагнитного
+потенциала — напряжённость поля, для неабелевых калибровочных полей —
+поле Янга–Миллса. Во всех случаях кривизна измеряется одинаково: обойдём
+маленькую петлю и посмотрим, насколько вектор вернулся «не таким».
+Для больших петель ответ даёт формула Стокса — точная в абелевом случае и
+приближённая в неабелевом.
+
+Используются [теорема Стокса](/math/forms/stokes.qmd) и
+[тензор кривизны](/math/riemann/curvature-riemann.qmd) как частный пример.
+
+## Определение
+
+Пусть в тривиализации $\nabla s = \dd s + As$. Применим ковариантную производную
+дважды (для сечений со значениями в формах $\nabla(\omega s) = \dd\omega\,s + (-1)^k\omega\wedge\nabla s$):
+$$
+\nabla\nabla s = \dd(\dd s + As) + A\wedge(\dd s + As) = (\dd A + A\wedge A)\,s .
+$$
+Производные $s$ сократились: $\nabla^2$ — не дифференциальный оператор, а умножение
+на матрицу 2-форм.
+
+::: {#def-curvature-form}
+**Кривизна** связности — 2-форма со значениями в матрицах
+$$
+F = \dd A + A\wedge A, \qquad F_{\mu\nu} = \partial_\mu A_\nu - \partial_\nu A_\mu + [A_\mu, A_\nu],
+$$
+то есть $F(X, Y)\,s = \nabla_X\nabla_Ys - \nabla_Y\nabla_Xs - \nabla_{[X, Y]}s$. При смене тривиализации
+($s_\alpha = gs_\beta$, $A_\alpha = gA_\beta g^{-1} - \dd g\,g^{-1}$)
+$$
+F_\alpha = g\,F_\beta\,g^{-1}
+$$
+— неоднородный член исчезает: кривизна — тензор, сечение $\Lambda^2T^*M\otimes\mathrm{End}\,E$.
+Связность **плоская**, если $F = 0$.
+:::
+
+Проверим тензорный закон в двух измерениях для произвольной матрицы
+связности $2\times2$ и произвольной $g(x, y)$:
+
+```{python}
+import numpy as np
+import sympy as sp
+import matplotlib.pyplot as plt
+from scipy.integrate import solve_ivp
+from scipy.linalg import expm
+from gmph.riemann import christoffel, riemann
+
+x, y, z = sp.symbols("x y z", real=True)
+
+def curvature(A, coords):
+    """Компоненты F_{μν} = ∂_μA_ν − ∂_νA_μ + [A_μ, A_ν] (словарь по парам μ < ν)."""
+    n = len(coords)
+    return {(m, k): sp.simplify(A[k].diff(coords[m]) - A[m].diff(coords[k]) + A[m] * A[k] - A[k] * A[m])
+            for m in range(n) for k in range(m + 1, n)}
+
+def gauge(A, g, coords):
+    """A_μ ↦ g A_μ g⁻¹ − ∂_μg g⁻¹."""
+    g_inv = g.inv()
+    return [g * A[m] * g_inv - g.diff(coords[m]) * g_inv for m in range(len(coords))]
+
+A2 = [sp.Matrix(2, 2, lambda i, j: sp.Function(f"a{m}{i}{j}")(x, y)) for m in range(2)]
+g2 = sp.Matrix(2, 2, lambda i, j: sp.Function(f"g{i}{j}")(x, y))
+F_old = curvature(A2, (x, y))[(0, 1)]
+F_new = curvature(gauge(A2, g2, (x, y)), (x, y))[(0, 1)]
+print("F' − g F g⁻¹ =", sp.simplify(F_new - g2 * F_old * g2.inv()))
+```
+
+**Физическая запись.** При $A = i\mathcal A$ ([конвенции](/conventions.qmd), раздел «Калибровочные
+поля») $F = i(\dd\mathcal A + i\mathcal A\wedge\mathcal A) = i\mathcal F$, где $\mathcal F_{\mu\nu} = \partial_\mu\mathcal A_\nu - \partial_\nu\mathcal A_\mu + i[\mathcal A_\mu, \mathcal A_\nu]$ — в
+точности кривизна из конвенций, а $[D_\mu, D_\nu] = i\mathcal F_{\mu\nu}$. Для электродинамики
+$\mathcal A = \frac{e}{\hbar c}A_\mu\dd x^\mu$ и $\mathcal F = \frac{e}{\hbar c}F_{\mu\nu}$: кривизна — это поле.
+
+## Тензор Римана как кривизна
+
+Для $E = TM$ в координатном репере $A^i{}_j(\partial_k) = \Gamma^i_{kj}$, и $F^i{}_j(\partial_k, \partial_l) = R^i{}_{jkl}$ — тензор
+Римана ([конвенции](/conventions.qmd), раздел «Связности»). В ортонормированном репере
+$E$ (столбцы — векторы репера) компоненты получаются сопряжением $E^{-1}RE$.
+Для сферы с формой связности $A = \cos\theta\,\dd\varphi\,J$ в репере $(e_\theta, e_\varphi)$:
+
+```{python}
+theta, phi = sp.symbols("theta phi", positive=True)
+J = sp.Matrix([[0, -1], [1, 0]])
+A_sphere = [sp.zeros(2), sp.cos(theta) * J]                     # A(∂_θ), A(∂_φ)
+F_sphere = curvature(A_sphere, (theta, phi))[(0, 1)]
+g_sph = sp.diag(1, sp.sin(theta)**2)
+R = riemann(christoffel(g_sph, (theta, phi)), (theta, phi))
+R_tp = sp.Matrix(2, 2, lambda i, j: R[i][j][0][1])               # R^i_j(∂_θ, ∂_φ)
+E = sp.diag(1, 1 / sp.sin(theta))
+print("F(∂_θ, ∂_φ) =", F_sphere.tolist())
+print("E⁻¹ R(∂_θ, ∂_φ) E =", sp.simplify(E.inv() * R_tp * E).tolist())
+```
+
+$F = -\sin\theta\,\dd\theta\wedge\dd\varphi\;J$, то есть $F^1{}_2 = \sin\theta\,\dd\theta\wedge\dd\varphi = K\,\mathrm{vol}$ с гауссовой кривизной $K = 1$.
+
+## Тождество Бианки
+
+Внешняя производная кривизны выражается через саму кривизну:
+$$
+\dd F = \dd A\wedge A - A\wedge\dd A = F\wedge A - A\wedge F, \qquad\text{то есть}\quad DF \equiv \dd F + [A, F] = 0 ,
+$$
+в компонентах $D_\lambda F_{\mu\nu} + D_\mu F_{\nu\lambda} + D_\nu F_{\lambda\mu} = 0$, $D_\lambda = \partial_\lambda + [A_\lambda, \cdot\,]$. Для
+электродинамики это $\dd F = 0$ — однородные уравнения Максвелла, а для
+римановой связности — второе тождество Бианки ([тождества Бианки](/math/riemann/bianchi.qmd)).
+Проверим на неабелевой $\mathfrak{su}(2)$-связности с произвольно выбранными
+компонентами:
+
+```{python}
+sx, sy, sz = sp.Matrix([[0, 1], [1, 0]]), sp.Matrix([[0, -sp.I], [sp.I, 0]]), sp.Matrix([[1, 0], [0, -1]])
+X3 = (x, y, z)
+A_su2 = [sp.I * (x * y * sx / 2 + z * sz / 3),                  # A = i𝒜, 𝒜 эрмитова
+         sp.I * (sp.sin(x) * sy / 2 + y * sx / 4),
+         sp.I * (x * sz / 2 + y * z * sy / 5)]
+F3 = curvature(A_su2, X3)
+F3.update({(k, m): -v for (m, k), v in list(F3.items())})
+D = lambda l, M: M.diff(X3[l]) + A_su2[l] * M - M * A_su2[l]
+print("D_x F_yz + D_y F_zx + D_z F_xy =", sp.simplify(D(0, F3[(1, 2)]) + D(1, F3[(2, 0)]) + D(2, F3[(0, 1)])).tolist())
+print("F_xy =", F3[(0, 1)].applyfunc(sp.factor).tolist())
+```
+
+## Голономия малой петли
+
+::: {#def-holonomy}
+**Голономия** связности вдоль замкнутой кривой $\gamma$ с началом $x_0$ — линейное
+отображение $\mathrm{Hol}_\gamma: E_{x_0}\to E_{x_0}$, параллельный перенос вдоль $\gamma$. Для петли,
+проходимой по параллелограмму $\varepsilon u$, $\eta v$ (сначала вдоль $u$),
+$$
+\mathrm{Hol} = 1 - \varepsilon\eta\,F(u, v) + O(\varepsilon^3) .
+$$
+:::
+
+Знак проверяется на постоянной связности: перенос вдоль $\varepsilon u$ —
+умножение на $e^{-\varepsilon A(u)}$, и $e^{\eta A_v}e^{\varepsilon A_u}e^{-\eta A_v}e^{-\varepsilon A_u} = 1 - \varepsilon\eta[A_u, A_v] + \dots$ Проверим
+численно для $\mathfrak{su}(2)$-связности выше, обходя квадратную петлю со
+стороной $\varepsilon$ и сравнивая с кривизной в центре квадрата:
+
+```{python}
+A_num = [sp.lambdify(X3, a, "numpy") for a in A_su2]
+F_num = sp.lambdify(X3, F3[(0, 1)], "numpy")
+
+def holonomy_square(corner, eps):
+    """Перенос по квадрату: +x, +y, −x, −y; решается Ṡ = −A(ẋ) S для матрицы S."""
+    S, start = np.eye(2, dtype=complex), np.array(corner, dtype=float)
+    for d in ([1, 0, 0], [0, 1, 0], [-1, 0, 0], [0, -1, 0]):
+        d = np.array(d, dtype=float) * eps
+        def rhs(t, v, start=start, d=d):
+            M = (v[:4] + 1j * v[4:]).reshape(2, 2)
+            q = start + t * d
+            dM = (-sum(np.array(A_num[k](*q), dtype=complex) * d[k] for k in range(3)) @ M).ravel()
+            return np.concatenate([dM.real, dM.imag])
+        v = solve_ivp(rhs, (0, 1), np.concatenate([S.ravel().real, S.ravel().imag]), rtol=1e-12, atol=1e-14).y[:, -1]
+        S, start = (v[:4] + 1j * v[4:]).reshape(2, 2), start + d
+    return S
+
+corner = np.array([0.3, -0.2, 0.5])
+eps_list = np.array([0.4, 0.2, 0.1, 0.05, 0.025])
+dev, err = [], []
+for eps in eps_list:
+    H = holonomy_square(corner, eps)
+    F_c = np.array(F_num(*(corner + [eps / 2, eps / 2, 0])), dtype=complex)
+    dev.append(np.abs(H - np.eye(2)).max())
+    err.append(np.abs(H - (np.eye(2) - eps**2 * F_c)).max())
+    print(f"ε = {eps:5}: |Hol − 1| = {dev[-1]:.2e},  |Hol − (1 − ε²F)| = {err[-1]:.2e}")
+print("наклоны в логарифмическом масштабе:", np.round(np.polyfit(np.log(eps_list), np.log(dev), 1)[0], 2),
+      np.round(np.polyfit(np.log(eps_list), np.log(err), 1)[0], 2))
+```
+
+## Абелев случай и формула Стокса
+
+Если все $A_\mu$ коммутируют (линейное расслоение, $\mathrm U(1)$, или как на сфере
+— все матрицы пропорциональны $J$), то $A\wedge A = 0$, $F = \dd A$, упорядоченная
+экспонента становится обычной, и для петли, ограничивающей поверхность $S$,
+$$
+\mathrm{Hol}_{\partial S} = \exp\Bigl(-\oint_{\partial S}A\Bigr) = \exp\Bigl(-\int_SF\Bigr) .
+$$
+Формула Стокса требует, чтобы $A$ была гладкой на всей $S$. На сфере
+калибровка $A = \cos\theta\,\dd\varphi\,J$ сингулярна в полюсе, и для шапки $\theta < \theta_0$
+$\oint A = 2\pi\cos\theta_0\,J$, а $\int F = -2\pi(1 - \cos\theta_0)J$ — разница $2\pi J$ сидит в полюсе.
+В регулярной калибровке $A_v = (\cos\theta - 1)\,\dd\varphi\,J$ равенство точное. Голономия при
+этом одна и та же: $e^{2\pi J} = 1$.
+
+```{python}
+theta0 = sp.Symbol("theta_0", positive=True)
+cap_F = sp.integrate(sp.integrate(F_sphere, (theta, 0, theta0)), (phi, 0, 2 * sp.pi))
+loop_singular = sp.integrate(A_sphere[1].subs(theta, theta0), (phi, 0, 2 * sp.pi))
+loop_regular = sp.integrate(((sp.cos(theta) - 1) * J).subs(theta, theta0), (phi, 0, 2 * sp.pi))
+print("∫_шапка F =", sp.simplify(cap_F[1, 0]), "· J")
+print("∮ A (сингулярная калибровка) =", loop_singular[1, 0], "· J;   ∮ A_v (регулярная) =", sp.simplify(loop_regular[1, 0]), "· J")
+```
+
+Голономия — поворот на угол $\int K\,\mathrm{vol}$, равный площади шапки. Это верно для
+**любой** окружности на сфере, а не только для широт: проверим без всяких
+координат, перенося вектор вдоль окружностей с разными центрами и
+радиусами (на единичной сфере $\dot V = -(V\cdot\dot p)\,p$ сохраняет вектор касательным):
+
+```{python}
+def circle_holonomy_angle(center, rho, n=4000):
+    """Угол поворота вектора после переноса по окружности угл. радиуса rho с центром center (на S²)."""
+    c = center / np.linalg.norm(center)
+    u = np.cross(c, [0.3, 0.5, 0.8]); u /= np.linalg.norm(u)
+    w = np.cross(c, u)
+    point = lambda t: np.cos(rho) * c + np.sin(rho) * (np.cos(t) * u + np.sin(t) * w)
+    velocity = lambda t: np.sin(rho) * (-np.sin(t) * u + np.cos(t) * w)
+    V0 = np.cross(point(0), velocity(0)); V0 /= np.linalg.norm(V0)          # касательный вектор в начале
+    sol = solve_ivp(lambda t, V: -(V @ velocity(t)) * point(t), (0, 2 * np.pi), V0, rtol=1e-11, atol=1e-12)
+    V1, p0 = sol.y[:, -1], point(0)
+    return np.arctan2(np.cross(V0, V1) @ p0, V0 @ V1) % (2 * np.pi)
+
+rng = np.random.default_rng(5)
+records = []
+for area in np.linspace(0.3, 6.0, 12):                          # радиусы подобраны под площади, центры случайны
+    rho = np.arccos(1 - area / (2 * np.pi))
+    records.append((area, circle_holonomy_angle(rng.normal(size=3), rho)))
+records = np.array(records)
+print(f"max |угол − площадь| по 12 окружностям со случайными центрами: {np.abs(records[:, 1] - records[:, 0]).max():.1e}")
+```
+
+```{python}
+#| label: fig-holonomy
+#| fig-cap: 'Слева: голономия квадратной петли со стороной ε для неабелевой su(2)-связности. Отклонение от единицы убывает как ε² (наклон 2), а отклонение от 1 − ε²F (F — кривизна в центре квадрата) — как ε³: кривизна и есть главный член голономии. Справа: угол поворота вектора после параллельного переноса по 12 окружностям со случайными центрами на единичной сфере со случайными центрами и разными радиусами против площади охваченной шапки; все точки лежат на прямой «угол = площадь» (K = 1).'
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
+ax1.loglog(eps_list, dev, "o-", label="|Hol − 1|")
+ax1.loglog(eps_list, err, "s-", label="|Hol − (1 − ε²F)|")
+ax1.loglog(eps_list, 0.8 * dev[0] * (eps_list / eps_list[0])**2, "k:", lw=1, label="∝ ε², ε³")
+ax1.loglog(eps_list, 0.8 * err[0] * (eps_list / eps_list[0])**3, "k:", lw=1)
+ax1.set(xlabel="ε", ylabel="отклонение")
+ax1.legend(fontsize=9)
+areas = np.linspace(0, 2 * np.pi, 50)
+ax2.plot(areas, areas, "k", lw=1)
+ax2.plot(records[:, 0], records[:, 1], "o", color="tab:red")
+ax2.set(xlabel="площадь шапки", ylabel="угол голономии, рад", aspect="equal", xlim=(0, 2 * np.pi), ylim=(0, 2 * np.pi))
+plt.tight_layout()
+plt.show()
+```
+
+## Плоские связности
+
+Если $F = 0$, перенос вдоль пути не меняется при малых деформациях
+пути, и в односвязной области можно выбрать репер из параллельных
+сечений: связность — **чистая калибровка** $A = -\dd g\,g^{-1}$ (калибровочное
+преобразование нулевой связности). Обратное проверяется прямо:
+
+```{python}
+th = sp.Function("vartheta")(x, y)
+lam = sp.Function("lam")(x, y)
+g_pure = lam * sp.Matrix([[sp.cos(th), -sp.sin(th)], [sp.sin(th), sp.cos(th)]])
+A_pure = [-g_pure.diff(q) * g_pure.inv() for q in (x, y)]
+print("F[−dg g⁻¹] =", curvature(A_pure, (x, y))[(0, 1)].tolist())
+```
+
+Но если область не односвязна, голономия плоской связности может быть
+нетривиальной: она зависит только от гомотопического класса петли. Пример
+— $A = ia\,\dd\varphi$ на плоскости без начала координат: $F = ia\,\dd\dd\varphi = 0$, а голономия
+вокруг начала $e^{-2\pi ia}$. Плоская связность «помнит» топологию: на этом
+основан эффект Ааронова–Бома (тема «Эффект Ааронова–Бома»).
+
+Обратный сюрприз: постоянная связность может быть искривлена. Для
+$A_x = \frac{ia}{2}\sigma_x$, $A_y = \frac{ia}{2}\sigma_y$ производные равны нулю, а $F_{xy} = [A_x, A_y] = -\frac{ia^2}{2}\sigma_z \ne 0$.
+Неабелево поле может быть ненулевым при постоянном потенциале — в
+электродинамике так не бывает.
+
+```{python}
+a_ = sp.Symbol("a", positive=True)
+F_const = curvature([sp.I * a_ / 2 * sx, sp.I * a_ / 2 * sy], (x, y))[(0, 1)]
+print("F_xy =", F_const.tolist(), " = −(i a²/2) σ_z:", sp.simplify(F_const + sp.I * a_**2 / 2 * sz) == sp.zeros(2))
+```
+
+## Физика
+
+**Электромагнетизм.** Голономия $\mathrm U(1)$-связности $\frac{ie}{\hbar c}A_\mu\dd x^\mu$ по петле — фазовый
+множитель $\exp\bigl(-\frac{ie}{\hbar c}\oint A_\mu\dd x^\mu\bigr)$; для пространственной петли $A_\mu\dd x^\mu = -\mathbf A\cdot\dd\mathbf r$, и
+множитель равен $\exp\bigl(\frac{ie}{\hbar c}\Phi\bigr)$, где $\Phi$ — магнитный поток через петлю. Именно эту
+фазу измеряют в интерференционных опытах; она определена по модулю $2\pi$,
+отсюда квант потока $hc/e$ ([заряд в электромагнитном поле](/physics/quantum/qm-em-field.qmd)).
+
+**Неабелевы поля.** Для калибровочной группы $\mathrm{SU}(2)$ или $\mathrm{SU}(3)$ кривизна
+$\mathcal F_{\mu\nu}$ содержит коммутатор, поле само себя «заряжает», а голономия малой
+петли — элемент группы, а не число. Действие Янга–Миллса $\propto\operatorname{tr}\mathcal F_{\mu\nu}\mathcal F^{\mu\nu}$
+строится из кривизны так же, как действие Максвелла.
+
+**Геометрическая фаза.** Медленно меняющийся гамильтониан задаёт
+связность на расслоении собственных состояний над пространством
+параметров; её голономия — фаза Берри, а кривизна — «магнитное поле в
+пространстве параметров» (тема «Фаза Берри»).
+
+## Итоги
+
+- Кривизна $F = \dd A + A\wedge A$, $F(X, Y) = [\nabla_X, \nabla_Y] - \nabla_{[X, Y]}$; преобразуется тензорно, $F\to gFg^{-1}$.
+- В физической записи $\mathcal F = \dd\mathcal A + i\mathcal A\wedge\mathcal A$; для $TM$ — тензор Римана; для $\mathrm U(1)$ — электромагнитное поле.
+- Тождество Бианки $DF = \dd F + [A, F] = 0$.
+- Голономия малой петли $1 - \varepsilon\eta F(u, v) + O(\varepsilon^3)$; в абелевом случае $\mathrm{Hol} = \exp(-\int_SF)$ (в регулярной калибровке).
+- Плоская связность локально — чистая калибровка $-\dd g\,g^{-1}$, но может иметь топологическую голономию.
+
+## Упражнения
+
+1. Выведите $F_\alpha = gF_\beta g^{-1}$ из закона смены тривиализации для $A$.
+2. Для связности сферы $A = \cos\theta\,\dd\varphi\,J$ найдите $\frac{1}{2\pi}\int_{S^2}F^1{}_2$. С каким числом из
+   статьи о векторных расслоениях оно совпадает?
+3. $\mathrm U(1)$-связность $A = \frac{iB}{2}(x\,\dd y - y\,\dd x)$ на плоскости. Найдите кривизну и голономию
+   окружности радиуса $R$ с центром в начале координат, обходимой против часовой стрелки.
+4. Покажите, что в абелевом случае тождество Бианки — это $\dd F = 0$, и
+   объясните, почему для $\mathrm U(1)$ оно эквивалентно $\dd\dd A = 0$.
+5. Для постоянной связности $A_x = \frac{ia}{2}\sigma_x$, $A_y = \frac{ia}{2}\sigma_y$ найдите голономию квадрата со
+   стороной $\varepsilon$ с точностью до $\varepsilon^2$. Как её интерпретировать?
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $\dd A_\alpha = \dd g\wedge A_\beta g^{-1} + g\,\dd A_\beta\,g^{-1} - gA_\beta\wedge\dd(g^{-1}) - \dd(\dd g\,g^{-1})$; с $\dd(g^{-1}) = -g^{-1}\dd g\,g^{-1}$ и
+   $A_\alpha\wedge A_\alpha$ все слагаемые с $\dd g$ сокращаются, остаётся $g(\dd A_\beta + A_\beta\wedge A_\beta)g^{-1}$.
+2. $F^1{}_2 = \sin\theta\,\dd\theta\wedge\dd\varphi$, $\frac{1}{2\pi}\int F^1{}_2 = \frac{4\pi}{2\pi} = 2 = \chi(S^2)$ — число оборотов функции перехода
+   $TS^2$ (формула Гаусса–Бонне).
+3. $F = iB\,\dd x\wedge\dd y$; голономия $\exp(-\oint A) = \exp(-iB\pi R^2)$ — фаза, равная «потоку».
+4. $[A, F] = A\wedge F - F\wedge A = 0$, когда матрицы коммутируют (для 1- и 2-форм
+   $A\wedge F = F\wedge A$). Для $\mathrm U(1)$ $F = \dd A$, и $\dd F = \dd\dd A = 0$ тождественно.
+5. $\mathrm{Hol} = 1 - \varepsilon^2[A_x, A_y] = 1 + \frac{i\varepsilon^2a^2}{2}\sigma_z$ — малый поворот спинора вокруг оси $z$ на угол
+   $-\varepsilon^2a^2$ ($e^{-i\alpha\sigma_z/2}$ с $\alpha = -\varepsilon^2a^2$): петля в плоскости $(x, y)$ порождает «вращение»
+   в направлении, перпендикулярном обоим генераторам.
+:::
