@@ -1,0 +1,296 @@
+---
+title: "Тензор напряжений"
+topic: stress
+order: 2
+description: "Силы на площадках и теорема Коши: вектор напряжений линеен по нормали, t = σn (тетраэдр, сумма векторов площадей равна нулю); знак σ и гидростатика σ = −pI добавлены в конвенции; напряжение как векторнозначная 2-форма Σ_i = σ_ij ⋆dx^j, сила F_i = ∮Σ_i и dΣ_i = div σ_i vol (gmph.exterior); уравнения равновесия и движения; симметрия σ из баланса момента (момент на кубике ∝ h³); главные напряжения, инварианты, давление и девиатор; круги Мора (рисунок); толстостенная труба Ламе через ковариантную дивергенцию в полярных координатах, «котельная» формула pa/h; закон Архимеда как поток 2-формы"
+---
+
+Разрежем мысленно нагруженное тело плоскостью. Чтобы половинки остались
+в равновесии, на разрез надо приложить силы — те, которыми половинки
+действовали друг на друга. Эти **внутренние силы** распределены по
+площади и зависят не только от точки, но и от ориентации разреза. Коши
+(1822) заметил, что зависимость от ориентации линейна, и тем самым ввёл
+первый в физике тензор. На языке форм напряжение — это тройка 2-форм:
+каждая «считает» одну компоненту силы, проходящей через поверхность, так
+же как форма потока считает заряд. Закон сохранения импульса становится
+формулой Стокса, а закон сохранения момента импульса — симметрией тензора.
+
+Используются [кинематика сплошной среды](/physics/continuum/continuum-kinematics.qmd) и
+[интегрирование форм](/math/forms/integration.qmd).
+
+## Вектор напряжений и теорема Коши
+
+::: {#def-traction}
+**Вектор напряжений** $\mathbf t(\mathbf x, \mathbf n)$ — сила на единицу площади, с которой среда,
+лежащая по ту сторону малой площадки, куда направлена единичная нормаль $\mathbf n$,
+действует на среду по эту сторону. По третьему закону Ньютона
+$\mathbf t(\mathbf x, -\mathbf n) = -\mathbf t(\mathbf x, \mathbf n)$.
+:::
+
+Рассмотрим малый тетраэдр с тремя гранями в координатных плоскостях и
+четвёртой — с нормалью $\mathbf n$ и площадью $\dd S$. Площади координатных граней
+равны $n_j\,\dd S$, а их внешние нормали — $-\mathbf e_j$: сумма векторов площадей
+замкнутой поверхности равна нулю. Поверхностные силы пропорциональны
+$\dd S \sim \ell^2$, объёмные (сила тяжести, $\rho\,\dot{\mathbf v}$) — объёму $\sim\ell^3$. При $\ell\to0$ остаётся
+$\mathbf t(\mathbf n)\,\dd S + \sum_j\mathbf t(-\mathbf e_j)\,n_j\,\dd S = 0$, то есть
+$$
+t_i(\mathbf n) = \sigma_{ij}\,n_j, \qquad \sigma_{ij} = t_i(\mathbf e_j) .
+$$
+
+::: {#def-stress}
+**Тензор напряжений** Коши $\sigma_{ij}$ — линейное отображение $\mathbf n\mapsto\mathbf t(\mathbf n)$: $j$-й столбец —
+сила на площадке с нормалью $\mathbf e_j$. Сила на площадку $\dd S$: $\dd F_i = \sigma_{ij}n_j\,\dd S$;
+растяжение положительно; жидкость в покое: $\sigma_{ij} = -p\,\delta_{ij}$
+([конвенции](/conventions.qmd), раздел «Механика сплошных сред»).
+**Нормальное** напряжение на площадке — $\sigma_n = \mathbf n\cdot\mathbf t$, **касательное** — $\tau = |\mathbf t - \sigma_n\mathbf n|$.
+:::
+
+Проверим ключевой геометрический факт — сумма внешних векторов площадей
+граней тетраэдра равна нулю — и вычислим напряжения на наклонной
+площадке для конкретного тензора (в МПа):
+
+```{python}
+import numpy as np
+import sympy as sp
+import matplotlib.pyplot as plt
+from gmph.exterior import d, hodge, show
+from gmph.riemann import covariant_derivative, flat_connection
+
+rng = np.random.default_rng(3)
+P = rng.normal(size=(4, 3))                                   # вершины случайного тетраэдра
+faces = [(0, 1, 2), (0, 1, 3), (0, 2, 3), (1, 2, 3)]
+center = P.mean(axis=0)
+total = np.zeros(3)
+for f in faces:
+    a, b, c = P[list(f)]
+    area_vec = np.cross(b - a, c - a) / 2
+    if area_vec @ (a - center) < 0:                            # внешняя нормаль
+        area_vec = -area_vec
+    total += area_vec
+print(f"сумма внешних векторов площадей граней: |Σ n dS| = {np.linalg.norm(total):.1e}")
+
+sigma = np.array([[50.0, 30.0, 0.0], [30.0, -20.0, 0.0], [0.0, 0.0, 10.0]])   # МПа
+n = np.array([1.0, 1.0, 0.0]) / np.sqrt(2)
+t = sigma @ n
+sigma_n = n @ t
+tau = np.linalg.norm(t - sigma_n * n)
+print(f"t = {np.round(t, 3)} МПа,  σ_n = {sigma_n:.3f} МПа,  τ = {tau:.3f} МПа")
+```
+
+## Напряжение как векторнозначная 2-форма
+
+Сила, проходящая через ориентированную поверхность, — интеграл по
+поверхности. Значит, каждой компоненте силы соответствует 2-форма
+$$
+\Sigma_i = \sigma_{ij}\hodge\dd x^j = \sigma_{i1}\,\dd y\wedge\dd z + \sigma_{i2}\,\dd z\wedge\dd x + \sigma_{i3}\,\dd x\wedge\dd y, \qquad F_i = \int_S\Sigma_i ,
+$$
+— форма потока векторного поля $(\sigma_{i1}, \sigma_{i2}, \sigma_{i3})$, $i$-й строки тензора. Набор
+$(\Sigma_1, \Sigma_2, \Sigma_3)$ — 2-форма со значениями в векторах. Для замкнутой поверхности
+$\partial V$ по формуле Стокса
+$$
+F_i = \oint_{\partial V}\Sigma_i = \int_V\dd\Sigma_i, \qquad \dd\Sigma_i = \partial_j\sigma_{ij}\;\mathrm{vol} .
+$$
+
+```{python}
+x, y, z = sp.symbols("x y z", real=True)
+X = (x, y, z)
+sig = sp.Matrix(3, 3, lambda i, j: sp.Function(f"s{min(i, j) + 1}{max(i, j) + 1}")(x, y, z))
+
+def stress_form(i, sig):
+    """2-форма Σ_i = σ_ij ⋆dx^j в декартовых координатах."""
+    form = {}
+    for j in range(3):
+        for J, c in hodge({(j + 1,): sig[i, j]}, sp.eye(3)).items():
+            form[J] = form.get(J, 0) + c
+    return form
+
+print("Σ₁ =", show(stress_form(0, sig), ["dx", "dy", "dz"]))
+for i in range(3):
+    div_i = sum(sp.diff(sig[i, j], X[j]) for j in range(3))
+    print(f"dΣ_{i + 1} − (∂_j σ_{i + 1}j) vol = {sp.simplify(d(stress_form(i, sig), X).get((1, 2, 3), 0) - div_i)}")
+```
+
+Отсюда **уравнение движения сплошной среды** (второй закон Ньютона для
+любого объёма $V$): $\int_V\rho\frac{Dv_i}{Dt}\,\mathrm{vol} = \int_V\bigl(\partial_j\sigma_{ij} + f_i\bigr)\mathrm{vol}$, и так как $V$ произволен,
+$$
+\rho\,\frac{Dv_i}{Dt} = \partial_j\sigma_{ij} + f_i, \qquad\text{в равновесии}\quad \partial_j\sigma_{ij} + f_i = 0 .
+$$
+Масса $\rho\,\mathrm{vol}$ переносится потоком ([кинематика](/physics/continuum/continuum-kinematics.qmd)),
+поэтому слева стоит материальная производная.
+
+## Симметрия: баланс момента импульса
+
+Посчитаем момент поверхностных сил на кубик со стороной $h$ при
+постоянном $\sigma$: $M_i = \oint\varepsilon_{ijk}x_j\,\sigma_{kl}n_l\,\dd S$.
+
+```{python}
+h = sp.Symbol("h", positive=True)
+S = sp.Matrix(3, 3, sp.symbols("sigma11 sigma12 sigma13 sigma21 sigma22 sigma23 sigma31 sigma32 sigma33"))
+M = sp.zeros(3, 1)
+for axis in range(3):
+    for sign in (1, -1):
+        normal = sp.Matrix([sign if k == axis else 0 for k in range(3)])
+        face = {X[axis]: sign * h / 2}
+        others = [X[k] for k in range(3) if k != axis]
+        integrand = sp.Matrix(X).subs(face).cross(S * normal)
+        M += integrand.applyfunc(lambda e: sp.integrate(e, (others[0], -h / 2, h / 2), (others[1], -h / 2, h / 2)))
+print("момент на кубик M =", M.T)
+```
+
+Момент $M_i = h^3\varepsilon_{ijk}\sigma_{kj}$ пропорционален объёму, а момент инерции кубика —
+$h^5$. Если бы антисимметричная часть $\sigma$ была ненулевой, угловое ускорение
+росло бы как $h^{-2}$ при уменьшении кубика. Поэтому (без объёмных моментов,
+которых в обычных средах нет)
+$$
+\sigma_{ij} = \sigma_{ji} .
+$$
+Шесть компонент вместо девяти. Симметричную матрицу можно
+диагонализовать.
+
+## Главные напряжения, давление и девиатор
+
+Собственные значения $\sigma_1 \ge \sigma_2 \ge \sigma_3$ — **главные напряжения**, собственные векторы
+— **главные оси**: на площадках, перпендикулярных им, нет касательных сил.
+Коэффициенты характеристического многочлена — **инварианты** $I_1 = \operatorname{tr}\sigma$,
+$I_2$, $I_3 = \det\sigma$. Шаровая часть задаёт **давление** $p = -\frac13\operatorname{tr}\sigma$, остаток
+$s_{ij} = \sigma_{ij} + p\,\delta_{ij}$ (**девиатор**) — сдвиговые напряжения, с которыми связана
+пластичность.
+
+Нормальное и касательное напряжения на всевозможных площадках $(\sigma_n, \tau)$
+заполняют на плоскости область между тремя **кругами Мора** — окружностями
+с диаметрами $[\sigma_3, \sigma_2]$, $[\sigma_2, \sigma_1]$, $[\sigma_3, \sigma_1]$. Наибольшее касательное напряжение
+$\tau_\text{max} = (\sigma_1 - \sigma_3)/2$ достигается на площадках под 45° к главным осям.
+
+```{python}
+principal, axes = np.linalg.eigh(sigma)
+s3, s2, s1 = principal
+p_mean = -np.trace(sigma) / 3
+print(f"главные напряжения: {s1:.2f}, {s2:.2f}, {s3:.2f} МПа;  давление p = {p_mean:.2f} МПа")
+print(f"инварианты: tr σ = {np.trace(sigma):.1f}, det σ = {np.linalg.det(sigma):.1f};  τ_max = {(s1 - s3) / 2:.2f} МПа")
+
+normals = rng.normal(size=(4000, 3))
+normals /= np.linalg.norm(normals, axis=1, keepdims=True)
+tractions = normals @ sigma                                  # σ симметрична: t = σ n
+sn = np.einsum("ij,ij->i", tractions, normals)
+tau_all = np.sqrt(np.einsum("ij,ij->i", tractions, tractions) - sn**2)
+n45 = (axes[:, 2] + axes[:, 0]) / np.sqrt(2)                   # биссектриса осей σ₁ и σ₃
+t45 = sigma @ n45
+print(f"max τ по случайным площадкам {tau_all.max():.2f};  на площадке под 45°: τ = {np.linalg.norm(t45 - (n45 @ t45) * n45):.2f}")
+```
+
+```{python}
+#| label: fig-mohr
+#| fig-cap: 'Круги Мора для тензора напряжений с главными значениями 61,1, 10 и −31,1 МПа. Каждая серая точка — нормальное σ_n и касательное τ напряжения на площадке со случайной ориентацией; все точки лежат в области между большим кругом [σ₃, σ₁] и двумя малыми. Красная точка — площадка под 45° к осям σ₁ и σ₃, на ней касательное напряжение максимально.'
+fig, ax = plt.subplots(figsize=(7, 4))
+ax.scatter(sn, tau_all, s=2, color="0.6", alpha=0.5)
+for lo, hi in ((s3, s2), (s2, s1), (s3, s1)):
+    ang = np.linspace(0, np.pi, 200)
+    ax.plot((lo + hi) / 2 + (hi - lo) / 2 * np.cos(ang), (hi - lo) / 2 * np.sin(ang), color="tab:blue", lw=1.4)
+ax.plot(n45 @ t45, (s1 - s3) / 2, "o", color="tab:red", ms=6)
+for val, name in ((s1, "σ₁"), (s2, "σ₂"), (s3, "σ₃")):
+    ax.annotate(name, (val, 0), xytext=(val, -6), ha="center", fontsize=10)
+ax.set(xlabel="σ_n, МПа", ylabel="τ, МПа", aspect="equal", ylim=(-10, 52))
+ax.axhline(0, color="k", lw=0.6)
+plt.tight_layout()
+plt.show()
+```
+
+## Криволинейные координаты: толстостенная труба
+
+В криволинейных координатах «столбцы» $\sigma$ — уже не постоянные векторы, и
+уравнение равновесия надо писать ковариантно: $\nabla_j\sigma^{ij} + f^i = 0$
+([ковариантная производная](/math/riemann/covariant-derivative.qmd)). Труба с внутренним
+радиусом $a$, внешним $b$ и давлением $p$ внутри: по симметрии в полярных
+координатах $\sigma$ диагонален, $\sigma_{rr}(r)$ и $\sigma_{\varphi\varphi}(r)$ (физические компоненты; контравариантная
+$\sigma^{\varphi\varphi} = \sigma_{\varphi\varphi}/r^2$). Решение Ламе $\sigma_{rr} = A - B/r^2$, $\sigma_{\varphi\varphi} = A + B/r^2$:
+
+```{python}
+r, phi = sp.symbols("r phi", positive=True)
+A_, B_, a, b, p = sp.symbols("A B a b p", positive=True)
+Gamma = flat_connection([r * sp.cos(phi), r * sp.sin(phi)], [r, phi])
+s_rr, s_pp = A_ - B_ / r**2, A_ + B_ / r**2
+T = sp.Array([[s_rr, 0], [0, s_pp / r**2]])                  # контравариантные σ^{ij}
+DT = covariant_derivative(T, "uu", Gamma, [r, phi])          # DT[j, i, k] = ∇_j σ^{ik}
+print("∇_j σ^{ij} =", [sp.simplify(sum(DT[j, i, j] for j in range(2))) for i in range(2)])
+
+consts = sp.solve([s_rr.subs(r, a) + p, s_rr.subs(r, b)], [A_, B_])   # σ_rr(a) = −p, σ_rr(b) = 0
+hoop = sp.simplify(s_pp.subs(consts))
+print("σ_φφ(a) =", sp.factor(hoop.subs(r, a)), "   ∫_a^b σ_φφ dr =", sp.simplify(sp.integrate(hoop, (r, a, b))))
+hoop_num = sp.lambdify((r, a, b, p), hoop)
+print(f"труба a = 50 мм, стенка 5 мм, p = 10 МПа: σ_φφ = {hoop_num(0.050, 0.050, 0.055, 10):.1f} МПа (внутри), "
+      f"{hoop_num(0.055, 0.050, 0.055, 10):.1f} МПа (снаружи), pa/h = {10 * 0.050 / 0.005:.1f} МПа")
+```
+
+Без ковариантной производной уравнение равновесия в полярных
+координатах выглядело бы как $\sigma_{rr}' = 0$ — и было бы неверным: правильное
+$\sigma_{rr}' + (\sigma_{rr} - \sigma_{\varphi\varphi})/r = 0$ содержит вклад символов Кристоффеля. Интеграл $\int_a^b\sigma_{\varphi\varphi}\dd r = pa$
+точен: это баланс сил на половинку трубы (давление на диаметр $2a$
+уравновешено двумя сечениями стенки). Для тонкой стенки отсюда
+«котельная» формула $\sigma_{\varphi\varphi} \approx pa/h$; толстая стенка нагружена неравномерно, сильнее
+изнутри.
+
+## Физика: давление и закон Архимеда
+
+Для жидкости в покое $\sigma_{ij} = -p\,\delta_{ij}$, и уравнение равновесия
+$-\nabla p + \rho\mathbf g = 0$ — гидростатика. Сила, с которой жидкость давит на погружённое
+тело, — поток 2-форм $\Sigma_i = -p\hodge\dd x^i$ через его поверхность. По формуле
+Стокса она равна $\int_V\dd\Sigma_i = -\int_V\partial_ip\,\mathrm{vol} = -\int_V\rho_\text{ж}g_i\,\mathrm{vol}$ — весу вытесненной жидкости,
+взятому с обратным знаком. Внутрь тела формула Стокса «заглядывает»
+только формально: важно лишь, что поле давления продолжается внутрь
+гладко. Проверим прямым интегрированием по поверхности тора (ось
+горизонтальна, чтобы ответ не был очевиден из симметрии):
+
+```{python}
+R_t, r_t, rho_w, g0 = 1.0, 0.4, 1000.0, 9.81                 # тор: радиусы, вода
+u, v = np.meshgrid(np.linspace(0, 2 * np.pi, 801)[:-1], np.linspace(0, 2 * np.pi, 801)[:-1], indexing="ij")
+du = dv = 2 * np.pi / 800
+# ось тора — вдоль x; точка поверхности и внешняя нормаль
+cx, cz = (R_t + r_t * np.cos(v)) * np.cos(u), (R_t + r_t * np.cos(v)) * np.sin(u)
+pos = np.stack([r_t * np.sin(v), cx, cz])
+normal = np.stack([np.sin(v), np.cos(v) * np.cos(u), np.cos(v) * np.sin(u)])
+dS = r_t * (R_t + r_t * np.cos(v)) * du * dv
+pressure = -rho_w * g0 * pos[2]                               # p = p₀ − ρ g z, постоянная p₀ силы не даёт
+F = np.round([np.sum(-pressure * normal[i] * dS) for i in range(3)], 2) + 0.0   # + 0.0 убирает «−0.00»
+V = 2 * np.pi**2 * R_t * r_t**2
+print(f"сила давления F = ({F[0]:.2f}, {F[1]:.2f}, {F[2]:.1f}) Н,  ρ g V = {rho_w * g0 * V:.1f} Н")
+```
+
+Та же схема работает для любого поля, переносящего импульс: сила,
+действующая на заряды внутри поверхности, равна потоку тензора натяжений
+Максвелла через неё ([энергия и импульс поля](/physics/electrodynamics/em-energy-momentum.qmd),
+знаки там согласованы с нашими: $\dd F_i = \sigma_{ik}\,\dd a_k$).
+
+## Итоги
+
+- Вектор напряжений линеен по нормали (тетраэдр Коши): $t_i = \sigma_{ij}n_j$; растяжение положительно, жидкость $\sigma = -pI$.
+- Напряжение — векторнозначная 2-форма $\Sigma_i = \sigma_{ij}\hodge\dd x^j$, сила $F_i = \oint\Sigma_i = \int\dd\Sigma_i$, $\dd\Sigma_i = \partial_j\sigma_{ij}\,\mathrm{vol}$.
+- Уравнение движения $\rho\,Dv_i/Dt = \partial_j\sigma_{ij} + f_i$; баланс момента даёт $\sigma_{ij} = \sigma_{ji}$.
+- Главные напряжения и оси; давление $p = -\frac13\operatorname{tr}\sigma$ и девиатор; круги Мора, $\tau_\text{max} = (\sigma_1 - \sigma_3)/2$.
+- В криволинейных координатах — ковариантная дивергенция; труба Ламе, $\sigma_{\varphi\varphi}\approx pa/h$.
+
+## Упражнения
+
+1. Для тензора из текста (МПа) найдите вектор напряжений, нормальное и
+   касательное напряжения на площадке с нормалью $(1, 1, 0)/\sqrt2$.
+2. Покажите, что на любой площадке в жидкости в покое касательное
+   напряжение равно нулю, а нормальное равно $-p$.
+3. **Функция Эйри.** В плоской задаче без объёмных сил положим
+   $\sigma_{xx} = \partial_y^2\Phi$, $\sigma_{yy} = \partial_x^2\Phi$, $\sigma_{xy} = -\partial_x\partial_y\Phi$. Проверьте, что уравнения равновесия
+   выполнены при любой $\Phi$. Как это связано с точностью форм $\Sigma_i$ на плоскости?
+4. Тонкостенная сферическая оболочка радиуса $R$, толщины $h$, давление $p$
+   внутри. Найдите напряжение в стенке. Почему цилиндрическая оболочка
+   (котёл, сосиска) рвётся вдоль, а не поперёк?
+5. Плотина шириной $w$ удерживает воду глубины $H$. Найдите полную силу
+   давления на плотину и глубину точки её приложения.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $\mathbf t = (80, 10, 0)/\sqrt2 \approx (56{,}57;\ 7{,}07;\ 0)$ МПа, $\sigma_n = 45$ МПа, $\tau = 35$ МПа.
+2. $\mathbf t = -p\mathbf n$ параллелен нормали: $\sigma_n = \mathbf n\cdot\mathbf t = -p$, $\tau = |\mathbf t - \sigma_n\mathbf n| = 0$.
+3. $\partial_x\sigma_{xx} + \partial_y\sigma_{xy} = \Phi_{yyx} - \Phi_{xyy} = 0$, аналогично для $y$. На плоскости $\Sigma_i = \sigma_{ix}\,\dd y - \sigma_{iy}\,\dd x$ —
+   1-формы, равновесие — их замкнутость $\dd\Sigma_i = 0$; по лемме Пуанкаре $\Sigma_i = \dd\psi_i$, а
+   симметрия $\sigma_{xy} = \sigma_{yx}$ позволяет взять $\psi_x = \partial_y\Phi$, $\psi_y = -\partial_x\Phi$.
+4. Баланс сил на полусферу: $p\pi R^2 = \sigma\cdot2\pi Rh$, $\sigma = pR/2h$. У цилиндра окружное
+   напряжение $pR/h$ вдвое больше осевого $pR/2h$, поэтому трещина идёт вдоль образующей.
+5. $F = \int_0^H\rho gz\,w\,\dd z = \frac12\rho gwH^2$; точка приложения — на глубине $\frac{\int\rho gz^2w\,\dd z}{F} = \frac23H$.
+:::

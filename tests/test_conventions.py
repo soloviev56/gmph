@@ -455,3 +455,31 @@ def test_green_function_signs():
     # G(k, t) = θ(t) c sin(ckt)/k: при t → 0+ G = 0, ∂_t G = c²  (скачок от δ(t) при множителе 1/c²)
     Gk = c * sp.sin(c * k * t) / k
     assert Gk.subs(t, 0) == 0 and sp.simplify(Gk.diff(t).subs(t, 0) - c**2) == 0
+
+
+# --- Сплошная среда: dF_i = σ_ij n_j dS (n — внешняя нормаль), σ = −p I, Σ_i = σ_ij ⋆dx^j
+
+
+def test_stress_sign():
+    from gmph.exterior import d, hodge
+
+    x, y, z = sp.symbols("x y z", real=True)
+    th, ph = sp.symbols("theta phi", positive=True)
+    R, rho, g0, p0 = sp.symbols("R rho g p0", positive=True)
+    # жидкость в покое: σ = −p I, p = p0 − ρ g z; сила давления на шар — архимедова, вверх
+    n = sp.Matrix([sp.sin(th) * sp.cos(ph), sp.sin(th) * sp.sin(ph), sp.cos(th)])
+    p = p0 - rho * g0 * R * sp.cos(th)
+    force = [sp.integrate(sp.integrate(-p * n[i] * R**2 * sp.sin(th), (ph, 0, 2 * sp.pi)), (th, 0, sp.pi))
+             for i in range(3)]
+    assert force[0] == 0 and force[1] == 0
+    assert sp.simplify(force[2] - sp.Rational(4, 3) * sp.pi * R**3 * rho * g0) == 0
+    # dΣ_i = (∂_j σ_ij) vol
+    sigma = sp.Matrix(3, 3, lambda i, j: sp.Function(f"s{min(i, j)}{max(i, j)}")(x, y, z))
+    coords = (x, y, z)
+    for i in range(3):
+        Sigma = {}
+        for j in range(3):
+            for J, c in hodge({(j + 1,): sigma[i, j]}, sp.eye(3)).items():
+                Sigma[J] = Sigma.get(J, 0) + c
+        div = sum(sp.diff(sigma[i, j], coords[j]) for j in range(3))
+        assert sp.simplify(d(Sigma, coords).get((1, 2, 3), 0) - div) == 0
