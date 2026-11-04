@@ -1,0 +1,296 @@
+---
+title: "Симметрии дифференциальных уравнений"
+topic: lie-symmetries-ode
+order: 14
+description: "Точечные преобразования и их генераторы ξ∂_x + η∂_y; продолжение поля на производные (формулы η⁽¹⁾, η⁽²⁾); условие симметрии и определяющие уравнения; у уравнения y″ = 0 восьмимерная алгебра проективных преобразований (SymPy); канонические координаты и сведение к квадратуре: однородные уравнения, масштабная симметрия, семейство решений переходит в себя (рисунок); интегрирующий множитель Ли 1/(ξM + ηN); автомодельные решения: уравнение теплопроводности, u = t^{−1/2}F(x/√t), функция Грина и выход на автомодельный режим (рисунок); масштабная группа и анализ размерностей: точечный взрыв Седова–Тейлора и оценка энергии взрыва"
+---
+
+Почти все уравнения, которые удаётся решить «в квадратурах», решаются
+потому, что у них есть симметрия. Уравнение с разделяющимися
+переменными, однородное, линейное, автономное — у каждого есть
+однопараметрическая группа преобразований плоскости $(x, y)$, переводящая
+решения в решения. Софус Ли увидел в этом общий механизм: симметрия
+позволяет выбрать координаты, в которых одна переменная выпадает, и
+порядок уравнения понижается. Найти симметрии можно алгоритмически: это
+линейная задача для коэффициентов векторного поля. В физике тот же
+механизм даёт **автомодельные решения** — от функции Грина уравнения
+теплопроводности до закона расширения ударной волны после взрыва.
+
+Используются [действия групп на многообразиях](/math/lie/group-actions.qmd):
+однопараметрические группы и их генераторы — векторные поля.
+
+## Группа симметрий и её продолжение
+
+::: {#def-point-symmetry}
+**Точечная симметрия** уравнения $y^{(n)} = F(x, y, y', \dots, y^{(n-1)})$ — однопараметрическая
+группа диффеоморфизмов плоскости $(x, y)\mapsto(\tilde x, \tilde y)$, переводящая графики решений в
+графики решений. Её **генератор** — векторное поле $X = \xi(x, y)\,\partial_x + \eta(x, y)\,\partial_y$.
+:::
+
+Чтобы понять, как преобразуются производные, надо проследить за
+наклоном графика. Группа действует на «пространстве струй» $(x, y, y', y'', \dots)$,
+и генератор **продолжается**:
+$$
+\mathrm{pr}\,X = \xi\,\partial_x + \eta\,\partial_y + \eta^{(1)}\partial_{y'} + \eta^{(2)}\partial_{y''} + \dots,\qquad
+\eta^{(1)} = D_x\eta - y'D_x\xi, \quad \eta^{(k)} = D_x\eta^{(k-1)} - y^{(k)}D_x\xi,
+$$
+где $D_x = \partial_x + y'\partial_y + y''\partial_{y'} + \dots$ — полная производная. Формула для $\eta^{(1)}$ — это
+производная от $\tilde y' = \dd\tilde y/\dd\tilde x = (y' + \varepsilon D_x\eta)/(1 + \varepsilon D_x\xi)$ по $\varepsilon$ при $\varepsilon = 0$.
+
+**Условие симметрии** (критерий Ли): $\mathrm{pr}\,X\bigl(y^{(n)} - F\bigr) = 0$ на решениях, то есть
+при $y^{(n)} = F$. Это уравнение в частных производных на $\xi, \eta$, но оно должно
+выполняться при **всех** значениях $y', \dots, y^{(n-1)}$, от которых $\xi, \eta$ не зависят.
+Коэффициенты при степенях $y'$ дают переопределённую линейную систему —
+**определяющие уравнения**.
+
+## Пример: восемь симметрий уравнения $y'' = 0$
+
+Решения $y'' = 0$ — прямые, и симметрии — преобразования, переводящие прямые
+в прямые. Найдём их: возьмём $\xi, \eta$ — многочлены степени не выше 2 (можно
+доказать, что других решений определяющих уравнений нет) и потребуем
+$\eta^{(2)} = 0$ при $y'' = 0$ тождественно по $x, y, y'$:
+
+```{python}
+import numpy as np
+import sympy as sp
+import matplotlib.pyplot as plt
+from scipy.special import erf
+
+x, y, p, q = sp.symbols("x y p q")                    # p = y′, q = y″
+
+def total_derivative(f):
+    """D_x f для функции от (x, y, y′) с заменой y″ = q."""
+    return f.diff(x) + p * f.diff(y) + q * f.diff(p)
+
+def prolong(xi, eta):
+    """Коэффициенты η⁽¹⁾, η⁽²⁾ продолженного поля."""
+    eta1 = total_derivative(eta) - p * total_derivative(xi)
+    eta2 = total_derivative(eta1) - q * total_derivative(xi)
+    return eta1, eta2
+
+monomials = [x**i * y**j for i in range(3) for j in range(3) if i + j <= 2]
+a = sp.symbols(f"a0:{len(monomials)}")
+b = sp.symbols(f"b0:{len(monomials)}")
+xi_gen = sum(c * mono for c, mono in zip(a, monomials))
+eta_gen = sum(c * mono for c, mono in zip(b, monomials))
+_, eta2 = prolong(xi_gen, eta_gen)
+equations = sp.Poly(sp.expand(eta2.subs(q, 0)), x, y, p).coeffs()       # на решениях y″ = 0
+solution = sp.solve(equations, list(a) + list(b), dict=True)[0]
+free = [s for s in list(a) + list(b) if s not in solution]
+generators = []
+for f in free:
+    pick = {s: int(s == f) for s in free}
+    generators.append((sp.expand(xi_gen.subs(solution).subs(pick)), sp.expand(eta_gen.subs(solution).subs(pick))))
+print(f"размерность алгебры симметрий: {len(generators)}")
+for xi_k, eta_k in generators:
+    print(f"   ξ = {str(xi_k):6}  η = {eta_k}")
+```
+
+Сдвиги ($\partial_x$, $\partial_y$), растяжения и сдвиги вида $x\partial_y$, $y\partial_x$ — аффинные
+преобразования (6 полей), и ещё два «проективных»: $x^2\partial_x + xy\partial_y$, $xy\partial_x + y^2\partial_y$.
+Вместе они образуют алгебру $\mathfrak{sl}(3, \R)$ проективных преобразований плоскости.
+Проверим, что коммутаторы не выводят за пределы найденной алгебры
+(векторные поля коммутируют по [конвенциям](/conventions.qmd), раздел «Многообразия
+и векторные поля»):
+
+```{python}
+def bracket(F, G):
+    """[F, G]^i = F^j ∂_j G^i − G^j ∂_j F^i для полей (ξ, η)."""
+    return tuple(sp.expand(F[0] * G[i].diff(x) + F[1] * G[i].diff(y) - G[0] * F[i].diff(x) - G[1] * F[i].diff(y))
+                 for i in range(2))
+
+basis_vectors = sp.Matrix([[sp.Poly(c, x, y).coeff_monomial(mono) for c in g for mono in monomials] for g in generators])
+closed = True
+for F, G in [(generators[i], generators[j]) for i in range(8) for j in range(i + 1, 8)]:
+    br = bracket(F, G)
+    vec = sp.Matrix([[sp.Poly(c, x, y).coeff_monomial(mono) for c in br for mono in monomials]])
+    closed &= basis_vectors.rank() == basis_vectors.col_join(vec).rank()
+print("коммутаторы лежат в линейной оболочке восьми полей:", closed)
+```
+
+## Канонические координаты: сведение к квадратуре
+
+Для поля $X$ выберем координаты $(r, s)$ с $Xr = 0$, $Xs = 1$ — **канонические**: в них
+$X = \partial_s$, группа — сдвиги по $s$. Уравнение первого порядка, инвариантное
+относительно сдвигов $s$, не содержит $s$: $\dd s/\dd r = G(r)$, и решение —
+квадратура.
+
+**Однородные уравнения** $y' = f(y/x)$ инвариантны относительно растяжений
+$(x, y)\mapsto(\lambda x, \lambda y)$ с генератором $X = x\partial_x + y\partial_y$. Канонические координаты $r = y/x$,
+$s = \ln x$, и уравнение становится
+$$
+\frac{\dd s}{\dd r} = \frac{1}{f(r) - r} .
+$$
+Возьмём $f(r) = r + r^2$: $s = -1/r + C$, то есть $y = x/(C - \ln x)$. Сравним с `dsolve` и
+проверим **интегрирующий множитель Ли**: для уравнения $M\,\dd x + N\,\dd y = 0$ с
+симметрией $X$ множитель $\mu = 1/(\xi M + \eta N)$ делает форму замкнутой.
+
+```{python}
+yf = sp.Function("y")
+f_rhs = lambda r: r + r**2
+print("dsolve:", sp.dsolve(sp.Eq(yf(x).diff(x), f_rhs(yf(x) / x))))
+r_, s_ = sp.symbols("r s")
+print("в канонических координатах: s(r) =", sp.integrate(1 / (f_rhs(r_) - r_), r_), "+ C")
+
+M, N = -f_rhs(y / x), sp.Integer(1)                       # форма −f dx + dy
+mu = 1 / (x * M + y * N)                                  # ξ = x, η = y
+print("d(μM dx + μN dy) = 0:", sp.simplify(sp.diff(mu * M, y) - sp.diff(mu * N, x)) == 0)
+print("проверка симметрии: pr X (y′ − f) на решениях =",
+      sp.simplify((prolong(x, y)[0] - (x * sp.diff(f_rhs(y / x), x) + y * sp.diff(f_rhs(y / x), y))).subs(p, f_rhs(y / x))))
+```
+
+Растяжение переводит каждое решение в другое решение того же семейства:
+$\lambda\,y(x/\lambda) = x/(C + \ln\lambda - \ln x)$ — сдвиг константы.
+
+```{python}
+#| label: fig-scaling-orbits
+#| fig-cap: 'Решения однородного уравнения y′ = y/x + (y/x)², то есть y = x/(C − ln x), при C = 0, 0,5, …, 3 (цветные кривые) и орбиты группы растяжений — лучи y = rx (серые). Растяжение в λ = e^{0,5} раз (стрелки) переводит кривую с константой C в кривую с константой C + 0,5. Вдоль каждого луча наклон решений один и тот же: r = y/x — инвариант группы.'
+fig, ax = plt.subplots(figsize=(6.5, 5))
+xs = np.linspace(0.02, 6, 600)
+Cs = np.arange(0, 3.01, 0.5)
+colors = plt.cm.viridis(np.linspace(0, 0.9, len(Cs)))
+for C, col in zip(Cs, colors):
+    ys = xs / (C - np.log(xs))
+    ys[(C - np.log(xs)) <= 0.05] = np.nan                    # за асимптотой x = e^C решение уходит в бесконечность
+    ax.plot(xs, ys, color=col, lw=1.6, label=f"C = {C:g}")
+for slope in (0.25, 0.5, 1, 2):
+    ax.plot([0, 6], [0, 6 * slope], color="0.75", lw=0.8, zorder=0)
+lam = np.exp(0.5)
+for x0 in (0.4, 0.8, 1.5):
+    y0 = x0 / (1.0 - np.log(x0))                             # точка на кривой C = 1
+    ax.annotate("", xy=(lam * x0, lam * y0), xytext=(x0, y0), arrowprops=dict(arrowstyle="->", color="tab:red"))
+ax.set(xlim=(0, 6), ylim=(0, 6), xlabel="x", ylabel="y", aspect="equal")
+ax.legend(fontsize=8, loc="upper left")
+plt.tight_layout()
+plt.show()
+```
+
+Для уравнений второго порядка симметрия понижает порядок на единицу:
+в канонических координатах уравнение не содержит $s$, и $w = \dd s/\dd r$
+удовлетворяет уравнению первого порядка. Автономное уравнение $y'' = F(y, y')$
+(симметрия $\partial_x$) так сводится к уравнению для $p(y) = y'$; уравнение движения
+с законом сохранения энергии — частный случай. Двух симметрий хватает,
+чтобы проинтегрировать уравнение второго порядка в квадратурах.
+
+## Автомодельные решения
+
+Для уравнений в частных производных симметрии дают **инвариантные
+решения**: решения, которые сами переходят в себя под действием группы,
+зависят от меньшего числа переменных. Уравнение теплопроводности
+$u_t = u_{xx}$ инвариантно относительно растяжений $x\to\lambda x$, $t\to\lambda^2t$, $u\to\lambda^{-1}u$ (последний
+множитель сохраняет «количество тепла» $\int u\,\dd x$). Инварианты группы —
+$\zeta = x/\sqrt t$ и $\sqrt t\,u$, поэтому инвариантное решение ищем в виде $u = t^{-1/2}F(\zeta)$:
+
+```{python}
+t = sp.Symbol("t", positive=True)
+zeta = sp.Symbol("zeta", real=True)
+F = sp.Function("F")
+u_self = F(x / sp.sqrt(t)) / sp.sqrt(t)
+reduced = sp.simplify((u_self.diff(t) - u_self.diff(x, 2)) * t**sp.Rational(3, 2)).subs(x, zeta * sp.sqrt(t))
+reduced = sp.simplify(reduced.doit())
+print("уравнение на F:", reduced, "= 0")
+print("это −(F′ + ζF/2)′:", sp.simplify(reduced + sp.diff(F(zeta).diff(zeta) + zeta * F(zeta) / 2, zeta)) == 0)
+print("подстановка F = e^(−ζ²/4):", sp.simplify(reduced.subs(F(zeta), sp.exp(-zeta**2 / 4)).doit()))
+```
+
+Уравнение $F'' + \frac\zeta2F' + \frac12F = 0$ — это $\bigl(F' + \frac\zeta2F\bigr)' = 0$; убывающее решение
+$F = Ae^{-\zeta^2/4}$, и с нормировкой $\int u\,\dd x = 1$ получается функция Грина
+$u = \frac{1}{\sqrt{4\pi t}}e^{-x^2/4t}$ ([функции Грина](/math/analysis/green-functions.qmd)). Автомодельное
+решение — не просто частный случай: решение с **любым** начальным
+распределением конечной ширины $a$ при $t\gg a^2$ выходит на него
+(«промежуточная асимптотика»). Проверим на начальной «ступеньке» ширины
+$2a$, для которой решение выражается через функцию ошибок:
+
+```{python}
+a_w = 1.0
+def box_solution(xx, tt):
+    """Решение u_t = u_xx с u(x, 0) = 1/2a при |x| < a (полное тепло 1)."""
+    return (erf((xx + a_w) / np.sqrt(4 * tt)) - erf((xx - a_w) / np.sqrt(4 * tt))) / (4 * a_w)
+
+zetas = np.linspace(-6, 6, 601)
+gauss = np.exp(-zetas**2 / 4) / np.sqrt(4 * np.pi)
+for tt in (0.1, 1.0, 10.0, 100.0):
+    collapsed = np.sqrt(tt) * box_solution(zetas * np.sqrt(tt), tt)
+    print(f"t = {tt:6}: max |√t·u − e^(−ζ²/4)/√(4π)| = {np.abs(collapsed - gauss).max():.2e}")
+```
+
+```{python}
+#| label: fig-self-similar
+#| fig-cap: 'Выход на автомодельный режим. Слева — решение уравнения теплопроводности с начальной «ступенькой» ширины 2 в моменты t = 0,05, 0,3, 1, 3, 10: профили разные. Справа — те же решения в автомодельных переменных √t·u и ζ = x/√t: с ростом t кривые сходятся к гауссиане e^{−ζ²/4}/√(4π) (чёрный пунктир), отклонение убывает примерно как 1/t.'
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 3.8))
+x_plot = np.linspace(-8, 8, 800)
+for tt, col in zip((0.05, 0.3, 1, 3, 10), plt.cm.plasma(np.linspace(0, 0.85, 5))):
+    ax1.plot(x_plot, box_solution(x_plot, tt), color=col, label=f"t = {tt:g}")
+    ax2.plot(zetas, np.sqrt(tt) * box_solution(zetas * np.sqrt(tt), tt), color=col)
+ax2.plot(zetas, gauss, "k--", lw=1.2)
+ax1.set(xlabel="x", ylabel="u")
+ax1.legend(fontsize=8)
+ax2.set(xlabel="ζ = x/√t", ylabel="√t · u")
+plt.tight_layout()
+plt.show()
+```
+
+## Физика: размерности как масштабная группа
+
+Анализ размерностей — частный случай той же идеи: физический закон
+инвариантен относительно группы растяжений единиц измерения, и ответ
+можно выразить через инварианты этой группы (Π-теорема). Классический
+пример — **сильный точечный взрыв** (Седов, Тейлор, 1941–1950). Радиус ударной
+волны $R$ может зависеть только от энергии $E$, плотности воздуха $\rho$ и времени
+$t$ (давление воздуха пренебрежимо мало по сравнению с давлением в волне).
+Ищем $R = \xi\,E^\alpha\rho^\beta t^\gamma$ с безразмерным $\xi$:
+
+```{python}
+al, be, ga = sp.symbols("alpha beta gamma")
+# размерности: E = M L² T⁻², ρ = M L⁻³, t = T; нужно L¹
+dims = {"M": al + be, "L": 2 * al - 3 * be, "T": -2 * al + ga}
+exps = sp.solve([dims["M"], dims["L"] - 1, dims["T"]], [al, be, ga])
+print("R = ξ · E^α ρ^β t^γ:", exps)
+
+R_obs, t_obs, rho_air = 140.0, 0.025, 1.2                    # огненный шар Тринити: ~140 м через 25 мс
+E_est = rho_air * R_obs**5 / t_obs**2                        # при ξ ≈ 1
+print(f"E ≈ ρR⁵/t² = {E_est:.2e} Дж ≈ {E_est / 4.184e12:.0f} кт ТНТ")
+```
+
+$R = \xi\,(Et^2/\rho)^{1/5}$, $\xi\approx1$. Тейлор по фотографиям испытания «Тринити» (1945),
+опубликованным со шкалой времени, оценил энергию взрыва — засекреченную
+тогда величину — в 20 с лишним килотонн. Здесь масштабная группа не
+просто «проверяет размерности»: она сводит уравнения газовой динамики к
+обыкновенным уравнениям для автомодельного профиля, как в задаче о
+теплопроводности.
+
+## Итоги
+
+- Симметрия — группа точечных преобразований, переводящих решения в решения; генератор $X = \xi\partial_x + \eta\partial_y$.
+- Продолжение: $\eta^{(1)} = D_x\eta - y'D_x\xi$, $\eta^{(k)} = D_x\eta^{(k-1)} - y^{(k)}D_x\xi$; критерий $\mathrm{pr}\,X(y^{(n)} - F) = 0$ на решениях.
+- Определяющие уравнения линейны; у $y'' = 0$ восьмимерная алгебра $\mathfrak{sl}(3)$.
+- Канонические координаты ($X = \partial_s$) сводят уравнение первого порядка к квадратуре; множитель Ли $1/(\xi M + \eta N)$.
+- Инвариантные решения УрЧП — автомодельные: $u = t^{-1/2}F(x/\sqrt t)$ для теплопроводности; точечный взрыв $R\propto(Et^2/\rho)^{1/5}$.
+
+## Упражнения
+
+1. Найдите симметрию уравнения $y' = g(x)$ и канонические координаты. Что даёт
+   метод Ли?
+2. Покажите, что поле $x^2\partial_x + xy\partial_y$ порождает преобразования
+   $(x, y)\mapsto\bigl(\frac{x}{1 - \varepsilon x}, \frac{y}{1 - \varepsilon x}\bigr)$ и что они переводят прямые в прямые.
+3. Линейное уравнение $y' + P(x)y = Q(x)$. Покажите, что $X = y_h(x)\partial_y$, где $y_h$ —
+   решение однородного уравнения, — симметрия, и найдите множитель Ли.
+4. Время прогрева тела размера $L$ с температуропроводностью $\chi$ по
+   соображениям подобия $\sim L^2/\chi$. Во сколько раз дольше прогревается шар
+   радиуса 10 см, чем шар радиуса 1 см из того же материала?
+5. Найдите закон движения фронта ударной волны $\dot R(t)$ при точечном взрыве и
+   зависимость давления за фронтом $\sim\rho\dot R^2$ от $R$.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $X = \partial_y$ (сдвиг решения на константу); канонические координаты $r = x$, $s = y$;
+   уравнение уже имеет вид $\dd s/\dd r = g(r)$, и метод Ли даёт $y = \int g\,\dd x + C$.
+2. Поток поля: $\dot x = x^2$, $\dot y = xy$ ⇒ $x(\varepsilon) = x/(1 - \varepsilon x)$, $y/x$ постоянно ⇒ $y(\varepsilon) = y/(1 - \varepsilon x)$.
+   Обратное отображение $x = \tilde x/(1 + \varepsilon\tilde x)$, $y = \tilde y/(1 + \varepsilon\tilde x)$; подставив его в уравнение прямой
+   $\alpha x + \beta y + \gamma = 0$ и умножив на $1 + \varepsilon\tilde x$, получаем $\alpha\tilde x + \beta\tilde y + \gamma(1 + \varepsilon\tilde x) = 0$ — снова прямая.
+3. Если $y$ — решение, то $y + \varepsilon y_h$ — тоже (линейность). Форма $\dd y + (Py - Q)\dd x$: $\xi = 0$, $\eta = y_h$,
+   $N = 1$, множитель $\mu = 1/y_h = e^{\int P\,\dd x}$ — известный интегрирующий множитель.
+4. В $10^2 = 100$ раз.
+5. $R\propto t^{2/5}$, $\dot R = \frac25R/t\propto t^{-3/5}\propto R^{-3/2}$; давление $\sim\rho\dot R^2\propto R^{-3}$ — энергия $E$,
+   распределённая по объёму $\sim R^3$.
+:::
