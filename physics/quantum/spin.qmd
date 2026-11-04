@@ -1,0 +1,216 @@
+---
+title: "Спин"
+topic: spin
+order: 9
+description: "Спин ½: Ŝ = ħσ/2, матрицы Паули и их алгебра; спиноры и вектор Блоха, поворот спинора e^{−iθn·σ/2} поворачивает ⟨σ⟩ на угол θ (сверка с SO(3)), а поворот на 2π даёт −1; уравнение Паули из (σ·π)²/2m = π²/2m − (eħ/2mc)σ·B (проверка SymPy) — g = 2 и аномалия α/2π; гамильтониан −γS·B и уравнение Гейзенберга Ṡ = γS×B, как у классического спина в конвенциях; ларморовы частоты электрона и протона (ЭПР и ЯМР); нейтронный интерферометр: интенсивность с периодом 4π по углу прецессии (рисунок); поляризация спинов в поле"
+---
+
+Опыт Штерна–Герлаха с атомами серебра дал два пучка — а момент импульса
+$l$ даёт $2l + 1$ проекций, то есть нечётное число. Значит, у электрона есть
+собственный момент с $s = \frac12$, не связанный с движением в пространстве, —
+**спин**. Его состояния — векторы $\mathbb C^2$, а повороты действуют на них
+матрицами группы $\mathrm{SU}(2)$, которая накрывает группу вращений дважды
+([группы SO(3) и SU(2)](/math/lie/so3-su2.qmd)). Отсюда неожиданное, но
+проверенное на опыте следствие: поворот на $360°$ меняет знак волновой
+функции. А связь спина с магнитным полем — с множителем $g = 2$ — получается
+из уравнения Шрёдингера почти даром, если записать кинетическую энергию
+через матрицы Паули.
+
+Используются [момент импульса](/physics/quantum/angular-momentum-qm.qmd) и
+[заряд в электромагнитном поле](/physics/quantum/qm-em-field.qmd).
+
+## Спин ½ и матрицы Паули
+
+::: {#def-spin-half}
+**Спин ½** — представление алгебры момента $j = \frac12$ на $\mathbb C^2$:
+$$
+\hat{\mathbf S} = \frac\hbar2\boldsymbol\sigma, \qquad
+\sigma_x = \begin{pmatrix}0 & 1\\ 1 & 0\end{pmatrix},\quad
+\sigma_y = \begin{pmatrix}0 & -i\\ i & 0\end{pmatrix},\quad
+\sigma_z = \begin{pmatrix}1 & 0\\ 0 & -1\end{pmatrix}.
+$$
+Векторы $\chi\in\mathbb C^2$ — **спиноры**. Матрицы Паули удовлетворяют
+$\sigma_i\sigma_j = \delta_{ij} + i\varepsilon_{ijk}\sigma_k$, откуда $[\hat S_x, \hat S_y] = i\hbar\hat S_z$ (и циклически) и $\hat{\mathbf S}^2 = \frac34\hbar^2$.
+:::
+
+Генераторы эрмитовы, как положено в квантовой механике ([конвенции](/conventions.qmd),
+раздел «Группы Ли»): оператор поворота на угол $\theta$ вокруг единичной оси $\mathbf n$
+$$
+U(\mathbf n, \theta) = e^{-i\theta\,\mathbf n\cdot\hat{\mathbf S}/\hbar} = e^{-i\theta\,\mathbf n\cdot\boldsymbol\sigma/2} = \cos\frac\theta2 - i\,\mathbf n\cdot\boldsymbol\sigma\,\sin\frac\theta2 .
+$$
+Каждому спинору соответствует **вектор Блоха** $\mathbf P = \langle\chi|\boldsymbol\sigma|\chi\rangle$ — направление, в котором
+спин «смотрит» ([постулаты](/physics/quantum/qm-postulates.qmd)). Проверим, что $U$ поворачивает
+$\mathbf P$ ровно на угол $\theta$ (матрицей $R = e^{\theta\,\mathbf n\cdot\mathbf J}$ с вещественными генераторами $J_k$
+группы $\mathrm{SO}(3)$), а поворот на $2\pi$ даёт $-1$:
+
+```{python}
+import numpy as np
+import sympy as sp
+import matplotlib.pyplot as plt
+from scipy.linalg import expm
+from scipy import constants as C
+
+sigma = [np.array([[0, 1], [1, 0]], dtype=complex), np.array([[0, -1j], [1j, 0]]), np.array([[1, 0], [0, -1]], dtype=complex)]
+J_so3 = [np.array([[0, 0, 0], [0, 0, -1], [0, 1, 0]]), np.array([[0, 0, 1], [0, 0, 0], [-1, 0, 0]]),
+         np.array([[0, -1, 0], [1, 0, 0], [0, 0, 0]])]
+
+def spin_rotation(n, theta):
+    return expm(-1j * theta / 2 * sum(n[k] * sigma[k] for k in range(3)))
+
+def bloch(chi):
+    return np.real([chi.conj() @ s @ chi for s in sigma])
+
+rng = np.random.default_rng(4)
+n = np.array([1.0, 2.0, 2.0]) / 3
+chi = rng.normal(size=2) + 1j * rng.normal(size=2)
+chi /= np.linalg.norm(chi)
+for theta in (0.7, np.pi, 2 * np.pi):
+    R = expm(theta * sum(n[k] * J_so3[k] for k in range(3)))
+    U = spin_rotation(n, theta)
+    print(f"θ = {theta:.4f}: |P(Uχ) − R·P(χ)| = {np.abs(bloch(U @ chi) - R @ bloch(chi)).max():.1e}")
+print("U(2π) = −1:", np.allclose(spin_rotation(n, 2 * np.pi), -np.eye(2)),
+      "  U(4π) = 1:", np.allclose(spin_rotation(n, 4 * np.pi), np.eye(2)))
+```
+
+Вектор Блоха после поворота на $2\pi$ возвращается, а спинор меняет знак:
+$U(\mathbf n, 2\pi) = -1$. Знак ненаблюдаем, пока поворачивается вся система, но
+его можно увидеть, интерферируя повёрнутую часть волны с неповёрнутой
+(см. ниже).
+
+## Уравнение Паули и $g = 2$
+
+Для частицы со спином ½ кинетическую энергию можно записать как
+$\frac{1}{2m}(\boldsymbol\sigma\cdot\hat{\mathbf p})^2$ — без поля это то же $\hat p^2/2m$, потому что $(\boldsymbol\sigma\cdot\mathbf a)(\boldsymbol\sigma\cdot\mathbf b) = \mathbf a\cdot\mathbf b + i\boldsymbol\sigma\cdot(\mathbf a\times\mathbf b)$.
+Но после минимальной связи $\hat{\mathbf p}\to\hat{\boldsymbol\pi} = \hat{\mathbf p} - \frac ec\mathbf A$ компоненты $\hat\pi$ не коммутируют, и
+$\hat{\boldsymbol\pi}\times\hat{\boldsymbol\pi} = \frac{i\hbar e}{c}\mathbf B \ne 0$. Проверим для произвольного $\mathbf A(x, y, z)$:
+
+```{python}
+x, y, z = sp.symbols("x y z", real=True)
+X = (x, y, z)
+hbar, e, c = sp.symbols("hbar e c", positive=True)
+pauli = [sp.Matrix(s.astype(complex)).applyfunc(sp.nsimplify) for s in sigma]
+A = [sp.Function(f"A_{k}")(x, y, z) for k in "xyz"]
+chi_f = sp.Matrix([sp.Function("u")(x, y, z), sp.Function("v")(x, y, z)])
+
+def pi(i, f):
+    return -sp.I * hbar * f.diff(X[i]) - e / c * A[i] * f
+
+def sigma_pi(f):
+    return sum((pauli[i] * pi(i, f) for i in range(3)), sp.zeros(2, 1))
+
+B = [A[2].diff(y) - A[1].diff(z), A[0].diff(z) - A[2].diff(x), A[1].diff(x) - A[0].diff(y)]
+pi_squared = sum((pi(i, pi(i, chi_f)) for i in range(3)), sp.zeros(2, 1))
+zeeman = e * hbar / c * sum((B[i] * pauli[i] * chi_f for i in range(3)), sp.zeros(2, 1))
+print("(σ·π)²χ − [π²χ − (eħ/c) σ·B χ] =", sp.simplify(sp.expand(sigma_pi(sigma_pi(chi_f)) - pi_squared + zeeman)).T)
+```
+
+::: {#def-pauli-equation}
+**Уравнение Паули** для частицы с зарядом $e$ и спином ½:
+$$
+i\hbar\pd{\chi}{t} = \Bigl[\frac{\hat{\boldsymbol\pi}^2}{2m} + e\varphi - \hat{\boldsymbol\mu}\cdot\mathbf B\Bigr]\chi, \qquad
+\hat{\boldsymbol\mu} = g\,\frac{e}{2mc}\,\hat{\mathbf S}, \quad g = 2 .
+$$
+:::
+
+Орбитальный момент даёт магнитный момент $\frac{e}{2mc}\hat{\mathbf L}$ ($g = 1$), спин — вдвое больше.
+Здесь $g = 2$ не постулат, а следствие записи $(\boldsymbol\sigma\cdot\hat{\boldsymbol\pi})^2$; уравнение Дирака делает эту
+запись неизбежной (тема «Уравнение Дирака»). Измеренный $g$ электрона
+чуть больше двух: поправка квантовой электродинамики $\frac{g - 2}{2}\approx\frac{\alpha}{2\pi}$:
+
+```{python}
+g_e = abs(C.physical_constants["electron g factor"][0])
+print(f"g_e = {g_e:.12f};  (g − 2)/2 = {(g_e - 2) / 2:.7f},  α/2π = {C.alpha / (2 * np.pi):.7f}")
+```
+
+## Прецессия
+
+В однородном поле спиновая часть гамильтониана $\hat H = -\gamma\,\hat{\mathbf S}\cdot\mathbf B$, где
+$\gamma = ge/2mc$ — **гиромагнитное отношение** (для электрона $e < 0$, и $\gamma < 0$). Уравнение
+Гейзенберга $\dot{\hat S}_k = \frac i\hbar[\hat H, \hat S_k]$ даёт
+$$
+\frac{\dd\hat{\mathbf S}}{\dd t} = \gamma\,\hat{\mathbf S}\times\mathbf B
+$$
+— то же уравнение, что для классического спина с симплектической формой
+сферы ([конвенции](/conventions.qmd), раздел «Гамильтонова механика»). Средние
+$\langle\hat{\mathbf S}\rangle$ прецессируют с **ларморовой частотой** $\omega_L = |\gamma|B$.
+
+```{python}
+gam, Bx, By, Bz = sp.symbols("gamma B_x B_y B_z", real=True)
+S_ops = [hbar / 2 * P for P in pauli]
+H = -gam * (Bx * S_ops[0] + By * S_ops[1] + Bz * S_ops[2])
+Bvec = sp.Matrix([Bx, By, Bz])
+for k in range(3):
+    heisenberg = sp.I / hbar * (H * S_ops[k] - S_ops[k] * H)
+    cross = sum((gam * sp.LeviCivita(k, i, j) * S_ops[i] * Bvec[j] for i in range(3) for j in range(3)), sp.zeros(2))
+    print(f"dS_{'xyz'[k]}/dt − γ(S×B)_{'xyz'[k]} =", sp.simplify(heisenberg - cross).tolist())
+
+mu_B = C.physical_constants["Bohr magneton"][0]
+f_e = g_e * mu_B / C.h                                        # Гц/Тл
+f_p = C.physical_constants["proton gyromag. ratio in MHz/T"][0]
+print(f"электрон: ω_L/2π = {f_e / 1e9:.3f} ГГц/Тл (ЭПР);  протон: {f_p:.3f} МГц/Тл (ЯМР)")
+```
+
+В поле 0,35 Тл электронный парамагнитный резонанс идёт на частоте около
+10 ГГц, а ядерный магнитный резонанс протонов в томографе на 1,5 Тл — на
+64 МГц: отношение частот — это отношение магнитных моментов, а не
+величин спинов.
+
+## Физика: поворот на 360° наблюдаем
+
+В нейтронном интерферометре пучок делится на два, в одном плече спин
+прецессирует в магнитном поле на угол $\alpha = |\gamma_n|BL/v$, затем пучки сводятся.
+Интенсивность на выходе $\propto|\chi + U(\alpha)\chi|^2 = 2\bigl(1 + \operatorname{Re}\langle\chi|U(\alpha)|\chi\rangle\bigr)$, а для поворота
+вокруг оси $z$ $\operatorname{Re}\langle\chi|e^{-i\alpha\sigma_z/2}|\chi\rangle = \cos\frac\alpha2$ при любом $\chi$. Интенсивность имеет период $4\pi$:
+после прецессии на $2\pi$ интерференция деструктивна. Это наблюдали в 1975
+году (Раух и др.; Вернер и др.).
+
+```{python}
+alphas = np.linspace(0, 4 * np.pi, 400)
+chi0 = np.array([np.cos(0.4), np.exp(0.9j) * np.sin(0.4)])           # произвольный спинор
+intensity = np.array([np.linalg.norm(chi0 + spin_rotation([0, 0, 1], a) @ chi0)**2 / 4 for a in alphas])
+print("max |I − (1 + cos(α/2))/2| =", f"{np.abs(intensity - (1 + np.cos(alphas / 2)) / 2).max():.1e}")
+gamma_n = abs(C.physical_constants["neutron gyromag. ratio"][0])
+v_n = C.h / (C.m_n * 1.8e-10)                                       # тепловые нейтроны, λ = 1,8 Å
+print(f"нейтрон λ = 1,8 Å: v = {v_n:.0f} м/с; поворот на 4π требует B·L = {4 * np.pi * v_n / gamma_n * 1e4:.2f} Тл·см")
+```
+
+```{python}
+#| label: fig-four-pi
+#| fig-cap: 'Нейтронный интерферометр: интенсивность на выходе (синяя) как функция угла прецессии спина в одном из плеч и проекция вектора Блоха на исходное направление, cos α (серый пунктир), для спина, перпендикулярного полю. Вектор Блоха возвращается через 360°, а интенсивность — только через 720°: при α = 360° спинор сменил знак, и волны гасят друг друга.'
+fig, ax = plt.subplots(figsize=(7.5, 3.6))
+ax.plot(np.degrees(alphas), intensity, color="tab:blue", lw=2, label="интенсивность (1 + cos(α/2))/2")
+ax.plot(np.degrees(alphas), np.cos(alphas), "--", color="0.5", lw=1.2, label="⟨σ⟩ вдоль исходного направления, cos α")
+for deg in (360, 720):
+    ax.axvline(deg, color="0.85", lw=1, zorder=0)
+ax.set(xlabel="угол прецессии α, градусы", xticks=range(0, 721, 90), ylim=(-1.1, 1.65))
+ax.legend(fontsize=9, loc="upper center", ncol=2)
+plt.tight_layout()
+plt.show()
+```
+
+## Итоги
+
+- Спин ½: $\hat{\mathbf S} = \frac\hbar2\boldsymbol\sigma$, $\sigma_i\sigma_j = \delta_{ij} + i\varepsilon_{ijk}\sigma_k$; состояния — спиноры, $\langle\boldsymbol\sigma\rangle$ — вектор Блоха.
+- Повороты: $U = e^{-i\theta\mathbf n\cdot\boldsymbol\sigma/2}\in\mathrm{SU}(2)$ поворачивает вектор Блоха на $\theta$; $U(2\pi) = -1$ — видно в интерферометре.
+- Уравнение Паули: $(\boldsymbol\sigma\cdot\hat{\boldsymbol\pi})^2 = \hat{\boldsymbol\pi}^2 - \frac{e\hbar}{c}\boldsymbol\sigma\cdot\mathbf B$, откуда $g = 2$; реально $g - 2\approx\alpha/\pi$.
+- Прецессия $\dot{\mathbf S} = \gamma\mathbf S\times\mathbf B$, $\omega_L = |\gamma|B$: 28 ГГц/Тл для электрона, 42,6 МГц/Тл для протона.
+
+## Упражнения
+
+1. Найдите собственные векторы $\mathbf n\cdot\boldsymbol\sigma$ для $\mathbf n = (\sin\theta\cos\varphi, \sin\theta\sin\varphi, \cos\theta)$ и их векторы Блоха.
+2. Докажите тождество $(\boldsymbol\sigma\cdot\mathbf a)(\boldsymbol\sigma\cdot\mathbf b) = \mathbf a\cdot\mathbf b + i\boldsymbol\sigma\cdot(\mathbf a\times\mathbf b)$ для коммутирующих $\mathbf a, \mathbf b$.
+3. Выведите $e^{-i\theta\mathbf n\cdot\boldsymbol\sigma/2} = \cos\frac\theta2 - i\,\mathbf n\cdot\boldsymbol\sigma\sin\frac\theta2$.
+4. Спин электрона в момент $t = 0$ направлен по $x$, поле 1 Тл направлено по $z$. Найдите
+   $\langle\hat S_x\rangle(t)$ и период прецессии.
+5. Электронные спины в поле 1 Тл при температуре $T$: поляризация $\tanh(\mu_BB/kT)$ (при $g = 2$).
+   При какой температуре она равна 10 %?
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $\chi_+ = (\cos\frac\theta2, e^{i\varphi}\sin\frac\theta2)$ с собственным значением $+1$ (вектор Блоха $\mathbf n$) и
+   $\chi_- = (\sin\frac\theta2, -e^{i\varphi}\cos\frac\theta2)$ с $-1$ (вектор Блоха $-\mathbf n$).
+2. $\sigma_i\sigma_ja_ib_j = (\delta_{ij} + i\varepsilon_{ijk}\sigma_k)a_ib_j = \mathbf a\cdot\mathbf b + i\sigma_k(\mathbf a\times\mathbf b)_k$.
+3. $(\mathbf n\cdot\boldsymbol\sigma)^2 = 1$ по п. 2, поэтому чётные степени ряда дают $\cos\frac\theta2$, нечётные — $-i\,\mathbf n\cdot\boldsymbol\sigma\sin\frac\theta2$.
+4. $\langle\hat S_x\rangle = \frac\hbar2\cos\omega_Lt$, $\omega_L = g_e\mu_BB/\hbar$; период $1/(28{,}0\ \text{ГГц}) = 35{,}7$ пс.
+5. $\mu_BB/kT = \operatorname{arth}0{,}1 = 0{,}1003$; $T = \frac{5{,}79\cdot10^{-5}\ \text{эВ}}{8{,}62\cdot10^{-5}\ \text{эВ/К}\cdot0{,}1003}\approx6{,}7$ К.
+:::
