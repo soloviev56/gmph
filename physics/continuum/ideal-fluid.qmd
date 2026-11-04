@@ -1,0 +1,232 @@
+---
+title: "Идеальная жидкость"
+topic: ideal-fluid
+order: 3
+description: "Идеальная жидкость: σ = −pI, уравнение Эйлера ρDv/Dt = −∇p + f; тензор плотности потока импульса Π = pI + ρvv и закон сохранения импульса; тождество Лэмба и геометрическая форма (∂_t + L_v)v♭ = d(½v² − h) (проверка gmph.exterior); баротропная жидкость и энтальпия; интеграл Бернулли вдоль линий тока и во всём потенциальном течении; потенциальные течения: Δφ = 0, комплексный потенциал; обтекание цилиндра с циркуляцией: проверка уравнения Эйлера, парадокс Даламбера и подъёмная сила Жуковского F = −ρUΓ интегрированием давления (рисунок линий тока и давления); трубка Пито, вращающееся ведро, подъёмная сила крыла"
+---
+
+Жидкость, в которой трение пренебрежимо мало, — хорошее приближение
+для потоков воздуха вокруг крыла или воды в трубе вдали от стенок.
+Внутренние силы в такой среде сводятся к давлению: касательных
+напряжений нет. Тогда уравнения движения замыкаются, и из них сразу
+следуют закон Бернулли, который объясняет работу трубки Пито и
+пульверизатора, и теория потенциальных течений, где задачи гидродинамики
+становятся задачами о гармонических функциях. В геометрической записи
+уравнение Эйлера утверждает, что форма $v^\flat$ (циркуляция) переносится
+потоком с точностью до точной формы, — из этого в теме «Завихренность»
+получаются теоремы Кельвина и Гельмгольца.
+
+Используются [тензор напряжений](/physics/continuum/stress.qmd) и
+[кинематика сплошной среды](/physics/continuum/continuum-kinematics.qmd).
+
+## Уравнение Эйлера
+
+::: {#def-ideal-fluid}
+**Идеальная жидкость** — среда, в которой на любой площадке действует только
+нормальное напряжение: $\sigma_{ij} = -p\,\delta_{ij}$ ([конвенции](/conventions.qmd), раздел «Механика
+сплошных сред»). Уравнение движения $\rho\,Dv_i/Dt = \partial_j\sigma_{ij} + f_i$ становится
+**уравнением Эйлера**
+$$
+\rho\Bigl(\pd{\mathbf v}{t} + (\mathbf v\cdot\nabla)\mathbf v\Bigr) = -\nabla p + \mathbf f ,
+$$
+а вместе с уравнением непрерывности $\partial_t\rho + \operatorname{div}(\rho\mathbf v) = 0$ и уравнением состояния
+($\rho = \mathrm{const}$ для несжимаемой жидкости, $p = p(\rho)$ для **баротропной**) образует
+замкнутую систему.
+:::
+
+**Закон сохранения импульса.** Умножив уравнение непрерывности на $v_i$ и
+сложив с уравнением Эйлера, получаем
+$$
+\pd{(\rho v_i)}{t} + \partial_j\Pi_{ij} = f_i, \qquad \Pi_{ij} = p\,\delta_{ij} + \rho v_iv_j .
+$$
+**Тензор плотности потока импульса** $\Pi_{ij} = -\sigma_{ij} + \rho v_iv_j$: импульс переносится через
+площадку и силами давления, и самим веществом.
+
+**Тождество Лэмба.** Конвективное ускорение раскладывается на градиент и
+«вихревую» часть:
+$$
+(\mathbf v\cdot\nabla)\mathbf v = \nabla\frac{v^2}{2} - \mathbf v\times\operatorname{rot}\mathbf v .
+$$
+В баротропной жидкости $\dd p/\rho = \dd h$, где $h(\rho)$ — **удельная энтальпия**, и для
+потенциальной внешней силы $\mathbf f = -\rho\nabla\Phi$ уравнение Эйлера принимает вид
+$\partial_t\mathbf v - \mathbf v\times\operatorname{rot}\mathbf v = -\nabla\bigl(\frac{v^2}2 + h + \Phi\bigr)$. На языке форм
+([производная Ли](/math/forms/interior-lie.qmd)) $\iprod{v}\dd v^\flat = -(\mathbf v\times\operatorname{rot}\mathbf v)^\flat$, $\iprod{v}v^\flat = v^2$, и формула
+Картана $\Lie{v} = \iprod{v}\dd + \dd\iprod{v}$ даёт
+$$
+\Bigl(\pd{}{t} + \Lie{v}\Bigr)v^\flat = \dd\Bigl(\frac{v^2}{2} - h - \Phi\Bigr) .
+$$
+Проверим оба тождества для произвольного поля скоростей:
+
+```{python}
+import numpy as np
+import sympy as sp
+import matplotlib.pyplot as plt
+from gmph.exterior import d, interior, lie
+
+x, y, z = sp.symbols("x y z", real=True)
+X = (x, y, z)
+v = sp.Matrix([sp.Function(f"v_{c}")(x, y, z) for c in "xyz"])
+grad = lambda f: sp.Matrix([f.diff(q) for q in X])
+rot = lambda u: sp.Matrix([u[2].diff(y) - u[1].diff(z), u[0].diff(z) - u[2].diff(x), u[1].diff(x) - u[0].diff(y)])
+convective = sp.Matrix([sum(v[j] * v[i].diff(X[j]) for j in range(3)) for i in range(3)])
+v2 = (v.T * v)[0]
+print("(v·∇)v − ∇(v²/2) + v×rot v =", sp.simplify(convective - grad(v2 / 2) + v.cross(rot(v))).T)
+
+v_flat = {(i + 1,): v[i] for i in range(3)}                     # декартовы координаты: v♭ = v_i dx^i
+v_vec = list(v)                                                # компоненты вектора v^i
+i_dv = interior(v_vec, d(v_flat, X))
+lamb = v.cross(rot(v))
+print("ι_v dv♭ + (v×rot v)♭ =", [sp.simplify(i_dv.get((i + 1,), 0) + lamb[i]) for i in range(3)])
+L_v = lie(v_vec, v_flat, X)                                     # L_v v♭
+print("L_v v♭ − [(v·∇)v + ∇(v²/2)]♭ =", [sp.simplify(L_v.get((i + 1,), 0) - convective[i] - grad(v2 / 2)[i]) for i in range(3)])
+```
+
+Последняя строка — та же формула в виде $\Lie{v}v^\flat = \bigl((\mathbf v\cdot\nabla)\mathbf v + \nabla\frac{v^2}2\bigr)^\flat$: подставив её в
+уравнение Эйлера, получаем геометрическую форму выше.
+
+## Интеграл Бернулли
+
+Для **стационарного** течения ($\partial_t\mathbf v = 0$) умножим уравнение скалярно на $\mathbf v$:
+слагаемое $\mathbf v\cdot(\mathbf v\times\operatorname{rot}\mathbf v)$ исчезает, и
+$$
+\mathbf v\cdot\nabla\Bigl(\frac{v^2}2 + h + \Phi\Bigr) = 0 :
+$$
+величина $\frac{v^2}2 + h + \Phi$ постоянна **вдоль каждой линии тока** (для несжимаемой
+жидкости $h = p/\rho$). Если течение ещё и **потенциально**, $\operatorname{rot}\mathbf v = 0$, то она
+постоянна во всём потоке, причём для нестационарного потенциального
+течения $\mathbf v = \nabla\varphi$ верно $\partial_t\varphi + \frac{v^2}2 + h + \Phi = C(t)$. Там, где скорость
+больше, давление меньше — на этом работают пульверизатор, трубка Вентури и
+крыло.
+
+## Потенциальные течения
+
+Для несжимаемой жидкости с $\mathbf v = \nabla\varphi$ уравнение непрерывности даёт
+$\Delta\varphi = 0$ (здесь $\Delta$ — обычный лапласиан $\nabla^2$): кинематика сводится к
+гармонической функции с условием непротекания $\partial_n\varphi = 0$ на твёрдых
+стенках, а давление находится из интеграла Бернулли. На плоскости
+удобен **комплексный потенциал** $w(z) = \varphi + i\psi$ — голоморфная функция $z = x + iy$,
+$w'(z) = v_x - iv_y$; $\psi$ — **функция тока**, её линии уровня — линии тока.
+
+**Обтекание цилиндра.** Поток со скоростью $U$ на бесконечности, цилиндр
+радиуса $a$, циркуляция $\Gamma$ (против часовой стрелки):
+$$
+w = U\Bigl(z + \frac{a^2}{z}\Bigr) + \frac{\Gamma}{2\pi i}\ln z, \qquad
+\varphi = U\Bigl(r + \frac{a^2}r\Bigr)\cos\theta + \frac{\Gamma\theta}{2\pi} .
+$$
+Проверим, что $\varphi$ гармонична, на цилиндре $v_r = 0$, и что поле скоростей с
+давлением $p = p_0 - \rho v^2/2$ удовлетворяет уравнению Эйлера; затем найдём силу,
+проинтегрировав давление по поверхности цилиндра (на единицу длины):
+
+```{python}
+r, th = sp.symbols("r theta", positive=True)
+U, a, Gamma, rho, p0 = sp.symbols("U a Gamma rho p0", positive=True)
+phi_pol = U * (r + a**2 / r) * sp.cos(th) + Gamma * th / (2 * sp.pi)
+laplace = sp.diff(r * phi_pol.diff(r), r) / r + phi_pol.diff(th, 2) / r**2
+print("Δφ =", sp.simplify(laplace), "   v_r(a) =", sp.simplify(phi_pol.diff(r).subs(r, a)))
+
+xs_, ys_ = sp.symbols("x y", real=True)
+phi_cart = U * (xs_ + a**2 * xs_ / (xs_**2 + ys_**2)) + Gamma * sp.atan2(ys_, xs_) / (2 * sp.pi)
+vx, vy = phi_cart.diff(xs_), phi_cart.diff(ys_)
+p_cart = p0 - rho * (vx**2 + vy**2) / 2
+euler = [rho * (vx * c.diff(xs_) + vy * c.diff(ys_)) + p_cart.diff(q) for c, q in ((vx, xs_), (vy, ys_))]
+print("уравнение Эйлера (невязка):", [sp.simplify(e) for e in euler])
+
+v_theta = sp.simplify(phi_pol.diff(th) / r)
+p_wall = (p0 - rho * (phi_pol.diff(r)**2 + v_theta**2) / 2).subs(r, a)
+F_x = sp.simplify(sp.integrate(-p_wall * sp.cos(th) * a, (th, 0, 2 * sp.pi)))     # dF = −p n dS
+F_y = sp.simplify(sp.integrate(-p_wall * sp.sin(th) * a, (th, 0, 2 * sp.pi)))
+print("сила на единицу длины: F_x =", F_x, ",  F_y =", F_y)
+stagnation = sp.solve(sp.Eq(v_theta.subs(r, a), 0), sp.sin(th))
+print("критические точки на цилиндре: sin θ =", stagnation)
+```
+
+Сопротивление $F_x$ равно нулю — **парадокс Даламбера**: в идеальной жидкости
+тело, движущееся равномерно, не испытывает сопротивления. Давление
+спереди и сзади одинаково, потому что течение симметрично. Реальное
+сопротивление возникает из-за вязкости — в тонком пограничном слое и
+отрыве потока (тема «Вязкая жидкость»). Зато сила, перпендикулярная
+потоку, есть: $F_y = -\rho U\Gamma$ — **подъёмная сила Жуковского**. Она не зависит от
+формы тела, только от циркуляции; у крыла циркуляцию создаёт острая
+задняя кромка.
+
+```{python}
+#| label: fig-cylinder
+#| fig-cap: 'Обтекание цилиндра (a = 1, U = 1) потенциальным потоком: линии тока ψ = const, цвет — давление p − p₀ в единицах ρU² по Бернулли (p₀ — давление торможения, поэтому p − p₀ ≤ 0). Слева Γ = 0: картина симметрична и спереди-назад, и сверху-вниз; сила равна нулю. Справа Γ = 2πaU (против часовой стрелки): критические точки сместились вверх, к sin θ = ½; под цилиндром скорость больше и давление ниже, чем над ним, — сила F_y = −ρUΓ направлена вниз.'
+def stream_and_pressure(Gam, Xg, Yg):
+    zg = Xg + 1j * Yg
+    w_prime = 1 - 1 / zg**2 + Gam / (2j * np.pi * zg)          # U = a = 1
+    psi = np.imag(zg + 1 / zg + Gam / (2j * np.pi) * np.log(zg))
+    return psi, -0.5 * np.abs(w_prime)**2
+
+Xg, Yg = np.meshgrid(np.linspace(-3, 3, 600), np.linspace(-2.2, 2.2, 440))
+outside = Xg**2 + Yg**2 > 1
+fig, axes = plt.subplots(1, 2, figsize=(10, 3.9))
+for ax, Gam, title in zip(axes, (0.0, 2 * np.pi), ("Γ = 0", "Γ = 2πaU")):
+    psi, pres = stream_and_pressure(Gam, Xg, Yg)
+    pres = np.where(outside, pres, np.nan)
+    im = ax.contourf(Xg, Yg, pres, levels=np.linspace(-2.6, 0, 27), cmap="RdBu_r", extend="min")
+    ax.contour(Xg, Yg, np.where(outside, psi, np.nan), levels=np.linspace(-3, 3, 25), colors="k", linewidths=0.6,
+               linestyles="solid")
+    ax.add_patch(plt.Circle((0, 0), 1, color="0.4"))
+    ax.set(aspect="equal", title=title, xticks=[], yticks=[])
+fig.colorbar(im, ax=axes, shrink=0.85, label="(p − p₀)/ρU²")
+plt.show()
+```
+
+## Физика
+
+**Трубка Пито.** Отверстие, обращённое навстречу потоку, — критическая
+точка ($v = 0$), там давление торможения $p + \rho v^2/2$; боковое отверстие
+измеряет статическое $p$. Разность даёт скорость: так измеряют скорость
+самолёта.
+
+**Подъёмная сила крыла.** Самолёт массы 70 т с размахом крыла 35 м при
+посадочной скорости 70 м/с должен создавать циркуляцию, при которой
+$\rho U\Gamma b = mg$:
+
+```{python}
+m_plane, g0, U_air, rho_air, span = 70e3, 9.81, 70.0, 1.2, 35.0
+Gamma_wing = m_plane * g0 / (rho_air * U_air * span)
+chord = 4.0
+print(f"циркуляция Γ = {Gamma_wing:.0f} м²/с;  при хорде {chord:g} м разность скоростей над и под крылом "
+      f"≈ Γ/хорду = {Gamma_wing / chord:.0f} м/с ({Gamma_wing / chord / U_air * 100:.0f} % скорости полёта)")
+dp = rho_air * U_air * Gamma_wing / chord                      # Δp ≈ ρ U Δv
+print(f"средний перепад давления ≈ ρUΔv = {dp:.0f} Па = {dp / 101325 * 100:.1f} % атмосферного")
+```
+
+Перепад давления — всего несколько процентов атмосферного, но на площади
+крыла его хватает, чтобы держать самолёт.
+
+## Итоги
+
+- Идеальная жидкость: $\sigma = -pI$; уравнение Эйлера $\rho\,D\mathbf v/Dt = -\nabla p + \mathbf f$; поток импульса $\Pi_{ij} = p\delta_{ij} + \rho v_iv_j$.
+- Тождество Лэмба и геометрическая форма $(\partial_t + \Lie{v})v^\flat = \dd(\frac{v^2}2 - h - \Phi)$.
+- Бернулли: $\frac{v^2}2 + h + \Phi$ постоянно вдоль линий тока, а в потенциальном течении — всюду.
+- Потенциальное несжимаемое течение: $\Delta\varphi = 0$; на плоскости — комплексный потенциал.
+- Цилиндр: сопротивления нет (Даламбер), подъёмная сила $-\rho U\Gamma$ (Жуковский).
+
+## Упражнения
+
+1. Из бака с водой уровня $h$ над отверстием вытекает струя. Найдите её скорость.
+2. Трубка Пито показывает разность давлений 2 кПа в воздухе ($\rho = 1{,}2$ кг/м³).
+   Какова скорость самолёта?
+3. Жидкость вращается в ведре как твёрдое тело с угловой скоростью $\Omega$. Найдите
+   форму свободной поверхности. Почему здесь нельзя применять интеграл
+   Бернулли «поперёк» линий тока?
+4. Потенциал обтекания шара $\varphi = U\bigl(r + \frac{a^3}{2r^2}\bigr)\cos\theta$. Проверьте, что он гармоничен,
+   и найдите наибольшую скорость на поверхности шара.
+5. Выведите закон сохранения импульса $\partial_t(\rho v_i) + \partial_j\Pi_{ij} = f_i$ из уравнений Эйлера и
+   непрерывности.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. Бернулли вдоль линии тока от поверхности (где $v\approx0$, $p = p_\text{атм}$) до струи: $v = \sqrt{2gh}$ (Торричелли).
+2. $v = \sqrt{2\Delta p/\rho} = \sqrt{2\cdot2000/1{,}2}\approx58$ м/с.
+3. $\mathbf v = \Omega\,\mathbf e_z\times\mathbf r$, $(\mathbf v\cdot\nabla)\mathbf v = -\Omega^2\mathbf r_\perp$, уравнение Эйлера: $\partial_rp = \rho\Omega^2r$, $\partial_zp = -\rho g$;
+   поверхность $p = \text{const}$: $z = \frac{\Omega^2r^2}{2g}$ — параболоид. Течение вихревое, $\operatorname{rot}\mathbf v = 2\boldsymbol\Omega$,
+   поэтому постоянная Бернулли своя на каждой линии тока (окружности), и
+   по Бернулли вышло бы ошибочное $p + \rho\Omega^2r^2/2 = \text{const}$.
+4. $\frac{1}{r^2}\partial_r(r^2\partial_r\varphi) + \frac{1}{r^2\sin\theta}\partial_\theta(\sin\theta\,\partial_\theta\varphi) = 0$; $v_r(a) = 0$, $v_\theta(a) = -\frac32U\sin\theta$, максимум $\frac32U$ на
+   экваторе (у цилиндра $2U$).
+5. $\partial_t(\rho v_i) = v_i\partial_t\rho + \rho\partial_tv_i = -v_i\partial_j(\rho v_j) - \rho v_j\partial_jv_i - \partial_ip + f_i = -\partial_j(\rho v_iv_j) - \partial_ip + f_i$.
+:::
