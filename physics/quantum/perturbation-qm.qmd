@@ -1,0 +1,341 @@
+---
+title: "Теория возмущений"
+topic: perturbation-qm
+order: 5
+description: "Стационарная теория возмущений: поправки E⁽¹⁾ = V_nn, E⁽²⁾ = Σ|V_mn|²/(E_n − E_m), поправка к состоянию; ангармонический осциллятор λx⁴: E_n⁽¹⁾, E_n⁽²⁾ в замкнутом виде (SymPy) и сверка с диагонализацией, асимптотический характер ряда (рисунок); точно решаемые проверки λx и λx²; вырожденный случай — диагонализация в подпространстве (двумерный осциллятор с λxy); теорема Фейнмана–Гельмана; нестационарная теория: картина взаимодействия, первый порядок и функция sin²(Δt/2)/Δ², сверка с точным решением двухуровневой системы; золотое правило Ферми и экспоненциальный распад уровня, связанного с квазинепрерывной зоной, естественная ширина линии (рисунок)"
+---
+
+Точно решаемых задач в квантовой механике немного: осциллятор, атом
+водорода, несколько потенциалов. Всё остальное — молекулы в поле, атом в
+световой волне, ангармонические колебания — считают, отталкиваясь от
+решаемой задачи и малого возмущения. Геометрически теория возмущений
+отвечает на вопрос, как поворачиваются собственные прямые и сдвигаются
+собственные значения эрмитовой матрицы $H_0 + \lambda V$ при малом $\lambda$. Ответ
+выражается через матричные элементы $V$ и разности энергий; малые
+знаменатели (почти вырожденные уровни) — признак того, что поворот
+велик, и нужна другая схема. Во времени возмущение вызывает переходы,
+и при переходах в непрерывный спектр из него получается экспоненциальный
+распад — золотое правило Ферми.
+
+Используются [постулаты квантовой механики](/physics/quantum/qm-postulates.qmd); примеры —
+[квантовый гармонический осциллятор](/physics/quantum/quantum-oscillator.qmd).
+
+## Стационарные возмущения
+
+Пусть $\hat H = \hat H_0 + \lambda\hat V$, и у $\hat H_0$ известны собственные состояния $|n\rangle$ с
+**невырожденными** энергиями $E_n$. Ищем $E_n(\lambda)$ и $|n(\lambda)\rangle$ рядами по $\lambda$, нормируя
+$\langle n|n(\lambda)\rangle = 1$. Подстановка в $\hat H|n(\lambda)\rangle = E_n(\lambda)|n(\lambda)\rangle$ и сравнение коэффициентов при
+$\lambda$ и $\lambda^2$ дают:
+
+::: {#def-rs-perturbation}
+**Ряд Рэлея–Шрёдингера** (с $V_{mn} = \langle m|\hat V|n\rangle$):
+$$
+E_n(\lambda) = E_n + \lambda V_{nn} + \lambda^2\sum_{m\ne n}\frac{|V_{mn}|^2}{E_n - E_m} + O(\lambda^3), \qquad
+|n(\lambda)\rangle = |n\rangle + \lambda\sum_{m\ne n}\frac{V_{mn}}{E_n - E_m}\,|m\rangle + O(\lambda^2) .
+$$
+:::
+
+Первая поправка — среднее возмущения в невозмущённом состоянии. Вторая
+для основного состояния всегда отрицательна (все знаменатели $E_0 - E_m < 0$):
+уровни «расталкиваются», нижний опускается.
+
+**Пример: ангармонический осциллятор.** $\hat H = \frac12(p^2 + x^2) + \lambda x^4$ в единицах $\hbar\omega$ и
+$x_0 = \sqrt{\hbar/m\omega}$. Матрица $x$ в базисе функций Эрмита трёхдиагональна, $x^4$ связывает
+$n$ лишь с $n$, $n\pm2$, $n\pm4$, поэтому суммы конечны и вычисляются точно:
+
+```{python}
+import numpy as np
+import sympy as sp
+import matplotlib.pyplot as plt
+from scipy.integrate import solve_ivp
+
+def ladder(n_basis, exact=False):
+    """Матрица оператора уничтожения в базисе ψ₀ … ψ_{n−1} (точная SymPy или numpy)."""
+    if exact:
+        return sp.Matrix(n_basis, n_basis, lambda i, j: sp.sqrt(j) if j == i + 1 else 0)
+    return np.diag(np.sqrt(np.arange(1, n_basis)), 1)
+
+def rs_corrections(H0_diag, V, n):
+    """Поправки Рэлея–Шрёдингера первого и второго порядка к уровню n (точная арифметика)."""
+    first = V[n, n]
+    second = sum(V[m, n]**2 / (H0_diag[n] - H0_diag[m]) for m in range(len(H0_diag)) if m != n)
+    return sp.nsimplify(first), sp.nsimplify(second)
+
+size = 14
+a = ladder(size, exact=True)
+X = (a + a.T) / sp.sqrt(2)
+X4 = X**4
+levels0 = [sp.Rational(2 * k + 1, 2) for k in range(size)]
+nn = sp.Symbol("n")
+E1_formula = sp.Rational(3, 4) * (2 * nn**2 + 2 * nn + 1)
+E2_formula = -sp.Rational(1, 8) * (34 * nn**3 + 51 * nn**2 + 59 * nn + 21)
+for n in range(5):
+    E1, E2 = rs_corrections(levels0, X4, n)
+    print(f"n = {n}: E⁽¹⁾ = {E1}, E⁽²⁾ = {E2};  формулы: {E1_formula.subs(nn, n)}, {E2_formula.subs(nn, n)}")
+```
+
+Итак, $E_n = n + \frac12 + \frac34(2n^2 + 2n + 1)\lambda - \frac18(34n^3 + 51n^2 + 59n + 21)\lambda^2 + \dots$ Сравним с
+численной диагонализацией в большом базисе:
+
+```{python}
+N_big = 160
+A = ladder(N_big)
+Xn = (A + A.T) / np.sqrt(2)
+X4n = np.linalg.matrix_power(Xn, 4)
+H0n = np.diag(np.arange(N_big) + 0.5)
+
+def ground_energy(lam):
+    return np.linalg.eigvalsh(H0n + lam * X4n)[0]
+
+for lam in (0.001, 0.01, 0.05, 0.1):
+    exact = ground_energy(lam)
+    pt1, pt2 = 0.5 + 0.75 * lam, 0.5 + 0.75 * lam - 21 / 8 * lam**2
+    print(f"λ = {lam:5}: точно {exact:.7f}, 1-й порядок {pt1:.7f} (ошибка {pt1 - exact:+.1e}), "
+          f"2-й порядок {pt2:.7f} (ошибка {pt2 - exact:+.1e})")
+```
+
+При малых $\lambda$ каждый порядок уменьшает ошибку, причём ошибка второго
+порядка $\sim\lambda^3$. Но коэффициенты ряда растут факториально (следующие:
+$\frac{333}{16}$, $-\frac{30885}{128}$, …), и при любом $\lambda > 0$ ряд расходится: при $\lambda < 0$
+потенциал не ограничен снизу и связанных состояний нет, так что $E_0(\lambda)$ не
+может быть аналитична в нуле (довод Дайсона). Ряд **асимптотический**:
+полезен при малых $\lambda$, и тем меньше членов стоит брать, чем больше $\lambda$.
+
+```{python}
+#| label: fig-anharmonic
+#| fig-cap: 'Энергия основного состояния ангармонического осциллятора ½(p² + x²) + λx⁴ (единицы ħω): точная (диагонализация в базисе 160 функций Эрмита) и приближения теории возмущений первого и второго порядка. Слева — сами энергии: при λ > 0,16 второй порядок уже хуже первого. Справа — модуль ошибки в логарифмическом масштабе: при малых λ наклоны 2 и 3, как и положено поправкам порядков λ² и λ³.'
+lams = np.linspace(0.0, 0.3, 61)
+exact_E = np.array([ground_energy(l) for l in lams])
+first = 0.5 + 0.75 * lams
+second = first - 21 / 8 * lams**2
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 3.8))
+ax1.plot(lams, exact_E, "k", lw=2, label="точно")
+ax1.plot(lams, first, "--", label="1-й порядок")
+ax1.plot(lams, second, "-.", label="2-й порядок")
+ax1.set(xlabel="λ", ylabel="E₀")
+ax1.legend(fontsize=9)
+small = np.logspace(-3, -0.5, 30)
+exact_s = np.array([ground_energy(l) for l in small])
+ax2.loglog(small, np.abs(0.5 + 0.75 * small - exact_s), "--", label="1-й порядок")
+ax2.loglog(small, np.abs(0.5 + 0.75 * small - 21 / 8 * small**2 - exact_s), "-.", label="2-й порядок")
+ax2.set(xlabel="λ", ylabel="|ошибка|")
+ax2.legend(fontsize=9)
+plt.tight_layout()
+plt.show()
+```
+
+## Вырожденные уровни
+
+Если $E_n$ вырожден, знаменатели $E_n - E_m$ обращаются в нуль для состояний
+того же уровня. Выход: внутри собственного подпространства $\mathcal H_n$ базис
+не фиксирован, и его надо выбрать так, чтобы $V$ там был диагонален.
+Поправки первого порядка — **собственные значения матрицы $V$, суженной
+на $\mathcal H_n$**, а правильные состояния нулевого порядка — её собственные
+векторы. Возмущение снимает вырождение, если эти собственные значения
+различны.
+
+Пример: двумерный изотропный осциллятор с возмущением $\lambda xy$. Уровень
+$E = 2$ дважды вырожден ($|1, 0\rangle$, $|0, 1\rangle$). Точное решение известно: поворотом
+на 45° задача распадается на две моды с частотами $\sqrt{1\pm\lambda}$.
+
+```{python}
+small_n = 6
+a1 = ladder(small_n, exact=True)
+x1 = (a1 + a1.T) / sp.sqrt(2)
+I = sp.eye(small_n)
+Vxy = sp.kronecker_product(x1, x1)                         # x ⊗ y в базисе |n_x, n_y⟩
+idx = lambda nx, ny: nx * small_n + ny
+block = sp.Matrix(2, 2, lambda i, j: Vxy[[idx(1, 0), idx(0, 1)][i], [idx(1, 0), idx(0, 1)][j]])
+print("V на подпространстве E = 2:", block.tolist(), "  собственные значения:", list(block.eigenvals()))
+lam = sp.Symbol("lambda", positive=True)
+wp, wm = sp.sqrt(1 + lam), sp.sqrt(1 - lam)
+exact_levels = [(wp + wm) / 2 + wp, (wp + wm) / 2 + wm]   # одна мода возбуждена
+print("точные уровни до λ²:", [sp.series(e, lam, 0, 3).removeO() for e in exact_levels])
+```
+
+Расщепление $\pm\lambda/2$ совпадает с разложением точных уровней. Обратим
+внимание: правильные состояния нулевого порядка $(|1,0\rangle \pm |0,1\rangle)/\sqrt2$ не зависят
+от $\lambda$, но и при сколь угодно малом $\lambda$ они далеки от исходного базиса —
+вырождение делает собственные векторы «неустойчивыми».
+
+**Теорема Фейнмана–Гельмана.** Для нормированного собственного состояния
+$\frac{\dd E_n}{\dd\lambda} = \langle n(\lambda)|\pd{\hat H}{\lambda}|n(\lambda)\rangle$ — производные от $\langle n|n\rangle = 1$ выпадают. При $\lambda = 0$ это
+первая поправка; при любом $\lambda$ — удобный способ находить средние:
+
+```{python}
+lam0, h_step = 0.05, 1e-5
+w_, U_ = np.linalg.eigh(H0n + lam0 * X4n)
+mean_x4 = U_[:, 0] @ X4n @ U_[:, 0]
+slope = (ground_energy(lam0 + h_step) - ground_energy(lam0 - h_step)) / (2 * h_step)
+print(f"λ = {lam0}: dE₀/dλ = {slope:.8f},  ⟨x⁴⟩ = {mean_x4:.8f}")
+```
+
+## Нестационарные возмущения
+
+Пусть $\hat H = \hat H_0 + \hat V(t)$. Разложим $\psi(t) = \sum_n c_n(t)\,e^{-iE_nt/\hbar}|n\rangle$ — это **картина
+взаимодействия**: быстрое вращение фаз от $\hat H_0$ вынесено, и коэффициенты
+меняются только из-за $V$:
+$$
+i\hbar\,\dot c_f = \sum_n V_{fn}(t)\,e^{i\omega_{fn}t}\,c_n, \qquad \omega_{fn} = \frac{E_f - E_n}{\hbar} .
+$$
+В первом порядке, при $c_n(0) = \delta_{ni}$:
+$$
+c_f(t) = \frac{1}{i\hbar}\int_0^tV_{fi}(t')\,e^{i\omega_{fi}t'}\dd t' .
+$$
+Для гармонического возмущения $V = v\,e^{-i\omega t} + \text{э. с.}$ вблизи резонанса $\omega\approx\omega_{fi}$ остаётся
+одно слагаемое, и при расстройке $\Delta = \omega_{fi} - \omega$
+$$
+P_{i\to f}(t) = \frac{|v_{fi}|^2}{\hbar^2}\,\frac{\sin^2(\Delta t/2)}{(\Delta/2)^2} .
+$$
+Сверим с точным решением двухуровневой системы с $V = 2v\cos\omega t\,\sigma_x$ ($\hbar = 1$):
+
+```{python}
+def two_level_probability(v, omega, w0, t_end):
+    """Точная вероятность перехода 0 → 1 под действием 2v cos(ωt) σ_x (картина взаимодействия)."""
+    def rhs(t, c):
+        c0, c1 = c[0] + 1j * c[1], c[2] + 1j * c[3]
+        coupling = 2 * v * np.cos(omega * t)
+        d0 = -1j * coupling * np.exp(-1j * w0 * t) * c1
+        d1 = -1j * coupling * np.exp(1j * w0 * t) * c0
+        return [d0.real, d0.imag, d1.real, d1.imag]
+    sol = solve_ivp(rhs, (0, t_end), [1, 0, 0, 0], rtol=1e-10, atol=1e-12)
+    return sol.y[2, -1]**2 + sol.y[3, -1]**2
+
+w0, v_small, t_end = 10.0, 0.01, 30.0
+for detuning in (0.0, 0.1, 0.3, 0.5):
+    exact = two_level_probability(v_small, w0 - detuning, w0, t_end)
+    first_order = v_small**2 * (t_end**2 if detuning == 0 else np.sin(detuning * t_end / 2)**2 / (detuning / 2)**2)
+    print(f"Δ = {detuning}: точно {exact:.6f}, первый порядок {first_order:.6f}")
+```
+
+Согласие хорошее, пока вероятность мала; на резонансе $P = v^2t^2$ растёт
+квадратично и при $vt\sim1$ первый порядок неприменим (точный ответ —
+осцилляции Раби, [постулаты](/physics/quantum/qm-postulates.qmd)).
+
+## Золотое правило Ферми
+
+Если конечные состояния образуют непрерывный спектр с плотностью $\rho(E)$
+(состояний на единицу энергии), вероятности надо сложить. При больших $t$
+функция $\frac{\sin^2(\Delta t/2)}{(\Delta/2)^2}$ — пик высоты $t^2$ и ширины $\sim1/t$ с площадью $2\pi t$, то есть
+$\to2\pi t\,\delta(\Delta)$. Суммарная вероятность растёт **линейно**, с постоянной скоростью
+$$
+\Gamma = \frac{2\pi}{\hbar}\,|V_{fi}|^2\,\rho(E_f)\Big|_{E_f = E_i} .
+$$
+Это **золотое правило**. Убыль начального состояния с постоянной скоростью
+означает экспоненциальный распад $P_i(t) = e^{-\Gamma t}$ — уже за пределами первого
+порядка, но правило даёт его показатель.
+
+Проверим на модели: уровень с энергией 0 связан матричным элементом $v$ с
+$N$ эквидистантными уровнями зоны $[-W, W]$ с шагом $\delta$, $\rho = 1/\delta$. Точную
+эволюцию найдём диагонализацией матрицы $(N + 1)\times(N + 1)$.
+
+```{python}
+def decay(n_band, half_width, v, times, t_final):
+    """Вероятность остаться в дискретном состоянии в моменты times и заселённости уровней зоны при t_final."""
+    band = np.linspace(-half_width, half_width, n_band)
+    H = np.diag(np.concatenate([[0.0], band]))
+    H[0, 1:] = H[1:, 0] = v
+    w, U = np.linalg.eigh(H)
+    amps = (U[0] * np.exp(-1j * np.outer(np.append(times, t_final), w))) @ U.T   # строки: ⟨k|ψ(t)⟩
+    return band, np.abs(amps[:-1, 0])**2, np.abs(amps[-1, 1:])**2
+
+delta_E = 0.002
+v_c = delta_E * np.sqrt(50 / (2 * np.pi))                     # Γ/δ = 50: в ширину линии попадает много уровней
+Gamma = 2 * np.pi * v_c**2 / delta_E
+times = np.linspace(0, 40, 401)
+results = {}
+for W in (1.0, 2.0):
+    band, survival, populations = decay(int(2 * W / delta_E) + 1, W, v_c, times, t_final=200.0)
+    results[W] = (band, survival, populations)
+    window = times < 3 / Gamma
+    print(f"W = {W}: Γ = {Gamma:.4f},  max |P(t) − e^(−Γt)| при t < 3/Γ: {np.abs(survival - np.exp(-Gamma * times))[window].max():.3f}")
+```
+
+Распад экспоненциальный, а отклонение уменьшается вдвое при удвоении
+ширины зоны: золотое правило точно в пределе $\Gamma \ll W$ (непрерывная зона,
+бесконечно широкая по сравнению с шириной уровня). Куда уходит
+вероятность? Заселённости уровней зоны после распада образуют контур
+Лоренца ширины $\Gamma$:
+$$
+|c_k(\infty)|^2 = \frac{v^2}{E_k^2 + \Gamma^2/4} \quad\Longrightarrow\quad \text{на единицу энергии}\ \ \frac{1}{2\pi}\,\frac{\Gamma}{E^2 + \Gamma^2/4} .
+$$
+
+```{python}
+#| label: fig-golden-rule
+#| fig-cap: 'Распад дискретного уровня, связанного с квазинепрерывной зоной (шаг δ = 0,002, Γ = 50δ = 0,1; ħ = 1). Слева: вероятность остаться в начальном состоянии (логарифмическая шкала) для зон полуширины W = 1 и 2 и предсказание золотого правила e^{−Γt} (пунктир); с ростом W кривые прижимаются к экспоненте. Справа: заселённости уровней зоны при t = 200 (Γt = 20, распад закончился; W = 2), отнесённые к шагу δ, и лоренцев контур Γ/2π(E² + Γ²/4) — естественная ширина линии.'
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 3.8))
+for W, style in ((1.0, ":"), (2.0, "-")):
+    ax1.semilogy(times, results[W][1], style, lw=1.5, label=f"W = {W:g}")
+ax1.semilogy(times, np.exp(-Gamma * times), "k--", lw=1, label="e^(−Γt)")
+ax1.set(xlabel="t", ylabel="P(t)", ylim=(1e-2, 1.1))
+ax1.legend(fontsize=9)
+band, _, pops = results[2.0]
+ax2.plot(band, pops / delta_E, ".", ms=2, color="tab:blue", label="заселённости / δ")
+Es = np.linspace(-0.5, 0.5, 400)
+ax2.plot(Es, Gamma / (2 * np.pi) / (Es**2 + Gamma**2 / 4), "k", lw=1, label="Лоренц, ширина Γ")
+ax2.set(xlim=(-0.5, 0.5), xlabel="E", ylabel="плотность вероятности")
+ax2.legend(fontsize=9)
+plt.tight_layout()
+plt.show()
+lorentz = Gamma / (2 * np.pi) / (band**2 + Gamma**2 / 4)
+print(f"t = 200: доля в зоне {pops.sum():.4f}; в центре линии {pops[len(band) // 2] / delta_E:.3f} "
+      f"(Лоренц {lorentz[len(band) // 2]:.3f}), max отклонение при |E| < 0,5: {np.abs(pops / delta_E - lorentz)[np.abs(band) < 0.5].max():.3f}")
+```
+
+## Физика: время жизни и ширина линии
+
+Возбуждённые состояния атома распадаются, излучая фотон: дискретный
+уровень связан с континуумом мод электромагнитного поля, и золотое
+правило даёт вероятность спонтанного излучения $\Gamma$. Спектральная линия
+получает лоренцеву форму с шириной $\Gamma$ на половине высоты — **естественная ширина**, и
+$\Delta E\cdot\tau = \hbar$ при $\tau = 1/\Gamma$. Для жёлтой D-линии натрия:
+
+```{python}
+from scipy import constants as C
+
+tau_Na, E_line, T_room = 16.2e-9, 2.104, 300.0                  # время жизни 3p, энергия фотона (эВ), К
+natural = C.hbar / tau_Na / C.e
+doppler = E_line * np.sqrt(8 * np.log(2) * C.k * T_room / (22.99 * C.atomic_mass * C.c**2))
+print(f"естественная ширина ħ/τ = {natural:.2e} эВ, доплеровская (300 К) = {doppler:.2e} эВ, отношение {doppler / natural:.0f}")
+```
+
+Естественная ширина в сотню раз меньше доплеровской; увидеть её можно
+лишь в опытах, где тепловое движение подавлено (атомные пучки,
+охлаждённые атомы). Тем же правилом считают сечения рассеяния, скорости
+фотоионизации и бета-распада: всюду произведение квадрата матричного
+элемента на плотность конечных состояний.
+
+## Итоги
+
+- $E_n^{(1)} = V_{nn}$, $E_n^{(2)} = \sum_{m\ne n}|V_{mn}|^2/(E_n - E_m)$; вторая поправка к основному состоянию отрицательна.
+- Ангармонизм $\lambda x^4$: $E_n = n + \frac12 + \frac34(2n^2 + 2n + 1)\lambda - \frac18(34n^3 + 51n^2 + 59n + 21)\lambda^2 + \dots$; ряд асимптотический.
+- Вырожденный уровень: диагонализовать $V$ в собственном подпространстве; Фейнман–Гельман $\dd E/\dd\lambda = \langle\partial_\lambda H\rangle$.
+- Нестационарно: $c_f = \frac{1}{i\hbar}\int V_{fi}e^{i\omega_{fi}t}\dd t$, $P = |v|^2\sin^2(\Delta t/2)/\hbar^2(\Delta/2)^2$.
+- Золотое правило $\Gamma = \frac{2\pi}{\hbar}|V_{fi}|^2\rho$; экспоненциальный распад и лоренцева линия ширины $\Gamma$.
+
+## Упражнения
+
+1. Заряженный осциллятор в поле: $V = -e\mathcal E x$. Найдите поправки первого и
+   второго порядка к $E_n$ и сравните с точным ответом. Чему равна
+   поляризуемость $\alpha$ ($\Delta E = -\frac12\alpha\mathcal E^2$)?
+2. Возмущение $V = \frac12\lambda m\omega^2x^2$. Найдите $E_n^{(1)}$, $E_n^{(2)}$ и сравните с разложением точного
+   ответа $\hbar\omega\sqrt{1 + \lambda}\,(n + \frac12)$.
+3. Двухуровневая система $\begin{pmatrix}E_1 & v\\ v & E_2\end{pmatrix}$, $E_1 < E_2$. Найдите точные уровни и
+   сравните со вторым порядком. Когда теория возмущений неприменима?
+4. Найдите $\langle x^4\rangle$ в основном состоянии осциллятора с помощью теоремы
+   Фейнмана–Гельмана и первой поправки.
+5. Уровень связан с континуумом: $|V| = 0{,}01$ эВ, плотность состояний $\rho = 10$ эВ⁻¹.
+   Найдите время жизни и ширину уровня.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $V_{nn} = 0$; $x$ связывает $n$ с $n\pm1$, $E^{(2)} = \frac{e^2\mathcal E^2\hbar}{2m\omega}\left(\frac{n + 1}{-\hbar\omega} + \frac{n}{\hbar\omega}\right) = -\frac{e^2\mathcal E^2}{2m\omega^2}$ для всех $n$ —
+   совпадает с точным ответом (дополнение до квадрата), высшие поправки
+   равны нулю. $\alpha = e^2/m\omega^2$.
+2. $E^{(1)} = \frac12\hbar\omega(n + \frac12)\lambda$, $E^{(2)} = -\frac18\hbar\omega(n + \frac12)\lambda^2$ — первые члены $\sqrt{1 + \lambda} = 1 + \frac\lambda2 - \frac{\lambda^2}8 + \dots$
+3. $E_\pm = \frac{E_1 + E_2}{2}\pm\sqrt{\left(\frac{E_2 - E_1}{2}\right)^2 + v^2}$; второй порядок: $E_1 - \frac{v^2}{E_2 - E_1}$, $E_2 + \frac{v^2}{E_2 - E_1}$ —
+   первые члены разложения корня по $v^2$. Неприменима при $|v|\gtrsim|E_2 - E_1|$ (почти
+   вырожденные уровни: там нужна точная диагонализация блока $2\times2$).
+4. $\langle x^4\rangle = \dd E_0/\dd\lambda|_{\lambda=0} = E_0^{(1)} = \frac34$ (в единицах $x_0^4$), то есть $\frac34\left(\frac{\hbar}{m\omega}\right)^2$.
+5. $\Gamma = 2\pi|V|^2\rho = 6{,}3\cdot10^{-3}$ эВ (ширина), время жизни $\tau = \hbar/\Gamma \approx 1{,}0\cdot10^{-13}$ с.
+:::
