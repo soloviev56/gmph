@@ -1,0 +1,269 @@
+---
+title: "Заряд в электромагнитном поле"
+topic: qm-em-field
+order: 8
+description: "Минимальная связь p → p − eA/c и гамильтониан заряда; калибровочная инвариантность уравнения Шрёдингера: ψ → e^{ief/ħc}ψ вместе с A → A + ∇f, φ → φ − ∂_t f/c (проверка SymPy), калибровочно-инвариантный ток; кинетический импульс π и [π_x, π_y] = iħeB/c; уровни Ландау: алгебраический вывод, калибровка Ландау (сдвинутые осцилляторы) и симметричная калибровка (функции zᵐe^{−|z|²/4l²}), вырождение = число квантов потока; полоса конечной ширины: плоские уровни в объёме и краевые состояния с противоположными скоростями (рисунок); магнитная длина, циклотронная энергия и фактор заполнения для электронов в GaAs"
+---
+
+Классическая частица в магнитном поле чувствует только силу Лоренца,
+то есть поля $\mathbf E$ и $\mathbf B$. В квантовой механике в уравнение Шрёдингера
+входят потенциалы $\varphi$ и $\mathbf A$, определённые лишь с точностью до
+калибровочного преобразования. Совместить одно с другим можно только
+так: при калибровочном преобразовании волновая функция тоже меняется —
+умножается на фазу, зависящую от точки. Это и есть
+[калибровочная инвариантность](/physics/electrodynamics/gauge-invariance-em.qmd) в её
+исходном, квантовом смысле, а потенциал оказывается связностью в
+расслоении, сечениями которого служат волновые функции. Самое яркое
+следствие — уровни Ландау: в магнитном поле движение в плоскости
+квантуется так же, как осциллятор, а каждый уровень вырожден ровно
+столько раз, сколько квантов потока пронизывает образец.
+
+Используются [постулаты квантовой механики](/physics/quantum/qm-postulates.qmd) и
+[квантовый гармонический осциллятор](/physics/quantum/quantum-oscillator.qmd); знаки — по
+[конвенциям](/conventions.qmd), раздел «Электродинамика».
+
+## Минимальная связь
+
+Функция Гамильтона заряда $e$ в поле — $H = \frac{1}{2m}\bigl(\mathbf p - \frac ec\mathbf A\bigr)^2 + e\varphi$, где $\mathbf p$ —
+обобщённый (канонический) импульс. Квантование $\mathbf p\to-i\hbar\nabla$ даёт
+
+::: {#def-minimal-coupling}
+**Уравнение Шрёдингера для заряда в поле**:
+$$
+i\hbar\,\pd{\psi}{t} = \frac{1}{2m}\Bigl(-i\hbar\nabla - \frac ec\mathbf A\Bigr)^2\psi + e\varphi\,\psi .
+$$
+Оператор $\hat{\boldsymbol\pi} = \hat{\mathbf p} - \frac ec\mathbf A$ — **кинетический импульс** ($m\hat{\mathbf v}$). Замена
+$\partial_\mu\to D_\mu = \partial_\mu + \frac{ie}{\hbar c}A_\mu$ называется **минимальной связью**: в 3-мерной записи
+$-i\hbar\nabla\to-i\hbar\nabla - \frac ec\mathbf A$, $i\hbar\partial_t\to i\hbar\partial_t - e\varphi$.
+:::
+
+**Калибровочная инвариантность.** При $\mathbf A\to\mathbf A + \nabla f$, $\varphi\to\varphi - \frac1c\partial_tf$ уравнение
+переходит в себя, если одновременно $\psi\to e^{ief/\hbar c}\psi$. Проверим это в двух
+измерениях для произвольных функций $\mathbf A$, $\varphi$, $f$: невязка уравнения
+должна просто умножиться на ту же фазу.
+
+```{python}
+import numpy as np
+import sympy as sp
+import matplotlib.pyplot as plt
+from scipy.linalg import eigh_tridiagonal
+from scipy import constants as C
+
+x, y, t = sp.symbols("x y t", real=True)
+hbar, m, c, e, B = sp.symbols("hbar m c e B", positive=True)
+
+def kinetic(i, g, A):
+    """π_i g = (−iħ ∂_i − (e/c) A_i) g, i = 0 (x) или 1 (y)."""
+    return -sp.I * hbar * sp.diff(g, (x, y)[i]) - e * A[i] / c * g
+
+def schrodinger_residual(psi, A, phi):
+    H_psi = sum(kinetic(i, kinetic(i, psi, A), A) for i in range(2)) / (2 * m) + e * phi * psi
+    return sp.I * hbar * sp.diff(psi, t) - H_psi
+
+psi = sp.Function("psi")(x, y, t)
+f = sp.Function("f")(x, y, t)
+A = [sp.Function("A_x")(x, y, t), sp.Function("A_y")(x, y, t)]
+phi = sp.Function("varphi")(x, y, t)
+U = sp.exp(sp.I * e * f / (hbar * c))
+A_new = [A[0] + sp.diff(f, x), A[1] + sp.diff(f, y)]
+phi_new = phi - sp.diff(f, t) / c
+print("R[e^(ief/ħc)ψ; A + ∇f, φ − ∂_t f/c] / e^(ief/ħc) − R[ψ; A, φ] =",
+      sp.simplify(sp.expand(schrodinger_residual(U * psi, A_new, phi_new) / U - schrodinger_residual(psi, A, phi))))
+
+psi_c = sp.Function("psi_c")(x, y, t)                          # ψ̄ как независимая функция
+# ток 2m j = ψ̄ πψ + ψ (πψ)‾, где (πψ)‾ = (iħ∂ − eA/c)ψ̄; проверим инвариантность при ψ → Uψ, ψ̄ → Ūψ̄
+U_bar = sp.exp(-sp.I * e * f / (hbar * c))
+j_old = [sp.simplify(psi_c * kinetic(i, psi, A) + psi * (sp.I * hbar * sp.diff(psi_c, (x, y)[i]) - e * A[i] / c * psi_c))
+         for i in range(2)]
+j_new = [sp.simplify(U_bar * psi_c * kinetic(i, U * psi, A_new)
+                     + U * psi * (sp.I * hbar * sp.diff(U_bar * psi_c, (x, y)[i]) - e * A_new[i] / c * U_bar * psi_c))
+         for i in range(2)]
+print("ток калибровочно инвариантен:", all(sp.simplify(a - b) == 0 for a, b in zip(j_new, j_old)))
+```
+
+Каноническая фаза и канонический импульс $-i\hbar\nabla$ зависят от калибровки,
+а наблюдаемые — плотность $|\psi|^2$, ток
+$\mathbf j = \frac{1}{2m}\bigl(\bar\psi\,\hat{\boldsymbol\pi}\psi + \psi\,\overline{\hat{\boldsymbol\pi}\psi}\bigr)$, энергия — нет. Геометрически $\frac{e}{\hbar c}A_\mu$ — форма
+связности $\mathcal A$ в линейном расслоении волновых функций, а $-i\hbar D$ —
+ковариантная производная ([связность в векторном расслоении](/math/bundles/bundle-connections.qmd)).
+
+## Кинетический импульс и уровни Ландау
+
+Компоненты канонического импульса коммутируют, кинетического — нет:
+$$
+[\hat\pi_x, \hat\pi_y] = \frac{i\hbar e}{c}\bigl(\partial_xA_y - \partial_yA_x\bigr) = \frac{i\hbar e}{c}B_z .
+$$
+Коммутатор ковариантных производных — кривизна связности, то есть поле.
+
+```{python}
+g = sp.Function("g")(x, y)
+A_static = [sp.Function("A_x")(x, y), sp.Function("A_y")(x, y)]
+comm = kinetic(0, kinetic(1, g, A_static), A_static) - kinetic(1, kinetic(0, g, A_static), A_static)
+B_z = sp.diff(A_static[1], x) - sp.diff(A_static[0], y)
+print("[π_x, π_y] g − (iħe/c) B_z g =", sp.simplify(comm - sp.I * hbar * e / c * B_z * g))
+```
+
+В однородном поле $\mathbf B = B\mathbf e_z$ ($eB > 0$) это та же алгебра, что у $x$ и $p$ осциллятора:
+положим $\hat\pi_x = \sqrt{\hbar m\omega_c}\,X$, $\hat\pi_y = \sqrt{\hbar m\omega_c}\,P$ с **циклотронной частотой**
+$\omega_c = \frac{eB}{mc}$; тогда $[X, P] = i$ и для движения в плоскости
+$$
+\hat H = \frac{\hat\pi_x^2 + \hat\pi_y^2}{2m} = \frac{\hbar\omega_c}{2}\bigl(X^2 + P^2\bigr), \qquad
+E_n = \hbar\omega_c\Bigl(n + \frac12\Bigr) .
+$$
+Это **уровни Ландау**. Классически частица вращается по окружности с
+частотой $\omega_c$ — квантование этого вращения и дало осциллятор. Но
+переменных две пары $(x, p_x)$, $(y, p_y)$, а осциллятор один: вторая пара
+(координаты центра орбиты) в энергию не входит, и каждый уровень
+бесконечно вырожден.
+
+**Калибровка Ландау** $\mathbf A = (0, Bx, 0)$. Гамильтониан не зависит от $y$, поэтому
+$\psi = e^{iky}u(x)$, и
+$$
+\hat Hu = -\frac{\hbar^2}{2m}u'' + \frac{m\omega_c^2}{2}(x - x_k)^2u, \qquad x_k = kl^2, \qquad l = \sqrt{\frac{\hbar c}{eB}}
+$$
+— осциллятор с центром $x_k$; $l$ — **магнитная длина**. Энергия не зависит от $k$.
+В образце $L_x\times L_y$ с периодичностью по $y$ значения $k = 2\pi j/L_y$, а центр
+должен лежать внутри образца, $0 < kl^2 < L_x$. Число состояний на уровне
+$$
+N = \frac{L_xL_y}{2\pi l^2} = \frac{BL_xL_y}{hc/e} = \frac{\Phi}{\Phi_0}, \qquad \Phi_0 = \frac{hc}{e}
+$$
+— число **квантов магнитного потока** через образец.
+
+**Симметричная калибровка** $\mathbf A = \frac B2(-y, x, 0)$ сохраняет вращательную
+симметрию, и нижний уровень состоит из функций $(x + iy)^m e^{-r^2/4l^2}$ — с
+моментом $L_z = m\hbar$. Проверим, что они (и только они, а не с $x - iy$)
+принадлежат нижнему уровню:
+
+```{python}
+l2 = hbar * c / (e * B)
+omega_c = e * B / (m * c)
+A_sym = [-B * y / 2, B * x / 2]
+for label, z in (("x + iy", x + sp.I * y), ("x − iy", x - sp.I * y)):
+    energies = []
+    for mm in range(4):
+        trial = z**mm * sp.exp(-(x**2 + y**2) / (4 * l2))
+        H_trial = sum(kinetic(i, kinetic(i, trial, A_sym), A_sym) for i in range(2)) / (2 * m)
+        energies.append(sp.simplify(H_trial / trial / (hbar * omega_c)))
+    print(f"({label})^m e^(−r²/4l²), m = 0…3:  E/ħω_c =", energies)
+```
+
+Функции с $x - iy$ — тоже собственные, но на уровнях $n = m$: калибровки
+разные, спектр один. (Для электрона, $e < 0$, роли $x\pm iy$ меняются.)
+
+## Краевые состояния
+
+В полосе $0 < x < W$ с непроницаемыми стенками уровни зависят от
+положения центра орбиты: пока $x_k$ далеко от стенок, $E = \hbar\omega_c(n + \frac12)$, а
+около стенки орбита «упирается», и энергия растёт. Скорость
+$v_y = \frac1\hbar\pd{E}{k} = \frac{l^2}{\hbar}\pd{E}{x_k}$ у двух краёв противоположна — электроны бегут вдоль края
+в одну сторону у одного края и в другую у другого. Решим задачу разностным
+методом (единицы $l = 1$, $\hbar\omega_c = 1$):
+
+```{python}
+W = 16.0
+n_grid = 1200
+xg = np.linspace(0, W, n_grid + 2)[1:-1]                  # нули на стенках
+h = xg[1] - xg[0]
+
+def strip_levels(x_center, k=6):
+    """Нижние уровни −½u'' + ½(x − x_c)²u на отрезке [0, W] с нулевыми условиями."""
+    diag = 1 / h**2 + 0.5 * (xg - x_center)**2
+    off = -0.5 / h**2 * np.ones(n_grid - 1)
+    return eigh_tridiagonal(diag, off, select="i", select_range=(0, k - 1), eigvals_only=True)
+
+centers = np.linspace(-3, W + 3, 241)
+bands = np.array([strip_levels(xc) for xc in centers])
+mid = np.argmin(np.abs(centers - W / 2))
+print("в середине полосы E_n =", np.round(bands[mid, :4], 6))
+E_F = 2.2
+slope = np.gradient(bands[:, 0], centers)
+for side, sel in (("левый край", centers < W / 2), ("правый край", centers > W / 2)):
+    idx = np.where(sel)[0][np.argmin(np.abs(bands[sel, 0] - E_F))]
+    print(f"{side}: уровень n = 0 пересекает E_F = {E_F} при x_k = {centers[idx]:.2f}, скорость ∝ dE/dx_k = {slope[idx]:+.2f}")
+print("число уровней ниже E_F в объёме:", int(np.sum(bands[mid] < E_F)))
+```
+
+```{python}
+#| label: fig-landau-edge
+#| fig-cap: 'Уровни Ландау в полосе шириной W = 16 магнитных длин с непроницаемыми стенками (серым — области за стенками) как функции положения центра орбиты x_k = kl². В объёме уровни плоские, E = (n + ½)ħω_c; около стенок энергия растёт. Уровень Ферми E_F = 2,2ħω_c (пунктир) пересекает два уровня (n = 0 и 1) у каждого края; наклоны в точках пересечения противоположны — краевые состояния у левого и правого края движутся в противоположные стороны.'
+fig, ax = plt.subplots(figsize=(8, 4))
+for n in range(bands.shape[1]):
+    ax.plot(centers, bands[:, n], lw=1.4)
+ax.axvspan(-3, 0, color="0.85")
+ax.axvspan(W, W + 3, color="0.85")
+ax.axhline(E_F, color="k", ls="--", lw=1)
+ax.text(W / 2, E_F + 0.12, "E_F", ha="center")
+ax.set(xlim=(-3, W + 3), ylim=(0, 5), xlabel="x_k / l", ylabel="E / ħω_c")
+plt.tight_layout()
+plt.show()
+```
+
+Если уровень Ферми лежит между уровнями Ландау, в объёме нет
+состояний на уровне Ферми — образец изолятор, а ток переносится только
+краевыми состояниями. Каждое из них даёт проводимость $e^2/h$, и холловская
+проводимость равна $\nu e^2/h$ с целым $\nu$ — числом заполненных уровней. Так
+устроен **целочисленный квантовый эффект Холла** (фон Клитцинг, 1980); его
+точность ($10^{-9}$ и лучше) объясняется топологически: $\nu$ — инвариант,
+подобный числу оборотов функций перехода (тема «Характеристические классы»).
+
+## Физика: электроны в сильном поле
+
+Для свободного электрона $\hbar\omega_c = \hbar|e|B/m_ec \approx 0{,}116$ мэВ/Тл — меньше тепловой энергии
+даже при гелиевых температурах в обычных полях. В полупроводниковых
+гетероструктурах эффективная масса мала ($m^* = 0{,}067\,m_e$ в GaAs), и уровни
+Ландау хорошо разрешены:
+
+```{python}
+B_T = 10.0
+l_m = np.sqrt(C.hbar / (C.e * B_T))                        # в СИ l = √(ħ/|e|B)
+phi0 = C.h / C.e                                            # квант потока, Вб
+for name, mass in (("свободный электрон", C.m_e), ("GaAs, m* = 0,067 m_e", 0.067 * C.m_e)):
+    print(f"{name:22}: ħω_c = {C.hbar * C.e * B_T / mass / C.e * 1e3:6.2f} мэВ при B = {B_T:g} Тл")
+print(f"магнитная длина l = {l_m * 1e9:.2f} нм;  квант потока Φ₀ = h/|e| = {phi0:.4e} Вб")
+n_2d = 3.0e15                                              # концентрация электронов, м⁻²
+print(f"состояний на уровне: B/Φ₀ = {B_T / phi0 / 1e4:.3e} см⁻²;  при n = {n_2d / 1e4:.1e} см⁻² "
+      f"фактор заполнения ν = {n_2d * phi0 / B_T:.2f}")
+print(f"kT при 4,2 К = {C.k * 4.2 / C.e * 1e3:.2f} мэВ")
+```
+
+При 10 Тл в GaAs расстояние между уровнями в десятки раз больше $kT$ при
+4,2 К; меняя поле, проходят через целые значения $\nu$ и видят плато
+холловского сопротивления.
+
+## Итоги
+
+- Минимальная связь: $\hat{\mathbf p}\to\hat{\boldsymbol\pi} = -i\hbar\nabla - \frac ec\mathbf A$, $i\hbar\partial_t\to i\hbar\partial_t - e\varphi$; потенциал — связность, $\psi$ — сечение.
+- Калибровочная инвариантность: $\psi\to e^{ief/\hbar c}\psi$ вместе с $\mathbf A\to\mathbf A + \nabla f$, $\varphi\to\varphi - \partial_tf/c$; ток и энергия инвариантны.
+- $[\hat\pi_x, \hat\pi_y] = i\hbar eB_z/c$ — кривизна; в однородном поле спектр $\hbar\omega_c(n + \frac12)$, $\omega_c = eB/mc$, $l = \sqrt{\hbar c/eB}$.
+- Вырождение уровня Ландау — число квантов потока $\Phi/\Phi_0$, $\Phi_0 = hc/e$.
+- В полосе — краевые состояния с противоположными скоростями; основа квантового эффекта Холла.
+
+## Упражнения
+
+1. Покажите, что оператор $\hat x_0 = x + \hat\pi_y/m\omega_c$ (координата центра классической орбиты)
+   коммутирует с $\hat H$ в однородном поле. Чему он равен на состояниях $e^{iky}u(x)$ в
+   калибровке Ландау?
+2. Добавьте однородное электрическое поле $\mathcal E$ вдоль $x$. Найдите спектр в
+   калибровке Ландау и групповую скорость $v_y$. Сравните с классическим
+   дрейфом $c\,\mathcal E\times\mathbf B/B^2$.
+3. Сколько состояний на нижнем уровне Ландау в диске радиуса $R$ в
+   симметричной калибровке? (Функция $z^me^{-|z|^2/4l^2}$ сосредоточена у $r = \sqrt{2m}\,l$.)
+4. Покажите, что в симметричной калибровке $\hat H = \frac{\hat p^2}{2m} + \frac{m\omega_c^2r^2}{8} - \frac{\omega_c}{2}\hat L_z$. Как отсюда
+   получить вырождение нижнего уровня по $m$?
+5. Найдите $\hbar\omega_c$ и $l$ для электрона в GaAs при $B = 1$ Тл и фактор заполнения
+   при концентрации $3\cdot10^{11}$ см⁻².
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $[\hat x_0, \hat\pi_x] = i\hbar + \frac{1}{m\omega_c}[\hat\pi_y, \hat\pi_x] = i\hbar - \frac{1}{m\omega_c}\frac{i\hbar eB}{c} = 0$ и $[\hat x_0, \hat\pi_y] = [x, \hat\pi_y] = 0$, поэтому
+   $\hat x_0$ коммутирует с $\hat H = (\hat\pi_x^2 + \hat\pi_y^2)/2m$. В калибровке Ландау $\hat\pi_y = \hat p_y - \frac{eB}{c}x$, и
+   $\hat x_0 = \frac{c\,\hat p_y}{eB}$; на $e^{iky}u$ он равен $kl^2 = x_k$.
+2. К осциллятору $\frac{m\omega_c^2}{2}(x - kl^2)^2$ добавляется $-e\mathcal Ex$; дополнение до квадрата сдвигает центр в
+   $kl^2 + \frac{mc^2\mathcal E}{eB^2}$ и даёт $E_{n,k} = \hbar\omega_c(n + \frac12) - e\mathcal E\,kl^2 - \frac{mc^2\mathcal E^2}{2B^2}$. Скорость
+   $v_y = \frac1\hbar\pd{E}{k} = -\frac{e\mathcal E l^2}{\hbar} = -\frac{c\mathcal E}{B}$ — классический дрейф ($\mathcal E\times\mathbf B$ направлен по $-y$).
+3. Условие $2ml^2 < R^2$: $m < R^2/2l^2$, то есть $N \approx \frac{\pi R^2}{2\pi l^2} = \Phi/\Phi_0$.
+4. $(\hat{\mathbf p} - \frac{e}{c}\mathbf A)^2 = \hat p^2 - \frac{eB}{c}\hat L_z + \frac{e^2B^2}{4c^2}r^2$. Двумерный осциллятор с частотой $\omega_c/2$ имеет
+   $E = \frac{\hbar\omega_c}{2}(2n_r + |m| + 1)$; вычитая $\frac{\omega_c}{2}\hbar m$, при $m\ge0$, $n_r = 0$ получаем $\frac12\hbar\omega_c$ независимо
+   от $m$.
+5. $\hbar\omega_c = 1{,}73$ мэВ, $l = 25{,}7$ нм, $B/\Phi_0 = 2{,}42\cdot10^{10}$ см⁻², $\nu\approx12{,}4$.
+:::
