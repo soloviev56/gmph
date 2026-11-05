@@ -106,8 +106,8 @@ print("ω_z(t) =", sp.dsolve(helmholtz[2], w_z, ics={w_z.subs(t, 0): w0}).rhs)
 ```
 
 Без вязкости растяжение неограниченно; в реальной жидкости его
-уравновешивает диффузия завихренности (вихрь Бюргерса, тема «Вязкая
-жидкость»).
+уравновешивает диффузия завихренности (вихрь Бюргерса в статье
+«[Вязкая жидкость](/physics/continuum/viscous-fluid.qmd)»).
 
 **Спиральность.** Интеграл $\mathcal H = \int v^\flat\wedge\Omega = \int\mathbf v\cdot\boldsymbol\omega\,\dd V$ тоже сохраняется:
 $(\partial_t + \Lie{v})(v^\flat\wedge\Omega) = \dd(\dots)\wedge\Omega$ — точная форма. Для двух тонких вихревых колец
