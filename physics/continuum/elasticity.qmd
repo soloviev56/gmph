@@ -1,0 +1,297 @@
+---
+title: "Теория упругости"
+topic: elasticity
+order: 4
+description: "Деформация как изменение метрики и линейный тензор ε_ij; закон Гука σ = C:ε и упругая энергия; изотропная среда: из 21 упругой постоянной инвариантность относительно so(3) оставляет две — вычисление ядра действия генераторов (SymPy), σ = λ tr ε I + 2με; модуль Юнга, коэффициент Пуассона и модуль всестороннего сжатия из одноосного растяжения; положительность энергии и −1 < ν < ½; уравнение Ламе ρü = (λ + μ)∇div u + μ∇²u, продольные и поперечные волны и c_l/c_t через ν (рисунок с материалами); толстостенная труба под давлением: перемещения u_r = Ar + B/r, напряжения и изменение радиусов (рисунок); сейсмические волны P и S и расстояние до очага по задержке"
+---
+
+Твёрдое тело, в отличие от жидкости, «помнит» исходную форму: при
+деформации в нём возникают напряжения, стремящиеся её восстановить.
+Деформация — это изменение метрики: расстояния между точками тела
+после смещения отличаются от исходных
+([кинематика сплошной среды](/physics/continuum/continuum-kinematics.qmd)). Для малых деформаций
+напряжение линейно по изменению метрики — это закон Гука, а вся
+информация о материале заключена в тензоре упругих постоянных
+четвёртого ранга. Симметрия материала резко сокращает число этих
+постоянных: для изотропной среды остаются две, и это прямое
+следствие теории представлений группы вращений. Из закона Гука и
+уравнения движения следуют упругие волны двух типов — продольные и
+поперечные, на различии которых основана сейсмология.
+
+Используются [тензор напряжений](/physics/continuum/stress.qmd) и
+[метрика](/math/algebra/metric.qmd); знак $\sigma$ — по [конвенциям](/conventions.qmd) (растяжение
+положительно).
+
+## Деформация и закон Гука
+
+При смещении $\mathbf u(\mathbf x)$ квадрат расстояния между близкими точками меняется на
+$2\varepsilon_{ij}\,\dd x^i\dd x^j$, где при малых градиентах
+$\varepsilon_{ij} = \frac12(\partial_iu_j + \partial_ju_i)$ — **линейный тензор деформаций**, половина изменения метрики.
+Антисимметричная часть градиента — малый поворот, она расстояний не
+меняет и напряжений не создаёт.
+
+::: {#def-hooke}
+**Закон Гука**: напряжение линейно по деформации,
+$$
+\sigma_{ij} = C_{ijkl}\,\varepsilon_{kl}, \qquad
+W = \frac12C_{ijkl}\,\varepsilon_{ij}\varepsilon_{kl} ,
+$$
+где $W$ — **упругая энергия** единицы объёма, $\sigma_{ij} = \partial W/\partial\varepsilon_{ij}$. Тензор **упругих
+постоянных** $C_{ijkl}$ симметричен по $i\leftrightarrow j$, $k\leftrightarrow l$ (симметрия $\sigma$ и $\varepsilon$) и по
+парам $(ij)\leftrightarrow(kl)$ (существование энергии). Независимых компонент
+$6\cdot7/2 = 21$ — у кристалла самой низкой (триклинной) симметрии.
+:::
+
+## Изотропная среда: две постоянные
+
+Если свойства материала не зависят от направления, тензор $C$
+инвариантен относительно поворотов: $R_{ia}R_{jb}R_{kc}R_{ld}C_{abcd} = C_{ijkl}$. Для связной группы
+$SO(3)$ достаточно инвариантности относительно генераторов $J_x, J_y, J_z$
+([конвенции](/conventions.qmd), раздел «Группы Ли»): производная по углу
+$$
+(J\cdot C)_{ijkl} = J_{ia}C_{ajkl} + J_{ja}C_{iakl} + J_{ka}C_{ijal} + J_{la}C_{ijka} = 0 .
+$$
+Это система линейных уравнений на 21 постоянную. Решим её:
+
+```{python}
+import itertools
+import numpy as np
+import sympy as sp
+import matplotlib.pyplot as plt
+
+voigt = {(0, 0): 0, (1, 1): 1, (2, 2): 2, (1, 2): 3, (2, 1): 3, (0, 2): 4, (2, 0): 4, (0, 1): 5, (1, 0): 5}
+c = sp.symbols("c0:21")
+V = sp.zeros(6, 6)                                              # симметричная 6×6 матрица Фойгта
+for (a, b), s in zip(((a, b) for a in range(6) for b in range(a, 6)), c):
+    V[a, b] = V[b, a] = s
+
+def C(i, j, k, l):
+    return V[voigt[i, j], voigt[k, l]]
+
+J = [sp.Matrix([[0, 0, 0], [0, 0, -1], [0, 1, 0]]),
+     sp.Matrix([[0, 0, 1], [0, 0, 0], [-1, 0, 0]]),
+     sp.Matrix([[0, -1, 0], [1, 0, 0], [0, 0, 0]])]
+equations = set()
+for G in J:
+    for i, j, k, l in itertools.product(range(3), repeat=4):
+        expr = sum(G[i, a] * C(a, j, k, l) + G[j, a] * C(i, a, k, l)
+                   + G[k, a] * C(i, j, a, l) + G[l, a] * C(i, j, k, a) for a in range(3))
+        if expr != 0:
+            equations.add(sp.expand(expr))
+solution = sp.solve(list(equations), c, dict=True)[0]
+V_iso = V.subs(solution)
+print("свободных постоянных:", len(V_iso.free_symbols), "→", V_iso.free_symbols)
+sp.pprint(V_iso)
+```
+
+Осталось две постоянные: диагональ $C_{xxxx} = a$, $C_{xxyy} = b$, а сдвиговые
+компоненты $C_{xyxy} = (a - b)/2$. Обозначив $b = \lambda$, $(a - b)/2 = \mu$, получаем
+
+::: {#def-isotropic-hooke}
+**Закон Гука для изотропной среды**:
+$$
+\sigma_{ij} = \lambda\,\varepsilon_{kk}\,\delta_{ij} + 2\mu\,\varepsilon_{ij}, \qquad
+W = \frac\lambda2(\operatorname{tr}\varepsilon)^2 + \mu\,\varepsilon_{ij}\varepsilon_{ij},
+$$
+$\lambda$, $\mu$ — **постоянные Ламе**, $\mu$ — **модуль сдвига**. Разложив деформацию на
+изменение объёма $\operatorname{tr}\varepsilon$ и бесследовую часть (сдвиг), имеем
+$W = \frac K2(\operatorname{tr}\varepsilon)^2 + \mu\,\tilde\varepsilon_{ij}\tilde\varepsilon_{ij}$ с **модулем всестороннего сжатия** $K = \lambda + \frac23\mu$.
+:::
+
+С точки зрения теории представлений: симметричные тензоры второго
+ранга распадаются на представления $SO(3)$ со спином 0 (след) и 2
+(бесследовая часть), и инвариантная квадратичная форма — это свой
+множитель на каждом слагаемом: $K$ и $\mu$.
+
+**Одноосное растяжение.** Стержень растянут напряжением $\sigma_{zz} = \sigma$,
+боковые грани свободны ($\sigma_{xx} = \sigma_{yy} = 0$). Относительное удлинение $\varepsilon_{zz} = \sigma/E$
+определяет **модуль Юнга** $E$, а поперечное сжатие $\varepsilon_{xx} = -\nu\varepsilon_{zz}$ —
+**коэффициент Пуассона** $\nu$ (здесь $E$ — не энергия):
+
+```{python}
+lam, mu, sig = sp.symbols("lambda mu sigma", positive=True)
+e_xx, e_zz = sp.symbols("epsilon_xx epsilon_zz")
+
+def stress(eps):
+    return lam * eps.trace() * sp.eye(3) + 2 * mu * eps
+
+eps = sp.diag(e_xx, e_xx, e_zz)
+sol = sp.solve([stress(eps)[0, 0], stress(eps)[2, 2] - sig], [e_xx, e_zz], dict=True)[0]
+E_young = sp.simplify(sig / sol[e_zz])
+nu = sp.simplify(-sol[e_xx] / sol[e_zz])
+K_bulk = lam + sp.Rational(2, 3) * mu
+print("E =", E_young, ";  ν =", nu)
+print("K − E/3(1 − 2ν) =", sp.simplify(K_bulk - E_young / (3 * (1 - 2 * nu))),
+      ";  μ − E/2(1 + ν) =", sp.simplify(mu - E_young / (2 * (1 + nu))))
+```
+
+Энергия положительна при любой деформации, если $K > 0$ и $\mu > 0$. В терминах
+$\nu$ это $-1 < \nu < \frac12$; предел $\nu\to\frac12$ — несжимаемый материал ($K\to\infty$, резина), а
+у большинства металлов $\nu\approx0{,}3$.
+
+## Уравнение Ламе и упругие волны
+
+Уравнение движения $\rho\ddot u_i = \partial_j\sigma_{ij} + f_i$ с законом Гука даёт **уравнение Ламе**
+$$
+\rho\,\ddot{\mathbf u} = (\lambda + \mu)\,\nabla(\operatorname{div}\mathbf u) + \mu\,\nabla^2\mathbf u + \mathbf f .
+$$
+Проверим это и найдём плоские волны $\mathbf u = \mathbf a\,e^{i(kx - \omega t)}$:
+
+```{python}
+x, y, z, t, rho, k, w = sp.symbols("x y z t rho k omega", positive=True)
+X = (x, y, z)
+u = sp.Matrix([sp.Function(f"u_{q}")(x, y, z, t) for q in "xyz"])
+grad_u = u.jacobian(X)
+eps_u = (grad_u + grad_u.T) / 2
+sigma_u = stress(eps_u)
+div_sigma = sp.Matrix([sum(sigma_u[i, j].diff(X[j]) for j in range(3)) for i in range(3)])
+div_u = sum(u[i].diff(X[i]) for i in range(3))
+lame = sp.Matrix([(lam + mu) * div_u.diff(X[i]) + mu * sum(u[i].diff(q, 2) for q in X) for i in range(3)])
+print("∂_j σ_ij − [(λ+μ)∇div u + μ∇²u] =", sp.simplify(div_sigma - lame).T)
+
+phase = sp.exp(sp.I * (k * x - w * t))
+for name, a in (("продольная (a ∥ k)", sp.Matrix([1, 0, 0])), ("поперечная (a ⊥ k)", sp.Matrix([0, 1, 0]))):
+    wave = a * phase
+    residual = rho * wave.diff(t, 2) - sp.Matrix([(lam + mu) * sum(wave[j].diff(X[j]) for j in range(3)).diff(X[i])
+                                                  + mu * sum(wave[i].diff(q, 2) for q in X) for i in range(3)])
+    speed = sp.solve(sp.simplify(residual / phase).dot(a), w)[0] / k
+    print(f"{name}: c = {speed}")
+ratio = sp.sqrt((lam + 2 * mu) / mu)
+print("c_l/c_t через ν:", sp.simplify(ratio.subs(lam, 2 * mu * sp.Symbol("nu") / (1 - 2 * sp.Symbol("nu")))))
+```
+
+Разложение $\mathbf u = \nabla\phi + \operatorname{rot}\boldsymbol\psi$ разделяет уравнение на два волновых: **продольные**
+волны (сжатия, $\operatorname{rot}\mathbf u = 0$) со скоростью $c_l = \sqrt{(\lambda + 2\mu)/\rho}$ и **поперечные** (сдвига,
+$\operatorname{div}\mathbf u = 0$) со скоростью $c_t = \sqrt{\mu/\rho}$. Поперечных поляризаций две, как у света, но в
+отличие от света есть ещё продольная, и она всегда быстрее:
+$c_l/c_t = \sqrt{2(1 - \nu)/(1 - 2\nu)}\ge\sqrt{4/3}$ при $\nu\ge-1$, а при $\nu \ge 0$ — не меньше $\sqrt2$. В жидкости $\mu = 0$ и
+поперечных волн нет.
+
+```{python}
+#| label: fig-elastic-speeds
+#| fig-cap: 'Отношение скоростей продольных и поперечных волн c_l/c_t = √(2(1 − ν)/(1 − 2ν)) в зависимости от коэффициента Пуассона. Точки — материалы из таблицы над рисунком; при ν → ½ (почти несжимаемая резина) продольные волны становятся сколь угодно быстрее поперечных.'
+materials = {                                  # E (ГПа), ν, ρ (кг/м³)
+    "сталь": (200, 0.29, 7850), "алюминий": (70, 0.33, 2700), "стекло": (70, 0.22, 2500),
+    "гранит": (50, 0.25, 2700), "свинец": (16, 0.44, 11340),
+}
+label_offsets = {"сталь": (28, -14), "алюминий": (-30, 14), "стекло": (-28, 10), "гранит": (10, -20), "свинец": (-30, 0)}
+nu_grid = np.linspace(-0.9, 0.48, 300)
+fig, ax = plt.subplots(figsize=(7, 3.8))
+ax.plot(nu_grid, np.sqrt(2 * (1 - nu_grid) / (1 - 2 * nu_grid)), "k", lw=1.5)
+print(f"{'материал':10} {'c_l, км/с':>10} {'c_t, км/с':>10} {'c_l/c_t':>8}")
+for name, (E_gpa, nu_m, rho_m) in materials.items():
+    mu_m = E_gpa * 1e9 / (2 * (1 + nu_m))
+    lam_m = E_gpa * 1e9 * nu_m / ((1 + nu_m) * (1 - 2 * nu_m))
+    c_l, c_t = np.sqrt((lam_m + 2 * mu_m) / rho_m), np.sqrt(mu_m / rho_m)
+    print(f"{name:10} {c_l / 1e3:10.2f} {c_t / 1e3:10.2f} {c_l / c_t:8.2f}")
+    ax.plot(nu_m, c_l / c_t, "o", ms=6)
+    ax.annotate(name, (nu_m, c_l / c_t), textcoords="offset points", xytext=label_offsets[name], ha="center", fontsize=9)
+ax.set(xlabel="коэффициент Пуассона ν", ylabel="c_l / c_t", ylim=(1, 5), xlim=(-0.9, 0.5))
+plt.tight_layout()
+plt.show()
+```
+
+## Толстостенная труба под давлением
+
+Труба с внутренним радиусом $a$, внешним $b$, внутри давление $p$, торцы
+закреплены (плоская деформация, $u_z = 0$). Перемещение радиально, $\mathbf u = u(r)\mathbf e_r$, и в
+полярных координатах $\varepsilon_{rr} = u'$, $\varepsilon_{\varphi\varphi} = u/r$ (физические компоненты: окружность
+радиуса $r$ удлиняется на $2\pi u$). Уравнение равновесия
+$\partial_r\sigma_{rr} + (\sigma_{rr} - \sigma_{\varphi\varphi})/r = 0$ (ковариантная дивергенция из статьи о напряжениях)
+сводится к $\bigl(\frac1r(ru)'\bigr)' = 0$, откуда $u = Ar + B/r$:
+
+```{python}
+r, a_in, b_out, p = sp.symbols("r a b p", positive=True)
+A, B = sp.symbols("A B")
+u_r = A * r + B / r
+e_rr, e_ff = sp.diff(u_r, r), u_r / r
+s_rr = lam * (e_rr + e_ff) + 2 * mu * e_rr
+s_ff = lam * (e_rr + e_ff) + 2 * mu * e_ff
+print("равновесие ∂_r σ_rr + (σ_rr − σ_φφ)/r =", sp.simplify(sp.diff(s_rr, r) + (s_rr - s_ff) / r))
+consts = sp.solve([s_rr.subs(r, a_in) + p, s_rr.subs(r, b_out)], [A, B], dict=True)[0]
+s_rr_sol, s_ff_sol = sp.simplify(s_rr.subs(consts)), sp.simplify(s_ff.subs(consts))
+print("σ_rr =", sp.factor(s_rr_sol), ";  σ_φφ =", sp.factor(s_ff_sol))
+print("σ_rr + σ_φφ =", sp.simplify(s_rr_sol + s_ff_sol), " (постоянна по сечению)")
+u_sol = sp.simplify(u_r.subs(consts))
+print("u(a) =", sp.factor(u_sol.subs(r, a_in)))
+```
+
+Напряжения $\sigma_{rr} = -p\frac{b^2/r^2 - 1}{b^2/a^2 - 1}$ и $\sigma_{\varphi\varphi} = p\frac{b^2/r^2 + 1}{b^2/a^2 - 1}$ не зависят от упругих
+постоянных — это решение Ламе из статьи о напряжениях, где оно
+получалось с точностью до двух констант; закон Гука эти константы
+определил. От материала зависят только перемещения. Возьмём стальную
+трубу $a = 5$ см, $b = 7{,}5$ см при давлении 300 атм:
+
+```{python}
+#| label: fig-thick-tube
+#| fig-cap: 'Стальная толстостенная труба (a = 5 см, b = 7,5 см) под внутренним давлением 300 атм: радиальное напряжение σ_rr (сжатие, от −p до нуля) и окружное σ_φφ (растяжение, наибольшее у внутренней стенки). Пунктир — оценка тонкостенной «котельной» формулы pa/h с h = b − a, занижающая максимальное напряжение.'
+steel = {lam: 200e9 * 0.29 / (1.29 * 0.42), mu: 200e9 / 2.58}
+vals = {a_in: 0.05, b_out: 0.075, p: 300 * 101325.0}
+r_num = np.linspace(0.05, 0.075, 200)
+f_rr = sp.lambdify(r, s_rr_sol.subs(vals))
+f_ff = sp.lambdify(r, s_ff_sol.subs(vals))
+f_u = sp.lambdify(r, u_sol.subs(vals).subs(steel))
+fig, ax = plt.subplots(figsize=(7, 3.8))
+ax.plot(r_num * 100, f_rr(r_num) / 1e6, lw=1.6, label="σ_rr")
+ax.plot(r_num * 100, f_ff(r_num) / 1e6, lw=1.6, label="σ_φφ")
+ax.axhline(vals[p] * 0.05 / 0.025 / 1e6, color="0.4", ls="--", lw=1, label="pa/h")
+ax.axhline(0, color="k", lw=0.6)
+ax.set(xlabel="r, см", ylabel="напряжение, МПа")
+ax.legend()
+plt.tight_layout()
+plt.show()
+print(f"σ_φφ(a) = {f_ff(0.05) / 1e6:.1f} МПа, σ_φφ(b) = {f_ff(0.075) / 1e6:.1f} МПа, pa/h = {vals[p] * 2 / 1e6:.1f} МПа")
+print(f"увеличение радиусов: Δa = {f_u(0.05) * 1e6:.1f} мкм, Δb = {f_u(0.075) * 1e6:.1f} мкм")
+```
+
+## Физика: сейсмические волны
+
+Землетрясение излучает оба типа волн, и сейсмограф регистрирует сначала
+продольную волну P (primary), затем поперечную S (secondary). В земной
+коре $c_P\approx6$ км/с, $c_S\approx3{,}5$ км/с. По задержке $\Delta t$ между вступлениями расстояние до
+очага $D = \Delta t\,c_Pc_S/(c_P - c_S)$ — по трём станциям очаг находят засечкой. Через
+жидкое внешнее ядро Земли S-волны не проходят ($\mu = 0$): за «тенью» S-волн на
+противоположной стороне Земли Олдхэм (1906) и Гутенберг (1914) открыли
+ядро, а Леман (1936) по слабым P-волнам — твёрдое внутреннее ядро.
+
+```{python}
+c_P, c_S = 6.0, 3.5                                     # км/с
+for dt in (5, 10, 30):
+    print(f"задержка S − P = {dt:2d} с → расстояние {dt * c_P * c_S / (c_P - c_S):.0f} км")
+nu_crust = ((c_P / c_S)**2 - 2) / (2 * ((c_P / c_S)**2 - 1))
+print(f"коэффициент Пуассона коры по c_P/c_S = {c_P / c_S:.3f}: ν = {nu_crust:.3f}")
+```
+
+## Итоги
+
+- Деформация — половина изменения метрики, $\varepsilon_{ij} = \frac12(\partial_iu_j + \partial_ju_i)$; закон Гука $\sigma_{ij} = C_{ijkl}\varepsilon_{kl}$, 21 постоянная в общем случае.
+- Инвариантность относительно $\mathfrak{so}(3)$ оставляет две: $\sigma = \lambda\operatorname{tr}\varepsilon\,I + 2\mu\varepsilon$; $K = \lambda + \frac23\mu$ (спин 0) и $\mu$ (спин 2).
+- $E = \mu(3\lambda + 2\mu)/(\lambda + \mu)$, $\nu = \lambda/2(\lambda + \mu)$; устойчивость: $K, \mu > 0$, $-1 < \nu < \frac12$.
+- Уравнение Ламе; продольные волны $c_l = \sqrt{(\lambda + 2\mu)/\rho}$ быстрее поперечных $c_t = \sqrt{\mu/\rho}$.
+- Труба под давлением: $u = Ar + B/r$, напряжения не зависят от материала, окружное максимально на внутренней стенке.
+
+## Упражнения
+
+1. Выразите $\lambda$ и $\mu$ через $E$ и $\nu$.
+2. На сколько уменьшится объём стального тела под всесторонним давлением
+   1000 атм? ($E = 200$ ГПа, $\nu = 0{,}29$.)
+3. Найдите деформацию и энергию при **чистом сдвиге** $\sigma_{xy} = \sigma_{yx} = \tau$ (остальные
+   компоненты нулевые). Чему равен угол сдвига?
+4. Почему в изотропной среде нет упругих постоянных, связывающих
+   объёмную деформацию со сдвиговым напряжением? Ответьте на языке
+   представлений $SO(3)$.
+5. Задержка между P- и S-волнами 20 с. Каково расстояние до очага при
+   $c_P = 6$ км/с, $c_S = 3{,}5$ км/с?
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $\lambda = \frac{E\nu}{(1 + \nu)(1 - 2\nu)}$, $\mu = \frac{E}{2(1 + \nu)}$.
+2. $K = E/3(1 - 2\nu) = 159$ ГПа; $\Delta V/V = -p/K = -1{,}01\cdot10^8/1{,}59\cdot10^{11}\approx-6{,}4\cdot10^{-4}$.
+3. $\varepsilon_{xy} = \tau/2\mu$, угол сдвига (изменение прямого угла) $2\varepsilon_{xy} = \tau/\mu$, энергия
+   $W = 2\mu\varepsilon_{xy}^2 = \tau^2/2\mu$ на единицу объёма.
+4. Объёмная деформация $\operatorname{tr}\varepsilon$ — скаляр (спин 0), бесследовая часть — спин 2. Линейное
+   инвариантное отображение между неэквивалентными неприводимыми
+   представлениями равно нулю (лемма Шура), поэтому $C$ сводится к числу на
+   каждом из них.
+5. $D = 20\cdot6\cdot3{,}5/2{,}5 = 168$ км.
+:::
