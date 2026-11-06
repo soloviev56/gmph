@@ -483,3 +483,20 @@ def test_stress_sign():
                 Sigma[J] = Sigma.get(J, 0) + c
         div = sum(sp.diff(sigma[i, j], coords[j]) for j in range(3))
         assert sp.simplify(d(Sigma, coords).get((1, 2, 3), 0) - div) == 0
+
+
+def test_cartan_structure_signs():
+    """∇e_b = e_a ω^a_b, de^a + ω^a_b∧e^b = 0, Ω = dω + ω∧ω = ½R^a_bcd e^c∧e^d (R как в gmph.riemann)."""
+    from gmph.cartan import connection_forms, curvature_forms, frame_riemann
+    from gmph.riemann import christoffel, riemann
+    r, ph = sp.symbols("r phi", positive=True)
+    f = sp.Function("f", positive=True)(r)
+    E = sp.diag(1, f)                                   # g = dr² + f² dφ²
+    om = connection_forms(E, (r, ph), sp.eye(2))
+    # ∇_φ e_φ̂ = e_r̂ ω^1_2(∂_φ): у окружности радиуса f вектор e_φ̂ поворачивается внутрь, ω^1_2 = −f' dφ
+    assert sp.simplify(om[0][1][(2,)] + sp.diff(f, r)) == 0
+    R = frame_riemann(curvature_forms(om, (r, ph)), E)
+    R_coord = riemann(christoffel(E.T * E, (r, ph)), (r, ph))
+    # R^1_212 в репере = R^r_φrφ / f² ; гауссова кривизна K = −f''/f
+    assert sp.simplify(R[0][1][0][1] - R_coord[0][1][0][1] / f**2) == 0
+    assert sp.simplify(R[0][1][0][1] + sp.diff(f, r, 2) / f) == 0

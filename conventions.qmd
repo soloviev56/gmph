@@ -70,6 +70,15 @@ subtitle: "Обозначения и соглашения о знаках, ед�
   кривизна $R = g^{jl}R_{jl}$; у сферы радиуса $a$ $R = 2/a^2 > 0$. Для симметричной связности
   это соглашения Ландау–Лифшица (т. II, § 91–92). Функции `riemann`, `ricci`,
   `scalar_curvature` из `gmph.riemann`.
+- Ортонормированный репер (тетрада) $e_a$ и дуальный корепер $e^a$: $g = \eta_{ab}\,e^a e^b$, где
+  $\eta_{ab}$ — $\operatorname{diag}(1, -1, -1, -1)$ в пространстве-времени (единичная матрица в римановом
+  случае). Формы связности: $\nabla e_b = e_a\,\omega^a{}_b$ (как $\nabla e_j = e_iA^i{}_j$ в разделе
+  «Расслоения»), $\omega_{ab} = \eta_{ac}\,\omega^c{}_b = -\omega_{ba}$. Структурные уравнения Картана
+  $$\dd e^a + \omega^a{}_b\wedge e^b = 0, \qquad
+  \Omega^a{}_b = \dd\omega^a{}_b + \omega^a{}_c\wedge\omega^c{}_b = \tfrac12 R^a{}_{bcd}\,e^c\wedge e^d,$$
+  где $R^a{}_{bcd}$ — компоненты того же тензора $R^i{}_{jkl}$ в репере. Для сферы радиуса $a$ с
+  $e^1 = a\,\dd\theta$, $e^2 = a\sin\theta\,\dd\varphi$: $\omega^1{}_2 = -\cos\theta\,\dd\varphi$, $\Omega^1{}_2 = e^1\wedge e^2/a^2$. Функции
+  `connection_forms`, `curvature_forms`, `frame_riemann` из `gmph.cartan`.
 
 ## Метрика
 
