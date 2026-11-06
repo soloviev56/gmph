@@ -87,3 +87,55 @@ def betti_numbers(nx, ny, periodic=False):
     r1 = np.linalg.matrix_rank(D1.toarray())
     n_nodes, n_ex, n_ey, n_cells = grid_sizes(nx, ny, periodic)
     return int(n_nodes - r0), int((n_ex + n_ey) - r1 - r0), int(n_cells - r1)
+
+
+def _cell_and_local(nx, ny, h, point):
+    """Ячейка (i, j), содержащая точку, и локальные координаты u, v ∈ [0, 1] в ней."""
+    i = min(max(int(np.floor(point[0] / h)), 0), nx - 1)
+    j = min(max(int(np.floor(point[1] / h)), 0), ny - 1)
+    return i, j, point[0] / h - i, point[1] / h - j
+
+
+def whitney0(nx, ny, h, point):
+    """Значения 0-форм Уитни (билинейных «шапочек») всех узлов в точке; сумма весов равна 1.
+
+    Заряд q в точке x распределяется по узлам как q · whitney0(x) (метод «облако в ячейке»).
+    """
+    i, j, u, v = _cell_and_local(nx, ny, h, point)
+    w = np.zeros((nx + 1) * (ny + 1))
+    for di, dj, weight in ((0, 0, (1 - u) * (1 - v)), (1, 0, u * (1 - v)),
+                           (0, 1, (1 - u) * v), (1, 1, u * v)):
+        w[(i + di) + (nx + 1) * (j + dj)] = weight
+    return w
+
+
+def whitney1_path(nx, ny, h, p0, p1):
+    """Интегралы 1-форм Уитни всех рёбер по отрезку p0 → p1 (вектор по рёбрам).
+
+    1-форма Уитни x-ребра (i, j) равна «шапочке» узла j по y, умноженной на dx/h в
+    столбце [x_i, x_{i+1}] (для y-рёбер аналогично). Так как d W0 = Σ D0[e, n] W1_e,
+    результат Q удовлетворяет ``D0.T @ Q = whitney0(p1) − whitney0(p0)``: это поток
+    заряда через рёбра двойственной сетки, согласованный с законом сохранения.
+    """
+    p0, p1 = np.asarray(p0, float), np.asarray(p1, float)
+    delta = p1 - p0
+    cuts = {0.0, 1.0}
+    for axis in (0, 1):                       # параметры пересечения линий сетки
+        if delta[axis] != 0:
+            lo, hi = sorted((p0[axis] / h, p1[axis] / h))
+            for k in range(int(np.ceil(lo)), int(np.floor(hi)) + 1):
+                s = (k * h - p0[axis]) / delta[axis]
+                if 0 < s < 1:
+                    cuts.add(s)
+    cuts = sorted(cuts)
+    n_ex = nx * (ny + 1)
+    Q = np.zeros(n_ex + (nx + 1) * ny)
+    for s0, s1 in zip(cuts[:-1], cuts[1:]):   # на куске внутри ячейки подынтегральное линейно:
+        mid = p0 + 0.5 * (s0 + s1) * delta    # правило средней точки точно
+        dx, dy = (s1 - s0) * delta / h
+        i, j, u, v = _cell_and_local(nx, ny, h, mid)
+        Q[i + nx * j] += dx * (1 - v)                        # нижнее x-ребро ячейки
+        Q[i + nx * (j + 1)] += dx * v                        # верхнее
+        Q[n_ex + i + (nx + 1) * j] += dy * (1 - u)           # левое y-ребро
+        Q[n_ex + (i + 1) + (nx + 1) * j] += dy * u           # правое
+    return Q
