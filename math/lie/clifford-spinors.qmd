@@ -1,0 +1,262 @@
+---
+title: "Алгебры Клиффорда и спиноры"
+topic: clifford-spinors
+order: 15
+description: "Квадратный корень из волнового оператора: (γ^μp_μ)² = p²; алгебра Клиффорда γ^μγ^ν + γ^νγ^μ = 2η^μν в сигнатуре (+,−,−,−); представления Дирака и Вейля, γ⁵; 16 произведений — базис всех матриц 4×4, следы; отражения v ↦ −uvu⁻¹ и повороты как произведения двух отражений (поворот на удвоенный угол, проверка на матрицах Паули); спинорное представление группы Лоренца S = exp(¼G_αβγ^αγ^β) с S⁻¹γ^μS = Λ^μ_νγ^ν для генераторов J_k, K_k из статьи о группе Лоренца; S(2π) = −1 — Spin(1,3) ≅ SL(2,ℂ); в представлении Вейля S блочно-диагонален: левые и правые спиноры (½,0) и (0,½); сопряжённый спинор ψ̄ = ψ†γ⁰, инвариант ψ̄ψ и вектор ψ̄γ^μψ (проверка на случайном преобразовании)"
+---
+
+Дирак (1928) искал релятивистское уравнение первого порядка по
+времени. Для этого нужно извлечь квадратный корень из волнового оператора:
+найти $\gamma^\mu$ с $(\gamma^\mu p_\mu)^2 = p_\mu p^\mu = E^2/c^2 - \mathbf p^2$. Раскрыв квадрат, получаем требование
+$\gamma^\mu\gamma^\nu + \gamma^\nu\gamma^\mu = 2\eta^{\mu\nu}$, которому числа не удовлетворяют, а матрицы — да.
+Алгебра, порождённая такими «векторами», чей квадрат равен их длине, —
+**алгебра Клиффорда**. Она объясняет, откуда берутся спиноры: они —
+представление не группы вращений, а её двулистного накрытия, и
+алгебра Клиффорда строит это накрытие из отражений.
+
+Используются [группа Лоренца](/math/lie/lorentz-group.qmd), [спин](/physics/quantum/spin.qmd)
+(матрицы Паули) и [представления групп и алгебр Ли](/math/lie/lie-representations.qmd).
+
+## Алгебра Клиффорда
+
+::: {#def-clifford}
+**Алгебра Клиффорда** $\mathrm{Cl}(V, \eta)$ векторного пространства с метрикой $\eta$ —
+ассоциативная алгебра с единицей, порождённая векторами $v\in V$ с
+единственным соотношением $v\,v = \eta(v, v)\cdot1$. Для базиса $e_\mu$ это
+$$
+e_\mu e_\nu + e_\nu e_\mu = 2\eta_{\mu\nu} .
+$$
+Ортогональные векторы антикоммутируют. Базис алгебры — упорядоченные
+произведения $e_{\mu_1}\cdots e_{\mu_k}$, $\mu_1 < \dots < \mu_k$; размерность $2^n$.
+:::
+
+Знакомые примеры: $\mathrm{Cl}(\mathbb R^3)$ с евклидовой метрикой реализуется матрицами Паули
+($\sigma_i\sigma_j + \sigma_j\sigma_i = 2\delta_{ij}$); $\mathrm{Cl}(0, 2)$ с $e_1^2 = e_2^2 = -1$ — кватернионы ($i = e_1$, $j = e_2$, $k = e_1e_2$);
+$\mathrm{Cl}(0, 1)$ — комплексные числа. Для пространства Минковского в сигнатуре
+$(+,-,-,-)$ образующие — **матрицы Дирака** $\gamma^\mu$ с $\{\gamma^\mu, \gamma^\nu\} = 2\eta^{\mu\nu}$, то есть
+$(\gamma^0)^2 = 1$, $(\gamma^i)^2 = -1$. Представление Дирака и киральное представление Вейля:
+$$
+\gamma^0 = \begin{pmatrix}1 & 0\\ 0 & -1\end{pmatrix},\ \gamma^i = \begin{pmatrix}0 & \sigma_i\\ -\sigma_i & 0\end{pmatrix}
+\quad\text{и}\quad
+\gamma^\mu = \begin{pmatrix}0 & \sigma^\mu\\ \bar\sigma^\mu & 0\end{pmatrix},\ \sigma^\mu = (1, \boldsymbol\sigma),\ \bar\sigma^\mu = (1, -\boldsymbol\sigma) .
+$$
+
+```{python}
+import itertools
+import numpy as np
+import sympy as sp
+from scipy.linalg import expm
+
+s0 = sp.eye(2)
+sig = [sp.Matrix([[0, 1], [1, 0]]), sp.Matrix([[0, -sp.I], [sp.I, 0]]), sp.Matrix([[1, 0], [0, -1]])]
+Z = sp.zeros(2)
+eta = sp.diag(1, -1, -1, -1)
+
+def block(a, b, c, d):
+    return sp.Matrix(sp.BlockMatrix([[a, b], [c, d]]))
+
+dirac = [block(s0, Z, Z, -s0)] + [block(Z, s, -s, Z) for s in sig]
+weyl = [block(Z, s0, s0, Z)] + [block(Z, s, -s, Z) for s in sig]
+
+def is_clifford(gam):
+    return all(gam[m] * gam[n] + gam[n] * gam[m] == 2 * eta[m, n] * sp.eye(4) for m in range(4) for n in range(4))
+
+print("Дирак: {γ^μ, γ^ν} = 2η^μν:", is_clifford(dirac), ";  Вейль:", is_clifford(weyl))
+
+p = sp.symbols("p0:4", real=True)
+p_low = [p[0], -p[1], -p[2], -p[3]]                       # p_μ = η_μν p^ν
+slash = sum((dirac[m] * p_low[m] for m in range(4)), sp.zeros(4))
+print("(γ^μ p_μ)² = p² · 1:", sp.expand(slash * slash) == sp.expand(p[0]**2 - p[1]**2 - p[2]**2 - p[3]**2) * sp.eye(4))
+```
+
+Из $(\gamma^\mu p_\mu)^2 = p^2$ следует, что каждая компонента решения уравнения Дирака
+$(i\hbar\gamma^\mu\partial_\mu - mc)\psi = 0$ удовлетворяет уравнению Клейна–Гордона (тема «Уравнение
+Дирака»). Произведение всех четырёх образующих
+$\gamma^5 = i\gamma^0\gamma^1\gamma^2\gamma^3$ («элемент объёма») антикоммутирует с каждой $\gamma^\mu$ и $(\gamma^5)^2 = 1$.
+Шестнадцать произведений $1, \gamma^\mu, \gamma^\mu\gamma^\nu\ (\mu < \nu), \gamma^\mu\gamma^5, \gamma^5$ линейно независимы и потому
+образуют базис всех матриц $4\times4$: комплексифицированная алгебра Клиффорда
+пространства Минковского — это $M_4(\mathbb C)$, и её неприводимое представление
+единственно с точностью до эквивалентности (теорема Паули). Следы
+произведений вычисляются только из антикоммутаторов:
+
+```{python}
+def gamma5(gam):
+    return sp.I * gam[0] * gam[1] * gam[2] * gam[3]
+
+g5 = gamma5(dirac)
+print("(γ⁵)² = 1:", g5 * g5 == sp.eye(4), ";  {γ⁵, γ^μ} = 0:", all(g5 * g + g * g5 == sp.zeros(4) for g in dirac))
+basis = [sp.eye(4)] + dirac + [dirac[m] * dirac[n] for m, n in itertools.combinations(range(4), 2)] \
+        + [g * g5 for g in dirac] + [g5]
+print("ранг 16 матриц, развёрнутых в векторы:", sp.Matrix([list(b) for b in basis]).rank())
+tr2 = all((dirac[m] * dirac[n]).trace() == 4 * eta[m, n] for m in range(4) for n in range(4))
+tr4 = all((dirac[a] * dirac[b] * dirac[c] * dirac[d]).trace()
+          == 4 * (eta[a, b] * eta[c, d] - eta[a, c] * eta[b, d] + eta[a, d] * eta[b, c])
+          for a, b, c, d in itertools.product(range(4), repeat=4))
+print("tr γ^μγ^ν = 4η^μν:", tr2, ";  tr γ^μγ^νγ^ργ^σ = 4(ηη − ηη + ηη):", tr4)
+```
+
+## Отражения и повороты
+
+Почему алгебра Клиффорда связана с вращениями? Пусть $u$ — единичный
+вектор евклидова пространства. Сопряжение
+$$
+v\ \mapsto\ -u\,v\,u^{-1}
+$$
+переводит векторы в векторы: составляющая $v$ вдоль $u$ меняет знак (она
+коммутирует с $u$), а перпендикулярная сохраняется (она антикоммутирует).
+Это **отражение** в плоскости, перпендикулярной $u$. Композиция двух отражений —
+поворот: $v\mapsto (wu)\,v\,(wu)^{-1}$, и по теореме Картана–Дьёдонне так получается любой
+поворот. Поворот, составленный из отражений в плоскостях с углом $\alpha$ между
+ними, — это поворот на $2\alpha$, а «ротор» $R = wu = \cos\alpha + \dots$ зависит от **половинного**
+угла поворота. Проверим на матрицах Паули (вектор $\mathbf v\leftrightarrow\mathbf v\cdot\boldsymbol\sigma$):
+
+```{python}
+sig_n = [np.array(s, dtype=complex) for s in sig]
+
+def as_matrix(v):
+    return sum(c * s for c, s in zip(v, sig_n))
+
+def as_vector(M):
+    return np.real([np.trace(M @ s) / 2 for s in sig_n])
+
+alpha = 0.4
+u = np.array([1.0, 0, 0])
+w = np.array([np.cos(alpha), np.sin(alpha), 0])
+R = as_matrix(w) @ as_matrix(u)                                       # ротор wu
+v = np.array([0.3, -0.7, 0.5])
+rotated = as_vector(R @ as_matrix(v) @ np.linalg.inv(R))
+c, s = np.cos(2 * alpha), np.sin(2 * alpha)
+print("два отражения:", np.round(rotated, 6), "  поворот на 2α вокруг z:", np.round([c * v[0] - s * v[1], s * v[0] + c * v[1], v[2]], 6))
+print("ротор R = wu =", np.round(R, 4).tolist(), " = exp(−iασ_z):", np.allclose(R, expm(-1j * alpha * sig_n[2])))
+```
+
+Ротор $R = e^{-i\alpha\sigma_z}$ поворачивает векторы на $2\alpha$ — это в точности $\mathrm{SU}(2)$-матрица
+$e^{-i\theta\sigma_z/2}$ поворота на $\theta = 2\alpha$ из статьи о [спине](/physics/quantum/spin.qmd). Роторы $R$ и $-R$ дают
+один и тот же поворот: произведения чётного числа единичных векторов
+образуют группу $\mathrm{Spin}(n)$, двулистно накрывающую $\mathrm{SO}(n)$. **Спиноры** —
+векторы пространства, на котором алгебра Клиффорда действует
+неприводимо; группа $\mathrm{Spin}$ действует на них линейно, а «поворот на $2\pi$»
+действует как $-1$.
+
+## Спинорное представление группы Лоренца
+
+В пространстве Минковского то же устройство. Если $\Lambda = e^{G}$ с генератором
+$G\in\mathfrak{so}(1, 3)$ (матрица $G^\mu{}_\nu$), положим
+$$
+S(\Lambda) = \exp\Bigl(\frac14\,G_{\alpha\beta}\,\gamma^\alpha\gamma^\beta\Bigr), \qquad G_{\alpha\beta} = \eta_{\alpha\lambda}G^\lambda{}_\beta .
+$$
+Тогда $S^{-1}\gamma^\mu S = \Lambda^\mu{}_\nu\gamma^\nu$: сопряжение спинорной матрицей поворачивает «вектор»
+$\gamma^\mu$, как отражения выше. (Инфинитезимально это тождество
+$[\gamma^\mu, \gamma^\alpha\gamma^\beta] = 2\eta^{\mu\alpha}\gamma^\beta - 2\eta^{\mu\beta}\gamma^\alpha$.) Для буста вдоль $x$ ($K_x$ из статьи о группе Лоренца)
+$S = e^{\theta\gamma^0\gamma^1/2}$, для поворота вокруг $z$ ($J_z$) — $S = e^{\theta\gamma^1\gamma^2/2}$. Проверим на всех шести
+генераторах и случайном элементе группы:
+
+```{python}
+eta_n = np.diag([1.0, -1, -1, -1])
+J4, K4 = [], []
+for k in range(3):
+    Jk = np.zeros((4, 4))
+    Jk[1:, 1:] = np.array(sp.Matrix(3, 3, lambda i, j: -sp.LeviCivita(k, i, j)), dtype=float)
+    Kk = np.zeros((4, 4))
+    Kk[0, k + 1] = Kk[k + 1, 0] = 1.0
+    J4.append(Jk)
+    K4.append(Kk)
+
+def spinor_generator(G, gam):
+    """¼ G_αβ γ^α γ^β для генератора G^μ_ν."""
+    G_low = eta_n @ G
+    return sum(G_low[a, b] * gam[a] @ gam[b] for a in range(4) for b in range(4)) / 4
+
+def check(G, gam, theta=0.7):
+    S = expm(theta * spinor_generator(G, gam))
+    Lam = expm(theta * G)
+    return all(np.allclose(np.linalg.inv(S) @ gam[m] @ S, sum(Lam[m, n] * gam[n] for n in range(4))) for m in range(4))
+
+gam_d = [np.array(g, dtype=complex) for g in dirac]
+print("S⁻¹γ^μS = Λ^μ_ν γ^ν для J_x, J_y, J_z, K_x, K_y, K_z:", [check(G, gam_d) for G in J4 + K4])
+rng = np.random.default_rng(5)
+coef = rng.normal(size=6)
+G_rand = sum(c * G for c, G in zip(coef, J4 + K4))
+print("для случайного генератора:", check(G_rand, gam_d, 1.0))
+print("S(поворот на 2π вокруг z) =", np.round(np.diag(expm(2 * np.pi * spinor_generator(J4[2], gam_d))).real, 10))
+```
+
+Поворот на $2\pi$ даёт $S = -1$: спинорное представление — представление не
+$\mathrm{SO}^+(1, 3)$, а её двулистного накрытия $\mathrm{Spin}(1, 3)\cong\mathrm{SL}(2, \mathbb C)$. В представлении Вейля это
+видно явно: $S$ **блочно-диагональна**, $\gamma^5 = \operatorname{diag}(-1, 1)$, и четырёхкомпонентный спинор
+распадается на два двухкомпонентных — **левый** и **правый** спиноры
+представлений $(\frac12, 0)$ и $(0, \frac12)$:
+
+```{python}
+gam_w = [np.array(g, dtype=complex) for g in weyl]
+print("γ⁵ (Вейль) =", np.round(np.diag(np.array(gamma5(weyl), dtype=complex)).real).tolist())
+th = 0.9
+for name, G in (("буст K_x", K4[0]), ("поворот J_z", J4[2])):
+    S = expm(th * spinor_generator(G, gam_w))
+    print(f"{name}: внедиагональные блоки нулевые: {np.allclose(S[:2, 2:], 0) and np.allclose(S[2:, :2], 0)}")
+    print("   левый блок:", np.round(np.real_if_close(S[:2, :2]), 4).tolist(), "  правый блок:", np.round(np.real_if_close(S[2:, 2:]), 4).tolist())
+print("e^{∓θσ_x/2}:", np.round(np.real_if_close(expm(-th * sig_n[0] / 2)), 4).tolist(), np.round(np.real_if_close(expm(th * sig_n[0] / 2)), 4).tolist())
+```
+
+При поворотах оба блока — одна и та же матрица $e^{-i\theta\sigma_z/2}$ из $\mathrm{SU}(2)$; при бустах
+левый блок $e^{-\theta\sigma_x/2}$, правый $e^{+\theta\sigma_x/2}$: правый — это матрица $A$ из статьи о
+группе Лоренца, левый — $(A^\dagger)^{-1}$. Отражение пространства $\mathbf x\to-\mathbf x$ меняет
+блоки местами, поэтому теория, где левые и правые спиноры
+взаимодействуют по-разному (слабое взаимодействие), нарушает чётность.
+
+## Билинейные формы
+
+Спинорное представление не унитарно (бусты дают эрмитовы, а не
+унитарные блоки), поэтому $\psi^\dagger\psi$ не инвариант. Инвариантное спаривание даёт
+**дираковское сопряжение** $\bar\psi = \psi^\dagger\gamma^0$: из $S^\dagger\gamma^0 = \gamma^0S^{-1}$ следует, что $\bar\psi\psi$ — скаляр,
+а $\bar\psi\gamma^\mu\psi$ — 4-вектор (ток Дирака):
+
+```{python}
+S_rand = expm(spinor_generator(G_rand, gam_d))
+Lam_rand = expm(G_rand)
+psi = rng.normal(size=4) + 1j * rng.normal(size=4)
+psi_new = S_rand @ psi
+bar = lambda x: x.conj() @ gam_d[0]
+current = lambda x: np.real([bar(x) @ g @ x for g in gam_d])
+print("S†γ⁰S = γ⁰:", np.allclose(S_rand.conj().T @ gam_d[0] @ S_rand, gam_d[0]))
+print(f"ψ̄ψ: до {(bar(psi) @ psi).real:.6f}, после {(bar(psi_new) @ psi_new).real:.6f}")
+print("ψ̄γ^μψ после = Λ·(ψ̄γ^μψ до):", np.allclose(current(psi_new), Lam_rand @ current(psi)))
+print("ψ†ψ до и после:", round(float(np.real(psi.conj() @ psi)), 4), round(float(np.real(psi_new.conj() @ psi_new)), 4))
+```
+
+## Итоги
+
+- Алгебра Клиффорда: $\{e_\mu, e_\nu\} = 2\eta_{\mu\nu}$, размерность $2^n$; матрицы Паули, кватернионы, матрицы Дирака.
+- $(\gamma^\mu p_\mu)^2 = p^2$ — квадратный корень из волнового оператора; $\gamma^5 = i\gamma^0\gamma^1\gamma^2\gamma^3$; 16 произведений — базис $M_4(\mathbb C)$.
+- Отражение $v\mapsto-uvu^{-1}$; два отражения — поворот на удвоенный угол; роторы образуют $\mathrm{Spin}(n)$ — двулистное накрытие.
+- $S(\Lambda) = \exp(\frac14G_{\alpha\beta}\gamma^\alpha\gamma^\beta)$, $S^{-1}\gamma^\mu S = \Lambda^\mu{}_\nu\gamma^\nu$, $S(2\pi) = -1$; в представлении Вейля — левые и правые спиноры.
+- $\bar\psi = \psi^\dagger\gamma^0$: $\bar\psi\psi$ — скаляр, $\bar\psi\gamma^\mu\psi$ — вектор.
+
+## Упражнения
+
+1. Докажите, что $\gamma^5$ антикоммутирует со всеми $\gamma^\mu$ и $(\gamma^5)^2 = 1$, используя только
+   антикоммутационные соотношения.
+2. Покажите, что $\sigma_x\sigma_y\sigma_z = i$. Что это говорит о «элементе объёма» в $\mathrm{Cl}(\mathbb R^3)$?
+3. Найдите $S$ для буста вдоль $x$ с быстротой $\theta$ в представлении Дирака в
+   явном виде ($e^{\theta\gamma^0\gamma^1/2} = \operatorname{ch}\frac\theta2 + \gamma^0\gamma^1\operatorname{sh}\frac\theta2$). Унитарна ли она?
+4. Докажите, что $\operatorname{tr}(\gamma^\mu\gamma^\nu\gamma^\rho) = 0$.
+5. Сколько независимых компонент у спинора в 10 измерениях ($n = 10$, размерность
+   неприводимого представления $2^{n/2}$)? А у левого (вейлевского) спинора?
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $\gamma^5\gamma^\mu$: переносим $\gamma^\mu$ через четыре множителя, три из которых с ним
+   антикоммутируют, а один коммутирует (сам $\gamma^\mu$): знак $(-1)^3 = -1$. Квадрат: переносим
+   второй $\gamma^0$ влево через три множителя, затем $\gamma^1$ через два и $\gamma^2$ через один:
+   $(\gamma^0\gamma^1\gamma^2\gamma^3)^2 = -(\gamma^0)^2\,\gamma^1\gamma^2\gamma^3\gamma^1\gamma^2\gamma^3 = -(\gamma^1)^2\,\gamma^2\gamma^3\gamma^2\gamma^3 = \gamma^2\gamma^3\gamma^2\gamma^3 = -(\gamma^2)^2(\gamma^3)^2 = -1$,
+   и $(\gamma^5)^2 = i^2\cdot(-1) = 1$.
+2. $\sigma_x\sigma_y = i\sigma_z$, поэтому $\sigma_x\sigma_y\sigma_z = i\sigma_z^2 = i$. Элемент объёма $e_1e_2e_3$ коммутирует со всей
+   алгеброй и в этом представлении — скаляр $i$; поэтому представлений $\mathrm{Cl}(\mathbb R^3)$ два
+   ($e_1e_2e_3 = \pm i$), они отличаются знаком всех $\sigma_i$.
+3. $(\gamma^0\gamma^1)^2 = -\gamma^0\gamma^0\gamma^1\gamma^1 = 1$, отсюда $S = \operatorname{ch}\frac\theta2 + \gamma^0\gamma^1\operatorname{sh}\frac\theta2$, где
+   $\gamma^0\gamma^1 = \begin{pmatrix}0 & \sigma_x\\ \sigma_x & 0\end{pmatrix}$ — эрмитова матрица; значит, $S$ эрмитова, а не унитарна
+   ($S^\dagger S = S^2 \ne 1$).
+4. $\operatorname{tr}(\gamma^\mu\gamma^\nu\gamma^\rho) = \operatorname{tr}(\gamma^5\gamma^5\gamma^\mu\gamma^\nu\gamma^\rho) = \operatorname{tr}(\gamma^5\gamma^\mu\gamma^\nu\gamma^\rho\gamma^5)$ (цикличность) $= -\operatorname{tr}(\gamma^5\gamma^5\gamma^\mu\gamma^\nu\gamma^\rho)$
+   (три антикоммутации), то есть след равен минус самому себе.
+5. $2^5 = 32$ комплексные компоненты; вейлевский спинор — половина, 16.
+:::
