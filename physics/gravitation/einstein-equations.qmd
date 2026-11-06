@@ -1,0 +1,323 @@
+---
+title: "Уравнения Эйнштейна"
+topic: einstein-equations
+order: 3
+description: "От уравнения Пуассона к геометрии: R_00 = ∇²Φ/c² в слабом поле (проверка SymPy) и почему возмущать надо и g_ij; уравнения R_μν − ½g_μνR = 8πkT_μν/c⁴ и их след; действие Гильберта −(c³/16πk)∫R√−g d⁴x: δ(√−gR) = √−g G_μν δg^μν на минисуперпространстве Фридмана; метрический тензор энергии-импульса T_μν = (2/√−g)δ(√−gℒ)/δg^μν — для скалярного поля совпадает с каноническим; уравнение Фридмана из действия; подсчёт степеней свободы; статическая звезда: уравнения Толмена–Оппенгеймера–Волкова через формы Картана, однородная звезда — давление в центре против ньютонова и предел Бухдаля r_s/R < 8/9 (рисунок)"
+---
+
+Ньютонова гравитация описывается одним уравнением на потенциал,
+$\nabla^2\Phi = 4\pi k\rho$. Принцип эквивалентности и движение по геодезическим
+говорят, что потенциал — это часть метрики, $g_{00} \approx 1 + 2\Phi/c^2$, а
+приливные силы — кривизна (см. [движение в гравитационном поле](/physics/gravitation/geodesic-motion.qmd)
+и [девиацию геодезических](/math/riemann/geodesic-deviation.qmd)). Значит, уравнение Пуассона
+должно быть предельным случаем уравнения, связывающего **кривизну** с
+**энергией-импульсом**. Найти это уравнение помогают три требования:
+оно тензорное, содержит не выше вторых производных метрики и
+совместимо с законом сохранения $\nabla_\mu T^{\mu\nu} = 0$. Эти требования почти однозначно
+приводят к тензору Эйнштейна из статьи о [тождествах Бианки](/math/riemann/bianchi.qmd).
+
+Используются [тензор кривизны](/math/riemann/curvature-riemann.qmd) (знаки — как у Ландау и
+Лифшица, см. [конвенции](/conventions.qmd)), [теорема Нётер для полей](/physics/fields/field-noether.qmd)
+и [тетрады Картана](/math/riemann/tetrads-cartan.qmd). Гравитационная постоянная
+обозначается $k$, как у Ландау и Лифшица.
+
+## Ньютонов предел
+
+Возьмём слабое статическое поле
+$$
+\dd s^2 = \Bigl(1 + \frac{2\Phi}{c^2}\Bigr)c^2\dd t^2 - \Bigl(1 - \frac{2\Phi}{c^2}\Bigr)(\dd x^2 + \dd y^2 + \dd z^2)
+$$
+и посчитаем тензор Риччи в первом порядке по $\Phi$ ($c = 1$, малый параметр $\varepsilon$):
+
+```{python}
+import numpy as np
+import sympy as sp
+import matplotlib.pyplot as plt
+from scipy.integrate import solve_ivp
+from gmph.riemann import christoffel, riemann, ricci, scalar_curvature
+
+t, x, y, z, eps = sp.symbols("t x y z epsilon")
+coords = (t, x, y, z)
+Phi = sp.Function("Phi")(x, y, z)
+g = sp.diag(1 + 2 * eps * Phi, *[-(1 - 2 * eps * Phi)] * 3)
+
+def linear(expr):
+    """Первый порядок по ε."""
+    return sp.simplify(sp.series(expr, eps, 0, 2).removeO())
+
+g_inv = sp.diag(*[1 / g[i, i] for i in range(4)])
+Gamma = [[[linear(sum(g_inv[i, l] * (sp.diff(g[l, k], coords[j]) + sp.diff(g[l, j], coords[k])
+                                     - sp.diff(g[j, k], coords[l])) for l in range(4)) / 2)
+           for k in range(4)] for j in range(4)] for i in range(4)]
+R = riemann(Gamma, coords)
+print("R_00 =", linear(sum(R[i][0][i][0] for i in range(4))))
+print("R_11 =", linear(sum(R[i][1][i][1] for i in range(4))))
+```
+
+В первом порядке $R_{00} = \nabla^2\Phi/c^2$: **уравнение Пуассона — это уравнение на $R_{00}$**,
+$R_{00} = 4\pi k\rho/c^2$. Но и $R_{11} = \nabla^2\Phi/c^2 \ne 0$: пространственная часть метрики
+обязана искривляться вместе с временной. Поэтому простейшая догадка
+$R_{\mu\nu} \propto T_{\mu\nu}$ не годится: у покоящейся пыли $T_{11} = 0$. Кроме того, $\nabla^\mu R_{\mu\nu} = \frac12\partial_\nu R \ne 0$
+(тождество Бианки), а $\nabla^\mu T_{\mu\nu} = 0$.
+
+## Уравнения поля
+
+::: {#def-einstein-equations}
+**Уравнения Эйнштейна:**
+$$
+G_{\mu\nu} \equiv R_{\mu\nu} - \frac12\,g_{\mu\nu}R = \frac{8\pi k}{c^4}\,T_{\mu\nu} ,
+$$
+где $T_{\mu\nu}$ — тензор энергии-импульса материи ($T_{00}$ — плотность энергии). Сворачивая
+с $g^{\mu\nu}$ ($g^{\mu\nu}g_{\mu\nu} = 4$), получаем $-R = \frac{8\pi k}{c^4}T$, и равносильная запись
+$$
+R_{\mu\nu} = \frac{8\pi k}{c^4}\Bigl(T_{\mu\nu} - \frac12\,g_{\mu\nu}T\Bigr) .
+$$
+:::
+
+Тождество Бианки $\nabla^\mu G_{\mu\nu} = 0$ делает закон сохранения $\nabla^\mu T_{\mu\nu} = 0$
+**следствием** уравнений поля: материя не может двигаться как угодно.
+Отсюда, например, следует, что пробные тела движутся по геодезическим.
+
+Проверим ньютонов предел. Для пыли $T_{\mu\nu} = \rho c^2u_\mu u_\nu$, в покое $T_{00} = \rho c^2$, $T = \rho c^2$, и
+$$
+R_{00} = \frac{8\pi k}{c^4}\cdot\frac12\rho c^2 = \frac{4\pi k\rho}{c^2}, \qquad
+R_{11} = \frac{8\pi k}{c^4}\cdot\frac12\rho c^2 = \frac{4\pi k\rho}{c^2} ,
+$$
+что совпадает с вычисленными выше $R_{00} = R_{11} = \nabla^2\Phi/c^2$ при $\nabla^2\Phi = 4\pi k\rho$. Коэффициент
+$8\pi k/c^4$ выбран именно так, чтобы получилась ньютонова теория. Его величина
+показывает, насколько «жёсткое» пространство-время:
+
+```{python}
+k_SI, c_SI = 6.674e-11, 2.998e8
+print(f"8πk/c⁴ = {8 * np.pi * k_SI / c_SI**4:.3e} с²/(кг·м) = Н⁻¹;  c⁴/(8πk)·(1 м)⁻² = {c_SI**4 / (8 * np.pi * k_SI):.1e} Дж/м³")
+```
+
+Чтобы заметно (на единицу) искривить область размером 1 м, нужна
+плотность энергии порядка $c^4/8\pi k\cdot1\ \text{м}^{-2} \sim 5\cdot10^{42}$ Дж/м³.
+
+**Подсчёт степеней свободы.** Симметричных уравнений 10, но четыре
+тождества Бианки связывают их, а четыре функции в $g_{\mu\nu}$ можно менять
+заменой координат. Независимых динамических функций остаётся
+$10 - 4 - 4 = 2$ — две поляризации гравитационных волн (тема «Гравитационные волны»).
+
+## Действие Гильберта
+
+Как и в электродинамике, уравнения поля следуют из принципа
+наименьшего действия. Единственный скаляр из метрики и её вторых
+производных — скалярная кривизна.
+
+::: {#def-hilbert-action}
+**Действие Гильберта–Эйнштейна** и **метрический тензор энергии-импульса**
+(в соглашениях Ландау и Лифшица, т. II, § 93–95):
+$$
+S_g = -\frac{c^3}{16\pi k}\int R\,\sqrt{-g}\,\dd^4x, \qquad
+S_m = \frac1c\int\mathcal L\,\sqrt{-g}\,\dd^4x, \qquad
+T_{\mu\nu} = \frac{2}{\sqrt{-g}}\,\frac{\partial(\sqrt{-g}\,\mathcal L)}{\partial g^{\mu\nu}} .
+$$
+:::
+
+Ключевая формула вариации: $\delta(\sqrt{-g}\,R) = \sqrt{-g}\,G_{\mu\nu}\,\delta g^{\mu\nu}$ + полная производная.
+Тогда $\delta(S_g + S_m) = \frac{1}{2c}\int\bigl(-\frac{c^4}{8\pi k}G_{\mu\nu} + T_{\mu\nu}\bigr)\delta g^{\mu\nu}\sqrt{-g}\,\dd^4x = 0$ — это и есть уравнения
+Эйнштейна. Проверим формулу вариации на **минисуперпространстве** —
+однородной изотропной метрике $\dd s^2 = N(t)^2\dd t^2 - a(t)^2\dd\mathbf x^2$. Здесь $g^{00} = 1/N^2$, $\delta g^{00} = -2\,\delta N/N^3$,
+и производная Эйлера–Лагранжа от $\sqrt{-g}R = Na^3R$ по $N$ должна равняться
+$-2a^3G_{00}/N^2$:
+
+```{python}
+N = sp.Function("N", positive=True)(t)
+a = sp.Function("a", positive=True)(t)
+g_frw = sp.diag(N**2, -a**2, -a**2, -a**2)
+Ric = ricci(riemann(christoffel(g_frw, coords), coords))
+R_scalar = scalar_curvature(Ric, g_frw)
+G00 = sp.simplify(Ric[0, 0] - g_frw[0, 0] * R_scalar / 2)
+
+def euler_lagrange(L, q):
+    """δ∫L dt / δq для лагранжиана со вторыми производными."""
+    return sp.diff(L, q) - sp.diff(sp.diff(L, sp.diff(q, t)), t) + sp.diff(sp.diff(L, sp.diff(q, t, 2)), t, 2)
+
+print("R =", R_scalar)
+print("G_00 =", G00)
+print("δ(√−g R)/δN + 2a³G_00/N² =", sp.simplify(euler_lagrange(N * a**3 * R_scalar, N) + 2 * a**3 * G00 / N**2))
+```
+
+Добавим материю — однородное скалярное поле $\varphi(t)$ с потенциалом $V$,
+$\mathcal L = \frac12g^{\mu\nu}\partial_\mu\varphi\,\partial_\nu\varphi - V$ ($c = 1$). Вариация полного действия по $N$ при $N = 1$ даёт
+**уравнение Фридмана** $3\dot a^2/a^2 = 8\pi k\,\varepsilon$ с плотностью энергии поля $\varepsilon = \frac12\dot\varphi^2 + V$:
+
+```{python}
+k = sp.Symbol("k", positive=True)
+varphi = sp.Function("varphi")(t)
+V = sp.Function("V")
+L_total = -N * a**3 * R_scalar / (16 * sp.pi * k) + N * a**3 * (sp.diff(varphi, t)**2 / (2 * N**2) - V(varphi))
+constraint = sp.simplify(euler_lagrange(L_total, N).subs(N, 1).doit())
+energy = sp.diff(varphi, t)**2 / 2 + V(varphi)
+print("δS/δN при N = 1:", constraint)
+print("это −a³(ε − 3ȧ²/(8πk a²)):", sp.simplify(constraint + a**3 * (energy - 3 * sp.diff(a, t)**2 / (8 * sp.pi * k * a**2))) == 0)
+```
+
+Метрический тензор энергии-импульса скалярного поля, найденный
+дифференцированием по $g^{\mu\nu}$ (с $\partial\sqrt{-g}/\partial g^{\mu\nu} = -\frac12\sqrt{-g}\,g_{\mu\nu}$), в плоском пространстве
+совпадает с каноническим тензором $T^\mu{}_\nu$ из теоремы Нётер (с опущенным
+индексом):
+
+```{python}
+h = sp.Matrix(4, 4, lambda i, j: sp.Symbol(f"h{min(i, j)}{max(i, j)}"))   # g^{μν}, симметричная
+dphi = sp.symbols("p0:4")                                                # ∂_μ φ
+eta = sp.diag(1, -1, -1, -1)
+dphi_vec = sp.Matrix(dphi)
+density = (-h.det())**sp.Rational(-1, 2) * (sp.Rational(1, 2) * dphi_vec.dot(h * dphi_vec) - sp.Symbol("V"))   # √−g ℒ
+at_flat = {h[i, j]: eta[i, j] for i in range(4) for j in range(i, 4)}
+T_metric = sp.Matrix(4, 4, lambda i, j: (2 if i == j else 1) * sp.diff(density, h[i, j]).subs(at_flat))
+L_flat = sp.Rational(1, 2) * dphi_vec.dot(eta * dphi_vec) - sp.Symbol("V")
+T_canonical = sp.Matrix(4, 4, lambda i, j: dphi[i] * dphi[j] - eta[i, j] * L_flat)
+print("T_μν(метрический) − T_μν(канонический) =", sp.simplify(T_metric - T_canonical) == sp.zeros(4))
+print("T_00 =", sp.expand(T_metric[0, 0]))
+```
+
+(Множитель 1 у недиагональных компонент — оттого что символ $g^{\mu\nu}$, $\mu\ne\nu$, входит
+в матрицу дважды.) Для полей со спином канонический тензор
+несимметричен и отличается от метрического; правильный — метрический,
+он же источник гравитации.
+
+## Статическая звезда
+
+Применим уравнения к сферической звезде из идеальной жидкости,
+$T_{\hat\mu\hat\nu} = \operatorname{diag}(\varepsilon, p, p, p)$ в репере покоящегося наблюдателя. Метрику ищем в виде
+$$
+\dd s^2 = e^{2\Phi(r)}\dd t^2 - \frac{\dd r^2}{1 - 2km(r)/r} - r^2\dd\Omega^2 ,
+$$
+с тетрадой $e^0 = e^\Phi\dd t$, $e^1 = \dd r/\sqrt{1 - 2km/r}$, $e^2 = r\,\dd\theta$, $e^3 = r\sin\theta\,\dd\varphi$. Тензор
+Эйнштейна в репере вычисляется формами Картана, и подстановка
+**уравнений Толмена–Оппенгеймера–Волкова** ($c = 1$)
+$$
+m' = 4\pi r^2\varepsilon, \qquad \Phi' = \frac{k\,(m + 4\pi r^3p)}{r^2(1 - 2km/r)}, \qquad p' = -(\varepsilon + p)\,\Phi'
+$$
+обращает все уравнения Эйнштейна в тождества:
+
+```{python}
+from gmph.cartan import connection_forms, curvature_forms, frame_riemann, frame_ricci, frame_scalar
+
+r, th, ph = sp.symbols("r theta phi", positive=True)
+Phi_r, m = sp.Function("Phi")(r), sp.Function("m")(r)
+energy_r, p = sp.Function("epsilon")(r), sp.Function("p")(r)
+star_coords = (t, r, th, ph)
+E_star = sp.diag(sp.exp(Phi_r), 1 / sp.sqrt(1 - 2 * k * m / r), r, r * sp.sin(th))
+R_star = frame_riemann(curvature_forms(connection_forms(E_star, star_coords, eta), star_coords), E_star)
+Ric_star = frame_ricci(R_star)
+G_star = sp.simplify(Ric_star - eta * frame_scalar(Ric_star, eta) / 2)
+print("G_0̂0̂ =", G_star[0, 0], ";  G_1̂1̂ =", G_star[1, 1])
+
+dm = 4 * sp.pi * r**2 * energy_r
+dPhi = k * (m + 4 * sp.pi * r**3 * p) / (r**2 * (1 - 2 * k * m / r))
+dp = -(energy_r + p) * dPhi
+
+def on_tov(expr):
+    """Подстановка уравнений ТОВ (сначала старшие производные)."""
+    expr = expr.subs(sp.diff(Phi_r, r, 2), sp.diff(dPhi, r)).subs(sp.diff(Phi_r, r), dPhi)
+    return sp.simplify(expr.subs(sp.diff(m, r), dm).subs(sp.diff(p, r), dp))
+
+for i, source in ((0, energy_r), (1, p), (2, p), (3, p)):
+    print(f"G_{i}̂{i}̂ − 8πk T_{i}̂{i}̂ на решении ТОВ:", on_tov(G_star[i, i] - 8 * sp.pi * k * source))
+```
+
+Первое уравнение — то же, что в ньютоновой теории, второе отличается
+тремя релятивистскими поправками: давление само тяготеет ($4\pi r^3p$),
+инертна вся энергия $\varepsilon + p$, а множитель $1/(1 - 2km/r)$ усиливает притяжение. Все
+три увеличивают давление, нужное для равновесия, и при достаточной
+компактности равновесие становится невозможным.
+
+Для звезды постоянной плотности уравнения решаются точно (внутреннее
+решение Шварцшильда). Давление в центре
+$$
+\frac{p_c}{\varepsilon} = \frac{1 - \sqrt{1 - r_s/R}}{3\sqrt{1 - r_s/R} - 1}, \qquad r_s = 2kM ,
+$$
+обращается в бесконечность при $r_s/R = 8/9$: **предел Бухдаля** — ни одна звезда не
+может быть компактнее, $R > \frac98r_s$. В ньютоновой теории $p_c/\varepsilon = r_s/4R$ при любой
+компактности. Проверим формулу численным интегрированием уравнений ТОВ:
+
+```{python}
+#| label: fig-buchdahl
+#| fig-cap: 'Давление в центре однородной звезды в единицах плотности энергии в зависимости от компактности r_s/R: точное решение ОТО (внутреннее решение Шварцшильда), численное интегрирование уравнений ТОВ (точки) и ньютонова формула r_s/4R. При r_s/R → 8/9 (предел Бухдаля, пунктир) давление неограниченно растёт.'
+def central_pressure_exact(c):
+    s = np.sqrt(1 - c)
+    return (1 - s) / (3 * s - 1)
+
+def tov_radius(p_c, eps0=1.0, k_num=1.0):
+    """Интегрирует ТОВ от центра до p = 0 при ε = eps0; возвращает (R, r_s/R)."""
+    def rhs(rr, u):
+        mm, pp = u
+        return [4 * np.pi * rr**2 * eps0,
+                -(eps0 + pp) * k_num * (mm + 4 * np.pi * rr**3 * pp) / (rr**2 * (1 - 2 * k_num * mm / rr))]
+    surface = lambda rr, u: u[1]
+    surface.terminal = True
+    r0 = 1e-6
+    sol = solve_ivp(rhs, (r0, 10), [4 / 3 * np.pi * r0**3 * eps0, p_c], events=surface, rtol=1e-10, atol=1e-14)
+    R_star, M_star = sol.t_events[0][0], sol.y_events[0][0][0]
+    return R_star, 2 * k_num * M_star / R_star
+
+compact = np.linspace(0, 0.885, 300)
+fig, ax = plt.subplots(figsize=(7, 4))
+ax.semilogy(compact, central_pressure_exact(compact), label="ОТО, точно")
+ax.semilogy(compact, compact / 4, "--", label="Ньютон: r_s/4R")
+for p_c in (0.01, 0.05, 0.2, 1.0, 5.0, 30.0):
+    _, c_num = tov_radius(p_c)
+    ax.plot(c_num, p_c, "ko", ms=4, label="ТОВ, численно" if p_c == 0.01 else None)
+    print(f"p_c = {p_c:5}: r_s/R = {c_num:.6f};  точная формула при этом r_s/R даёт p_c = {central_pressure_exact(c_num):.6f}")
+ax.axvline(8 / 9, color="gray", ls=":", label="8/9")
+ax.set(xlabel="r_s / R", ylabel="p_c / ε", xlim=(0, 0.92), ylim=(1e-3, 1e2))
+ax.legend()
+plt.tight_layout()
+plt.show()
+
+for name, c in (("Солнце", 2.95 / 6.96e5), ("белый карлик", 2.95 * 0.6 / 7000), ("нейтронная звезда 1,4 M☉, R = 12 км", 2.95 * 1.4 / 12)):
+    print(f"{name:35}: r_s/R = {c:.2e},  p_c(ОТО)/p_c(Ньютон) = {central_pressure_exact(c) / (c / 4):.4f}")
+```
+
+Для Солнца и белых карликов поправка ОТО к давлению в центре
+ничтожна, а для нейтронных звёзд (в грубой модели однородной звезды)
+давление в центре нужно в полтора раза больше ньютонова. Реальные
+нейтронные звёзды неоднородны, и вместо предела Бухдаля их массу
+ограничивает уравнение состояния вещества: известные нейтронные звёзды
+не тяжелее примерно двух солнечных масс, а более массивные остатки
+звёзд коллапсируют в чёрные дыры.
+
+## Итоги
+
+- В слабом поле $R_{00} = \nabla^2\Phi/c^2$: уравнение Пуассона — часть уравнения на кривизну;
+  искривляется и пространственная часть метрики.
+- Уравнения Эйнштейна $R_{\mu\nu} - \frac12g_{\mu\nu}R = \frac{8\pi k}{c^4}T_{\mu\nu}$; тождество Бианки делает $\nabla_\mu T^{\mu\nu} = 0$ следствием.
+- Действие $S_g = -\frac{c^3}{16\pi k}\int R\sqrt{-g}\,\dd^4x$, $\delta(\sqrt{-g}R) = \sqrt{-g}\,G_{\mu\nu}\delta g^{\mu\nu}$; $T_{\mu\nu} = \frac{2}{\sqrt{-g}}\partial(\sqrt{-g}\mathcal L)/\partial g^{\mu\nu}$;
+  из вариации по $N$ — уравнение Фридмана.
+- Две динамические степени свободы: $10 - 4 - 4$.
+- Статическая звезда: уравнения ТОВ; однородная звезда существует только при $R > \frac98r_s$.
+
+## Упражнения
+
+1. Покажите, что в пустоте ($T_{\mu\nu} = 0$) уравнения Эйнштейна равносильны $R_{\mu\nu} = 0$.
+   Следует ли отсюда, что пространство-время плоское?
+2. Добавьте космологическую постоянную: $S_g = -\frac{c^3}{16\pi k}\int(R + 2\Lambda)\sqrt{-g}\,\dd^4x$. Какой член
+   появится в уравнениях? Как выглядит её «тензор энергии-импульса»?
+3. Найдите след $T = T^\mu{}_\mu$ для идеальной жидкости $T_{\mu\nu} = (\varepsilon + p)u_\mu u_\nu - pg_{\mu\nu}$ и для
+   излучения ($p = \varepsilon/3$). Чему равна скалярная кривизна в области, заполненной излучением?
+4. Оцените $r_s/R$ и относительную поправку ОТО к давлению в центре Земли
+   в модели однородной планеты ($M = 6\cdot10^{24}$ кг, $R = 6400$ км).
+5. Почему в ньютоновом пределе достаточно уравнения на $R_{00}$, хотя
+   уравнений десять?
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. След даёт $R = 0$, и тогда $R_{\mu\nu} = 0$. Плоским пространство-время от этого не
+   становится: тензор Римана может быть ненулевым при нулевом тензоре
+   Риччи (например, у Шварцшильда, см. тетрады Картана), — это и есть
+   гравитационное поле в пустоте.
+2. $\delta(\sqrt{-g}\cdot2\Lambda) = -\Lambda\sqrt{-g}\,g_{\mu\nu}\delta g^{\mu\nu}$, поэтому $G_{\mu\nu} - \Lambda g_{\mu\nu} = \frac{8\pi k}{c^4}T_{\mu\nu}$. Перенесённый
+   вправо, этот член — тензор энергии-импульса вакуума $T^{(\Lambda)}_{\mu\nu} = \frac{c^4\Lambda}{8\pi k}g_{\mu\nu}$,
+   то есть идеальная жидкость с $\varepsilon = c^4\Lambda/8\pi k$ и $p = -\varepsilon$.
+3. $T = (\varepsilon + p) - 4p = \varepsilon - 3p$; для излучения $T = 0$, и из следа уравнений $R = -\frac{8\pi k}{c^4}T = 0$.
+4. $r_s = 2kM/c^2 \approx 8{,}9$ мм, $r_s/R \approx 1{,}4\cdot10^{-9}$. Разложение точной формулы
+   $\frac{p_c}{\varepsilon} = \frac{r_s}{4R}\bigl(1 + \frac{r_s}{R} + \frac{17}{16}\frac{r_s^2}{R^2} + \dots\bigr)$ даёт поправку $\frac{p_c^\text{ОТО}}{p_c^\text{Н}} - 1 \approx \frac{r_s}{R} \approx 1{,}4\cdot10^{-9}$.
+5. В ньютоновом пределе $T_{00} = \rho c^2$ много больше остальных компонент ($p \ll \rho c^2$,
+   $\rho v^2 \ll \rho c^2$), а движение частиц в главном порядке определяется только
+   $g_{00}$. Остальные уравнения задают $g_{ij}$ (оно влияет на свет — удвоение
+   угла отклонения) и поправки следующих порядков.
+:::
