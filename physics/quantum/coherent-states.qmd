@@ -1,0 +1,266 @@
+---
+title: "Когерентные состояния"
+topic: coherent-states
+order: 18
+description: "Собственные векторы a: |α⟩ = e^{−|α|²/2}Σαⁿ/√n!|n⟩ = D(α)|0⟩, точка фазовой плоскости q + ip = √2α; минимальная неопределённость ΔqΔp = ½ и эволюция α → αe^{−iωt} (сверка в усечённом базисе); неортогональность |⟨α|β⟩|² = e^{−|α−β|²} и разложение единицы ∫|α⟩⟨α|d²α/π = 1; пуассоновская статистика фотонов; функция Хусими Q(α) = ⟨α|ρ|α⟩/π для когерентного, фоковского и «кошачьего» состояний (рисунок); фаза Берри петли когерентных состояний −S/ħ (площадь в фазовой плоскости, проверка дискретной формулой); спиновые когерентные состояния: |⟨n|n'⟩|² = ((1 + n·n')/2)^{2j}, кривизна Берри −j sinθ dθ∧dφ — симплектическая форма классического спина из конвенций; классический предел (рисунок)"
+---
+
+Состояния квантового осциллятора с определённой энергией $|n\rangle$ совсем не
+похожи на классические колебания: среднее положение в них равно нулю, а
+плотность вероятности не движется. Шрёдингер (1926) нашёл суперпозиции,
+которые ведут себя как классическая частица: волновой пакет минимальной
+ширины, который колеблется, не расплываясь. Глаубер (1963) понял, что
+именно в таких состояниях находится свет лазера. Геометрически
+когерентные состояния — способ вложить классическое фазовое
+пространство в квантовое: каждой точке фазовой плоскости (или сферы,
+для спина) сопоставляется вектор состояния, и симплектическая форма
+оказывается кривизной Берри этого вложения.
+
+Используются [квантовый осциллятор](/physics/quantum/quantum-oscillator.qmd) (единицы $\hbar = m = \omega = 1$,
+$a = (x + ip)/\sqrt2$) и [фаза Берри](/physics/quantum/berry-phase.qmd).
+
+## Определение и свойства
+
+::: {#def-coherent}
+**Когерентное состояние** $|\alpha\rangle$, $\alpha\in\mathbb C$, — нормированный собственный вектор оператора
+уничтожения: $a|\alpha\rangle = \alpha|\alpha\rangle$. Разложение по состояниям $|n\rangle$ и запись через
+**оператор сдвига** $D(\alpha) = e^{\alpha a^\dagger - \bar\alpha a}$:
+$$
+|\alpha\rangle = e^{-|\alpha|^2/2}\sum_{n=0}^\infty\frac{\alpha^n}{\sqrt{n!}}\,|n\rangle = D(\alpha)\,|0\rangle .
+$$
+:::
+
+Оператор $D(\alpha)$ сдвигает фазовую плоскость: $D^\dagger aD = a + \alpha$, поэтому $\langle x\rangle = \sqrt2\operatorname{Re}\alpha$,
+$\langle p\rangle = \sqrt2\operatorname{Im}\alpha$, а неопределённости такие же, как у основного состояния:
+$\Delta x = \Delta p = 1/\sqrt2$, $\Delta x\Delta p = \frac12$ — минимум, допускаемый соотношением
+неопределённостей. Эволюция с $H = a^\dagger a + \frac12$ даёт $|\alpha\rangle\to e^{-it/2}|\alpha e^{-it}\rangle$:
+точка $\alpha$ вращается по часовой стрелке, как классическая точка фазовой
+плоскости, а состояние остаётся когерентным. Проверим в усечённом базисе
+из 60 состояний:
+
+```{python}
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.linalg import expm
+from scipy.special import gammaln
+
+N = 60
+a = np.diag(np.sqrt(np.arange(1, N)), 1)                 # a|n⟩ = √n |n−1⟩
+ad = a.T
+X, P = (a + ad) / np.sqrt(2), (a - ad) / (1j * np.sqrt(2))
+
+def coherent(alpha, n=N):
+    """Коэффициенты |α⟩ в базисе |n⟩ (через логарифмы, чтобы не переполнялся n!)."""
+    k = np.arange(n)
+    log_abs = -abs(alpha)**2 / 2 + k * np.log(abs(alpha) + 1e-300) - 0.5 * gammaln(k + 1)
+    return np.exp(log_abs) * np.exp(1j * k * np.angle(alpha))
+
+alpha = 1.5 + 0.8j
+psi = coherent(alpha)
+mean = lambda op, v: np.vdot(v, op @ v)
+print("|a|α⟩ − α|α⟩| =", f"{np.linalg.norm(a @ psi - alpha * psi):.1e}",
+      ";  |D(α)|0⟩ − |α⟩| =", f"{np.linalg.norm(expm(alpha * ad - np.conj(alpha) * a)[:, 0] - psi):.1e}")
+dx = np.sqrt(mean(X @ X, psi).real - mean(X, psi).real**2)
+dp = np.sqrt(mean(P @ P, psi).real - mean(P, psi).real**2)
+print(f"⟨x⟩ = {mean(X, psi).real:.6f} (√2 Re α = {np.sqrt(2) * alpha.real:.6f}),  ⟨p⟩ = {mean(P, psi).real:.6f};  Δx·Δp = {dx * dp:.6f}")
+H = ad @ a + 0.5 * np.eye(N)
+t = 0.9
+evolved = expm(-1j * H * t) @ psi
+print("|e^{−iHt}|α⟩ − e^{−it/2}|αe^{−it}⟩| =", f"{np.linalg.norm(evolved - np.exp(-0.5j * t) * coherent(alpha * np.exp(-1j * t))):.1e}")
+```
+
+**Неортогональность и полнота.** Разные когерентные состояния не ортогональны:
+$$
+|\langle\alpha|\beta\rangle|^2 = e^{-|\alpha - \beta|^2},
+$$
+перекрытие мало, только если точки фазовой плоскости удалены на расстояние,
+большее размера «кванта площади». Тем не менее они образуют
+**переполненную** систему с разложением единицы
+$$
+\frac1\pi\int|\alpha\rangle\langle\alpha|\,\dd^2\alpha = 1, \qquad \dd^2\alpha = \dd(\operatorname{Re}\alpha)\,\dd(\operatorname{Im}\alpha) ,
+$$
+то есть каждой клетке фазовой плоскости площади $\pi$ в переменных $\alpha$ ($2\pi\hbar$ в
+переменных $q, p$) соответствует «одно состояние».
+
+```{python}
+beta = -0.4 + 1.1j
+print(f"|⟨α|β⟩|² = {abs(np.vdot(psi, coherent(beta)))**2:.8f},  e^(−|α−β|²) = {np.exp(-abs(alpha - beta)**2):.8f}")
+grid = np.linspace(-6, 6, 121)
+step = grid[1] - grid[0]
+identity = np.zeros((N, N), dtype=complex)
+for re in grid:
+    for im in grid:
+        v = coherent(re + 1j * im)
+        identity += np.outer(v, v.conj())
+identity *= step**2 / np.pi
+print("max |(1/π)∫|α⟩⟨α| d²α − 1| на подпространстве n < 15:", f"{np.abs(identity[:15, :15] - np.eye(15)).max():.1e}")
+```
+
+**Статистика фотонов.** Вероятность найти $n$ квантов
+$|\langle n|\alpha\rangle|^2 = e^{-|\alpha|^2}|\alpha|^{2n}/n!$ — распределение Пуассона со средним $\bar n = |\alpha|^2$ и дисперсией $\bar n$.
+Именно так распределены отсчёты фотодетектора в пучке лазера: фотоны
+приходят независимо. Относительная флуктуация числа квантов $1/\sqrt{\bar n}$, а
+неопределённость фазы — того же порядка: при больших $\bar n$ состояние
+почти классическое.
+
+## Функция Хусими
+
+Раз когерентные состояния покрывают фазовую плоскость, любое состояние
+можно «нарисовать» как функцию на ней:
+
+::: {#def-husimi}
+**Функция Хусими** состояния $\rho$:
+$$
+Q(\alpha) = \frac1\pi\langle\alpha|\rho|\alpha\rangle \ge 0, \qquad \int Q\,\dd^2\alpha = 1 .
+$$
+:::
+
+Это сглаженное гауссом (с шириной основного состояния) распределение в
+фазовом пространстве. Для когерентного состояния — гауссово пятно, для
+$|n\rangle$ — кольцо радиуса $\sqrt n$, для суперпозиции $|\alpha\rangle + |-\alpha\rangle$ («кошка Шрёдингера») —
+два пятна. Интерференция, отличающая кошку от смеси двух пятен, в $Q$
+почти не видна — она проявляется в осцилляциях функции Вигнера:
+
+```{python}
+#| label: fig-husimi
+#| fig-cap: 'Функция Хусими Q(α) = ⟨α|ψ|α⟩/π трёх состояний с одинаковым средним числом квантов ⟨n⟩ ≈ 4: когерентного |α = 2⟩ (гауссово пятно в точке α = 2), фоковского |n = 4⟩ (кольцо радиуса √4 = 2, фаза совсем неопределённа) и «кошки» (|2⟩ + |−2⟩)/N (два пятна). Оси — Re α и Im α, то есть q/√2 и p/√2.'
+def husimi(state, extent=4.5, m=181):
+    re, im = np.meshgrid(np.linspace(-extent, extent, m), np.linspace(-extent, extent, m))
+    Q = np.array([[abs(np.vdot(coherent(x + 1j * y), state))**2 / np.pi for x, y in zip(r1, r2)]
+                  for r1, r2 in zip(re, im)])
+    return re, im, Q
+
+fock = np.zeros(N, dtype=complex)
+fock[4] = 1
+cat = coherent(2.0) + coherent(-2.0)
+cat /= np.linalg.norm(cat)
+states = (("|α = 2⟩", coherent(2.0)), ("|n = 4⟩", fock), ("кошка |2⟩ + |−2⟩", cat))
+fig, axes = plt.subplots(1, 3, figsize=(11, 3.8))
+for ax, (title, st) in zip(axes, states):
+    re, im, Q = husimi(st)
+    ax.contourf(re, im, Q, levels=20, cmap="viridis")
+    ax.set(aspect="equal", title=title, xlabel="Re α")
+    print(f"{title:18}: ∫Q d²α = {Q.sum() * (re[0, 1] - re[0, 0])**2:.4f},  ⟨n⟩ = {mean(ad @ a, st).real:.4f}")
+axes[0].set_ylabel("Im α")
+plt.tight_layout()
+plt.show()
+p_cat = np.abs(cat[:10])**2
+print("распределение числа квантов у кошки (n = 0…9):", np.round(p_cat, 4), " — только чётные n")
+```
+
+## Фаза Берри и площадь
+
+Семейство $|\alpha\rangle$ — вложение плоскости в пространство состояний. Его связность
+Берри (статья о фазе Берри) находится из $\dd|\alpha\rangle = (a^\dagger\dd\alpha - \frac12\dd|\alpha|^2)|\alpha\rangle$:
+$$
+A = i\langle\alpha|\dd\alpha\rangle = -\operatorname{Im}(\bar\alpha\,\dd\alpha) = -(\xi\,\dd\eta - \eta\,\dd\xi), \qquad F = \dd A = -2\,\dd\xi\wedge\dd\eta \quad (\alpha = \xi + i\eta).
+$$
+В переменных $q = \sqrt2\xi$, $p = \sqrt2\eta$ кривизна $F = -\dd q\wedge\dd p = \dd p\wedge\dd q$ — это **симплектическая форма**
+$\omega = \dd p\wedge\dd q$ из [конвенций](/conventions.qmd). Фаза Берри петли когерентных состояний равна
+(с минусом) охваченной площади фазовой плоскости в единицах $\hbar$:
+$\gamma = \int F = -S/\hbar$ для петли, обходимой против часовой стрелки в плоскости $(q, p)$. Проверим
+дискретной формулой $\gamma = -\arg\prod\langle\alpha_k|\alpha_{k+1}\rangle$ на окружности и на эллипсе:
+
+```{python}
+def berry_loop(points):
+    states_ = [coherent(z) for z in points]
+    prod = np.prod([np.vdot(states_[k], states_[(k + 1) % len(states_)]) for k in range(len(states_))])
+    return -np.angle(prod)
+
+s_ = np.linspace(0, 2 * np.pi, 2000, endpoint=False)
+for name, loop, area_qp in (("окружность |α − 1| = 0,5", 1 + 0.5 * np.exp(1j * s_), 2 * np.pi * 0.25),
+                            ("эллипс с полуосями 0,6 и 0,3", 0.6 * np.cos(s_) + 0.3j * np.sin(s_) - 0.5j, 2 * np.pi * 0.18)):
+    print(f"{name:30}: γ = {berry_loop(loop):+.5f},  −S/ħ = {-area_qp:+.5f}")
+```
+
+Это связывает когерентные состояния с квазиклассикой: правило
+Бора–Зоммерфельда $\oint p\,\dd q = 2\pi\hbar(n + \frac12)$ (тема «Квазиклассическое
+приближение») — условие того, что набег фазы по замкнутой орбите кратен $2\pi$.
+
+## Спиновые когерентные состояния
+
+Для спина $j$ роль фазовой плоскости играет сфера: когерентное состояние
+$|\mathbf n\rangle = U(\mathbf n)|j, j\rangle$ — состояние со спином, «максимально направленным» вдоль $\mathbf n$
+(поворот состояния $|j, j\rangle$). Его свойства — те же: минимальная
+неопределённость $\Delta S_\perp^2 = j/2$, перекрытие
+$$
+|\langle\mathbf n|\mathbf n'\rangle|^2 = \Bigl(\frac{1 + \mathbf n\cdot\mathbf n'}{2}\Bigr)^{2j},
+$$
+быстро убывающее при больших $j$, и разложение единицы
+$\frac{2j + 1}{4\pi}\int|\mathbf n\rangle\langle\mathbf n|\,\dd\Omega = 1$. Кривизна Берри, найденная в статье о фазе Берри для $m = j$,
+$$
+F = -j\sin\theta\,\dd\theta\wedge\dd\varphi ,
+$$
+в точности совпадает с симплектической формой классического спина длины
+$S = j$ из [конвенций](/conventions.qmd): $\omega = \dd S_z\wedge\dd\varphi = -S\sin\theta\,\dd\theta\wedge\dd\varphi$. Классическая механика спина —
+это геометрия семейства его когерентных состояний.
+
+```{python}
+#| label: fig-spin-coherent
+#| fig-cap: 'Перекрытие спиновых когерентных состояний |⟨n|n′⟩|² как функция угла между n и n′ для j = ½, 2, 10 и 50 (точки — расчёт поворотом состояния |j, j⟩, линии — формула ((1 + cos ψ)/2)^{2j}). С ростом j состояния становятся «точками» сферы шириной порядка 1/√j: классический предел.'
+from gmph.lie import spin_matrices
+
+def spin_coherent(j, theta_, phi_=0.0):
+    Sx, Sy, Sz = (np.array(S.evalf(), dtype=complex) for S in spin_matrices(j))
+    top = np.zeros(int(2 * j + 1), dtype=complex)
+    top[0] = 1                                            # |j, j⟩ (S_z = diag(j, …, −j))
+    return expm(-1j * phi_ * Sz) @ expm(-1j * theta_ * Sy) @ top
+
+angles = np.linspace(0, np.pi, 200)
+fig, ax = plt.subplots(figsize=(7, 3.8))
+for j in (0.5, 2, 10, 50):
+    ax.plot(angles, ((1 + np.cos(angles)) / 2)**(2 * j), lw=1, label=f"j = {j}")
+    pts = angles[::20]
+    ref = spin_coherent(j, 0.0)
+    ax.plot(pts, [abs(np.vdot(ref, spin_coherent(j, a_)))**2 for a_ in pts], "k.", ms=4)
+ax.set(xlabel="угол между n и n′, рад", ylabel="|⟨n|n′⟩|²")
+ax.legend()
+plt.tight_layout()
+plt.show()
+
+j = 3
+Sx, Sy, Sz = (np.array(S.evalf(), dtype=complex) for S in spin_matrices(j))
+st = spin_coherent(j, 0.7, 1.2)
+n_vec = np.array([np.sin(0.7) * np.cos(1.2), np.sin(0.7) * np.sin(1.2), np.cos(0.7)])
+S_mean = np.real([mean(S, st) for S in (Sx, Sy, Sz)])
+perp = np.cross(n_vec, [0, 0, 1.0])
+perp /= np.linalg.norm(perp)
+S_perp = perp[0] * Sx + perp[1] * Sy + perp[2] * Sz
+print("⟨S⟩ =", np.round(S_mean, 6), " = j n:", np.allclose(S_mean, j * n_vec),
+      f";  ΔS⊥² = {mean(S_perp @ S_perp, st).real:.6f} (j/2 = {j / 2})")
+```
+
+## Итоги
+
+- $|\alpha\rangle$ — собственный вектор $a$, $|\alpha\rangle = D(\alpha)|0\rangle$; точка фазовой плоскости $q + ip = \sqrt2\alpha$;
+  $\Delta x\Delta p = \frac12$; эволюция — вращение $\alpha\to\alpha e^{-i\omega t}$ без расплывания.
+- Переполненная система: $|\langle\alpha|\beta\rangle|^2 = e^{-|\alpha - \beta|^2}$, $\frac1\pi\int|\alpha\rangle\langle\alpha|\dd^2\alpha = 1$; статистика квантов
+  пуассоновская.
+- Функция Хусими $Q = \langle\alpha|\rho|\alpha\rangle/\pi$ — картина состояния на фазовой плоскости.
+- Кривизна Берри семейства когерентных состояний — симплектическая форма: $\gamma = -S/\hbar$ для
+  плоскости, $F = -j\sin\theta\,\dd\theta\wedge\dd\varphi$ для спина.
+
+## Упражнения
+
+1. Найдите $\langle n\rangle$ и $\Delta n$ в состоянии $|\alpha\rangle$. Чему равна относительная флуктуация
+   числа квантов при $\bar n = 10^6$?
+2. Лазерный импульс содержит в среднем 4 фотона. Какова вероятность не
+   зарегистрировать ни одного?
+3. Найдите $|\langle\alpha|-\alpha\rangle|^2$ при $\alpha = 2$. Почему «кошка» с $\alpha = 2$ почти ортогональна каждой из
+   своих половин в смысле перекрытия $\frac12$?
+4. Докажите, что «кошка» $(|\alpha\rangle + |-\alpha\rangle)/\mathcal N$ содержит только чётные $n$, и найдите $\mathcal N^2$.
+5. Какую фазу Берри получает когерентное состояние, обходящее окружность
+   $|\alpha| = \frac12$ против часовой стрелки? Окружность $|\alpha| = 1$?
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $\langle n\rangle = \langle\alpha|a^\dagger a|\alpha\rangle = |\alpha|^2$, $\langle n^2\rangle = |\alpha|^4 + |\alpha|^2$, $\Delta n = |\alpha|$; относительная флуктуация
+   $1/|\alpha| = 10^{-3}$.
+2. $P(0) = e^{-4}\approx0{,}018$.
+3. $e^{-|2\alpha|^2} = e^{-16}\approx1{,}1\cdot10^{-7}$: половины почти ортогональны, поэтому каждая из них
+   имеет с нормированной «кошкой» перекрытие $|\langle\alpha|\text{кошка}\rangle|^2\approx\frac12$.
+4. $|\alpha\rangle + |-\alpha\rangle = e^{-|\alpha|^2/2}\sum\frac{\alpha^n(1 + (-1)^n)}{\sqrt{n!}}|n\rangle$ — нечётные слагаемые сокращаются;
+   $\mathcal N^2 = 2 + 2\operatorname{Re}\langle\alpha|-\alpha\rangle = 2(1 + e^{-2|\alpha|^2})$.
+5. $\gamma = \int F = -2\cdot\pi r^2$: при $r = \frac12$ $\gamma = -\pi/2$; при $r = 1$ $\gamma = -2\pi$, то есть фаза незаметна
+   ($e^{i\gamma} = 1$) — площадь петли в плоскости $(q, p)$ равна $2\pi\hbar$.
+:::
