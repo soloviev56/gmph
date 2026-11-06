@@ -1,0 +1,308 @@
+---
+title: "Неголономные системы"
+topic: nonholonomic
+order: 14
+description: "Связи на скорости как распределение ker ω^a; принцип Даламбера–Лагранжа: виртуальные перемещения из распределения, уравнения с множителями λ_a ω^a и сохранение энергии; почему вариационный («вакономный») подход даёт другие уравнения; сани Чаплыгина: вывод в SymPy, v̇ = aω², ω̇ = −maωv/(I + ma²), точное решение с tanh, сжатие фазового объёма и притягивающее прямолинейное движение (рисунок); шар на вращающемся столе: центр движется по окружности с частотой 2Ω/7 (вывод и расчёт, рисунок)"
+---
+
+Конёк, колесо, шар на столе — их связи ограничивают не положения, а
+скорости. Конёк не может ехать поперёк лезвия, но, как показывает опыт
+параллельной парковки, из любого положения можно попасть в любое другое.
+В статье о [распределениях и теореме Фробениуса](/math/forms/frobenius.qmd) это объяснено
+геометрически: связь задаёт неинтегрируемое распределение, и
+коммутаторы допустимых полей выводят из него. Здесь нас интересует
+**динамика**: какие уравнения движения порождает такая связь и чем
+неголономные системы отличаются от обычных лагранжевых.
+
+Используются [уравнения Лагранжа](/physics/mechanics/lagrange-equations.qmd) и
+[твёрдое тело](/physics/mechanics/rigid-body.qmd).
+
+## Связи на скорости
+
+Пусть система с координатами $q^i$ подчинена связям, линейным по
+скоростям:
+$$
+\omega^a(\dot q) = \omega^a_i(q)\,\dot q^i = 0, \qquad a = 1, \dots, k .
+$$
+Допустимые скорости образуют распределение $D = \ker\omega^1\cap\dots\cap\ker\omega^k$. Если оно
+интегрируемо (по Фробениусу, $\dd\omega^a\wedge\omega^1\wedge\dots\wedge\omega^k = 0$), связи **голономны**: они
+равносильны условиям на координаты, и задача сводится к обычной
+лагранжевой на меньшем многообразии. Иначе связи **неголономны**.
+
+Какие силы создают такие связи? Сила трения покоя лезвия о лёд
+направлена поперёк лезвия и не совершает работы на допустимых
+перемещениях. Это обобщает понятие идеальной связи.
+
+::: {#def-dalembert}
+**Принцип Даламбера–Лагранжа.** Реакции идеальных связей не совершают
+работы на виртуальных перемещениях, лежащих в распределении: $R_i\,\delta q^i = 0$
+при $\omega^a(\delta q) = 0$. Следовательно, ковектор реакции — линейная комбинация
+форм связей, $R = \lambda_a\omega^a$, и уравнения движения
+$$
+\frac{\dd}{\dd t}\pd{L}{\dot q^i} - \pd{L}{q^i} = \lambda_a\,\omega^a_i(q), \qquad \omega^a_i(q)\,\dot q^i = 0 .
+$$
+Неизвестных $n + k$ (ускорения и множители $\lambda_a$), уравнений столько же.
+:::
+
+Реакция — ковектор, как и всякая обобщённая сила. Если связи и
+лагранжиан не зависят от времени, энергия $E = \dot q^i\,\partial L/\partial\dot q^i - L$ сохраняется:
+$\dot E = \lambda_a\,\omega^a(\dot q) = 0$ — реакция работы не совершает.
+
+**Это не вариационный принцип.** Соблазнительно добавить связь в
+действие с множителем, $\int(L + \mu_a\omega^a(\dot q))\,\dd t$, и варьировать как обычно. Получается
+другая («вакономная») система уравнений, в которой участвуют $\dot\mu_a$ и
+$\dd\omega^a$. Для голономных связей обе системы совпадают, для неголономных —
+нет, и опыт с катящимися телами подтверждает уравнения Даламбера–Лагранжа.
+Вакономная механика описывает другую задачу — оптимальное управление:
+поиск допустимой кривой наименьшей «длины».
+
+## Сани Чаплыгина
+
+Твёрдое тело на плоскости опирается на лезвие (конёк) в точке $(x, y)$,
+направленное под углом $\theta$, и на две гладкие ножки; центр масс лежит на оси
+лезвия на расстоянии $a$ впереди точки опоры. Масса $m$, момент инерции
+относительно центра масс $I$. Лагранжиан — кинетическая энергия, связь
+запрещает скорость точки опоры поперёк лезвия:
+$$
+\omega = -\sin\theta\,\dd x + \cos\theta\,\dd y .
+$$
+Распределение $\ker\omega$ на $(x, y, \theta)$ неинтегрируемо: $\omega\wedge\dd\omega = -\dd x\wedge\dd y\wedge\dd\theta\ne0$.
+Выведем уравнения, решая систему Даламбера–Лагранжа относительно
+ускорений и множителя:
+
+```{python}
+import numpy as np
+import sympy as sp
+import matplotlib.pyplot as plt
+from scipy.integrate import solve_ivp
+from gmph.exterior import d, wedge, show
+
+t = sp.Symbol("t")
+m, I, a = sp.symbols("m I a", positive=True)
+X, Y, TH = sp.symbols("x y theta")
+omega_form = {(1,): -sp.sin(TH), (2,): sp.cos(TH)}       # индексы базисных форм — с 1
+print("ω∧dω =", show(wedge(omega_form, d(omega_form, (X, Y, TH))), ("dx", "dy", "dθ")))
+
+def lagrange_dalembert(L, q, constraints):
+    """Ускорения и множители из уравнений Даламбера–Лагранжа (связи — списки компонент ω^a_i)."""
+    qd = [sp.diff(qi, t) for qi in q]
+    qdd = [sp.diff(qi, t, 2) for qi in q]
+    lams = sp.symbols(f"lambda1:{len(constraints) + 1}")
+    eqs = [sp.diff(sp.diff(L, qd[i]), t) - sp.diff(L, q[i]) - sum(lam * w[i] for lam, w in zip(lams, constraints))
+           for i in range(len(q))]
+    eqs += [sp.diff(sum(w[i] * qd[i] for i in range(len(q))), t) for w in constraints]   # связь, продифференцированная по t
+    sol = sp.solve(eqs, qdd + list(lams), dict=True)[0]
+    return [sol[s] for s in qdd], [sol[lam] for lam in lams]
+
+x, y, th = (sp.Function(name)(t) for name in ("x", "y", "theta"))
+x_c, y_c = x + a * sp.cos(th), y + a * sp.sin(th)
+L = m / 2 * (sp.diff(x_c, t)**2 + sp.diff(y_c, t)**2) + I / 2 * sp.diff(th, t)**2
+acc, (lam,) = lagrange_dalembert(L, [x, y, th], [[-sp.sin(th), sp.cos(th), 0]])
+
+# переменные тела: скорость вдоль лезвия v и угловая скорость Ω
+v, W = sp.symbols("v Omega")
+body = {sp.diff(x, t): v * sp.cos(th), sp.diff(y, t): v * sp.sin(th), sp.diff(th, t): W}
+v_dot = sp.simplify((sp.diff(sp.cos(th) * sp.diff(x, t) + sp.sin(th) * sp.diff(y, t), t)
+                     .subs({sp.diff(x, t, 2): acc[0], sp.diff(y, t, 2): acc[1]})).subs(body))
+W_dot = sp.simplify(acc[2].subs(body))
+print("v̇ =", v_dot, "   Ω̇ =", W_dot, "   λ =", sp.simplify(lam.subs(body)))
+```
+
+Получились **уравнения Чаплыгина**
+$$
+\dot v = a\,\Omega^2, \qquad \dot\Omega = -\frac{ma\,v\,\Omega}{I + ma^2},
+$$
+а множитель $\lambda = \frac{Im\,v\Omega}{I + ma^2}$ — поперечная сила реакции лезвия. Энергия
+$E = \frac12mv^2 + \frac12(I + ma^2)\Omega^2$ сохраняется, и из неё следует точное решение: при
+$J = I + ma^2$, $V = \sqrt{2E/m}$
+$$
+\dot v = \frac{am}{J}(V^2 - v^2) \quad\Longrightarrow\quad v(t) = V\tanh\frac{amV(t - t_0)}{J} .
+$$
+
+```{python}
+J = I + m * a**2
+E = m * v**2 / 2 + J * W**2 / 2
+print("Ė =", sp.simplify(sp.diff(E, v) * v_dot + sp.diff(E, W) * W_dot))
+
+V, t0 = sp.symbols("V t_0", positive=True)
+v_exact = V * sp.tanh(a * m * V * (t - t0) / J)
+W_squared = (m * V**2 - m * v_exact**2) / J                     # из закона сохранения энергии
+print("v̇ − aΩ² на точном решении:", sp.simplify(sp.diff(v_exact, t) - a * W_squared))
+```
+
+Это решение показывает главное отличие от гамильтоновых систем. При
+$t\to\infty$ $v\to V$, $\Omega\to0$: **любое** движение (кроме вращения на месте) асимптотически
+становится прямолинейным движением вперёд, центром масс по ходу. Состояния
+$(v, 0)$ с $v > 0$ притягивают, с $v < 0$ — отталкивают. В гамильтоновой системе
+такого быть не может: по теореме Лиувилля фазовый объём сохраняется, и
+притягивающих множеств нет. Здесь же дивергенция поля $(\dot v, \dot\Omega)$ равна
+$-mav/J$ и отрицательна при движении вперёд (упражнение 5). Энергия при
+этом сохраняется — она просто перетекает из вращения в поступательное
+движение.
+
+```{python}
+#| label: fig-sleigh
+#| fig-cap: 'Сани Чаплыгина (m = 1, I = 0,5, a = 0,5). Слева: траектории в плоскости (v, Ω) лежат на эллипсах постоянной энергии E = 1 и E = 0,4 и идут от точки (−V, 0) к точке (V, 0); точки — начальные условия. Справа: путь точки опоры для трёх начальных условий с энергией E = 1 — при любом начальном вращении сани выходят на прямую.'
+par = {m: 1, I: sp.Rational(1, 2), a: sp.Rational(1, 2)}
+rhs_body = sp.lambdify((v, W), [v_dot.subs(par), W_dot.subs(par)])
+J_num = float(J.subs(par))
+
+def sleigh(state0, T=12):
+    """Интегрирование (x, y, θ, v, Ω) на отрезке [0, T]."""
+    def rhs(_, s):
+        dv, dW = rhs_body(s[3], s[4])
+        return [s[3] * np.cos(s[2]), s[3] * np.sin(s[2]), s[4], dv, dW]
+    return solve_ivp(rhs, (0, T), state0, rtol=1e-10, atol=1e-12, dense_output=True)
+
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4.2))
+for energy, style, color in ((1.0, "-", "tab:blue"), (0.4, "--", "tab:orange")):
+    Vmax = np.sqrt(2 * energy)
+    for phi0 in np.linspace(0, 2 * np.pi, 8, endpoint=False) + 0.3:     # точки на эллипсе энергии
+        v0, W0 = Vmax * np.cos(phi0), np.sqrt(2 * energy / J_num) * np.sin(phi0)
+        sol = sleigh([0, 0, 0, v0, W0])
+        tt = np.linspace(0, 12, 800)
+        ax1.plot(sol.sol(tt)[3], sol.sol(tt)[4], style, lw=1, color=color)
+        ax1.plot(v0, W0, "o", ms=3, color="k")
+ax1.set(xlabel="v", ylabel="Ω", title="плоскость (v, Ω)")
+ax1.axhline(0, color="gray", lw=0.5)
+for v0, W0 in ((-0.5, 1.6), (0.2, -1.9), (1.0, 1.4)):
+    W0 = np.sign(W0) * np.sqrt((2 - v0**2) / J_num)               # энергия E = 1
+    sol = sleigh([0, 0, 0, v0, W0], T=10)
+    tt = np.linspace(0, 10, 2000)
+    ax2.plot(sol.sol(tt)[0], sol.sol(tt)[1], lw=1.2, label=f"v₀ = {v0}, Ω₀ = {W0:.2f}")
+ax2.set(aspect="equal", xlabel="x", ylabel="y", title="путь точки опоры")
+ax2.legend(fontsize=8)
+plt.tight_layout()
+plt.show()
+
+sol = sleigh([0, 0, 0, -0.5, np.sqrt((2 - 0.25) / J_num)], T=30)
+end = sol.y[:, -1]
+print(f"при t = 30: v = {end[3]:.6f} (V = √2 = {np.sqrt(2):.6f}),  Ω = {end[4]:.1e},  "
+      f"E = {0.5 * end[3]**2 + 0.5 * J_num * end[4]**2:.10f}")
+```
+
+## Шар на вращающемся столе
+
+Однородный шар радиуса $r$ катится без проскальзывания по горизонтальному
+столу, который вращается с угловой скоростью $\Omega$ вокруг вертикальной оси
+$z$. Опыт поражает: шар, которому придали скорость, не улетает со стола,
+а ходит по окружности. Связь — скорость точки касания шара равна скорости
+точки стола под ней:
+$$
+\mathbf v + \boldsymbol\omega\times(-r\mathbf e_z) = \Omega\,\mathbf e_z\times\mathbf x ,
+$$
+где $\mathbf x$ и $\mathbf v$ — положение и скорость центра шара, $\boldsymbol\omega$ — его угловая скорость.
+Это три (по сути две горизонтальные) неголономные связи на конфигурационном пространстве
+$\R^2\times SO(3)$. Реакция — сила трения $\mathbf F$ в точке касания (и нормальная сила,
+уравновешенная весом). Уравнения Ньютона–Эйлера: $m\dot{\mathbf v} = \mathbf F$,
+$I\dot{\boldsymbol\omega} = (-r\mathbf e_z)\times\mathbf F$. Исключим силу и $\dot{\boldsymbol\omega}$, продифференцировав связь:
+
+```{python}
+r, Om, mass, Ib = sp.symbols("r Omega_t m I_b", positive=True)
+vx, vy, Fx, Fy = sp.symbols("v_x v_y F_x F_y")
+ez = sp.Matrix([0, 0, 1])
+v_vec, F_vec = sp.Matrix([vx, vy, 0]), sp.Matrix([Fx, Fy, 0])
+acc_c = F_vec / mass                                       # m v̇ = F
+omega_dot = (-r * ez).cross(F_vec) / Ib                    # I ω̇ = (−r e_z) × F
+# производная связи: v̇ + ω̇ × (−r e_z) = Ω e_z × v
+eq = acc_c + omega_dot.cross(-r * ez) - Om * ez.cross(v_vec)
+F_sol = sp.solve(list(eq[:2]), [Fx, Fy], dict=True)[0]
+a_c = sp.simplify(acc_c.subs(F_sol))
+print("v̇ =", list(a_c[:2]))
+k = sp.simplify(a_c[1] / (Om * vx))
+print("v̇ = k Ω e_z × v,  k = I/(I + m r²) =", k, ";  для сплошного шара k =", k.subs(Ib, sp.Rational(2, 5) * mass * r**2))
+```
+
+Ускорение центра $\dot{\mathbf v} = k\,\Omega\,\mathbf e_z\times\mathbf v$ перпендикулярно скорости: вектор $\mathbf v$
+равномерно вращается с угловой скоростью $k\Omega$. Значит, центр шара движется
+по окружности с частотой
+$$
+\omega_\text{орб} = \frac{I}{I + mr^2}\,\Omega = \frac27\,\Omega
+$$
+для сплошного шара — независимо от радиуса, массы и начальной
+скорости, в ту же сторону, что и стол. Радиус окружности $|\mathbf v_0|/\omega_\text{орб}$. Проверим
+полным интегрированием с вектором $\boldsymbol\omega$, найденным из связи, и силой
+трения, найденной из уравнений:
+
+```{python}
+#| label: fig-turntable
+#| fig-cap: 'Сплошной шар на столе, вращающемся против часовой стрелки с Ω = 1 (вид сверху, лабораторная система). Шар стартует из точки (0,2; 0) с разными скоростями центра v₀; каждая траектория — окружность, проходимая за время 7π (частота 2Ω/7). Пунктир — край стола радиуса 1.'
+F_num = sp.lambdify((vx, vy, Om, mass, r, Ib), [F_sol[Fx], F_sol[Fy]])
+
+def ball(x0, v0, Omega=1.0, radius=0.05, T=None):
+    """Центр шара и его угловая скорость: интегрирование уравнений Ньютона–Эйлера с силой трения из связи."""
+    m_b, I_b = 1.0, 0.4 * radius**2
+    e_z = np.array([0.0, 0.0, 1.0])
+    x0, v0 = np.array([*x0, 0.0]), np.array([*v0, 0.0])
+    w0 = np.cross(e_z, v0 - Omega * np.cross(e_z, x0)) / radius   # из связи (ω_z = 0)
+    def rhs(_, s):
+        xx, vv, ww = s[:3], s[3:6], s[6:]
+        F = np.array([*F_num(vv[0], vv[1], Omega, m_b, radius, I_b), 0.0])
+        return np.concatenate([vv, F / m_b, np.cross(-radius * e_z, F) / I_b])
+    T = T or 7 * np.pi / Omega
+    sol = solve_ivp(rhs, (0, T), np.concatenate([x0, v0, w0]), rtol=1e-10, atol=1e-12, dense_output=True)
+    return sol
+
+fig, ax = plt.subplots(figsize=(5.2, 5))
+tt = np.linspace(0, 7 * np.pi, 600)
+for v0 in ((0.0, 0.1), (0.1, 0.0), (-0.06, -0.08)):
+    sol = ball((0.2, 0.0), v0)
+    ax.plot(sol.sol(tt)[0], sol.sol(tt)[1], lw=1.4, label=f"v₀ = {v0}")
+    # проверка связи в конце: скорость точки касания минус скорость стола
+    s = sol.y[:, -1]
+    slip = s[3:6] + np.cross(s[6:], [0, 0, -0.05]) - np.cross([0, 0, 1.0], s[:3])
+    print(f"v₀ = {v0}: возврат в старт через 7π: |Δx| = {np.hypot(s[0] - 0.2, s[1]):.1e},  "
+          f"нарушение связи {np.abs(slip).max():.1e},  радиус орбиты {np.hypot(sol.sol(tt)[0] - 0.2, sol.sol(tt)[1]).max() / 2:.4f} (|v₀|·7/2 = {np.hypot(*v0) * 3.5:.4f})")
+ax.add_patch(plt.Circle((0, 0), 1, fill=False, ls="--", color="gray"))
+ax.plot(0.2, 0, "ko", ms=4)
+ax.set(aspect="equal", xlim=(-1.1, 1.1), ylim=(-1.1, 1.1), xlabel="x", ylabel="y")
+ax.legend(fontsize=8, loc="lower left")
+plt.tight_layout()
+plt.show()
+```
+
+Проигрыватель на 33⅓ оборота в минуту ($T = 1{,}8$ с) заставит бильярдный шар
+обходить окружность за $\frac72\cdot1{,}8 = 6{,}3$ с. Если стол не вращается, $k\Omega = 0$, и шар
+катится по прямой, как и положено. Трение здесь не меняет скорость центра по
+величине ($\dot{\mathbf v}\perp\mathbf v$), а только поворачивает её — «закручивает» траекторию. Это
+вклад неголономной связи, которого нет ни у скользящей шайбы, ни у частицы.
+
+## Итоги
+
+- Связи на скорости $\omega^a(\dot q) = 0$ задают распределение; неинтегрируемое — неголономные связи.
+- Принцип Даламбера–Лагранжа: реакция — ковектор $\lambda_a\omega^a$, уравнения
+  $\frac{\dd}{\dd t}\partial_{\dot q}L - \partial_qL = \lambda_a\omega^a$; энергия сохраняется. Это не вариационный принцип:
+  «вакономный» подход даёт другие уравнения.
+- Сани Чаплыгина: $\dot v = a\Omega^2$, $\dot\Omega = -ma\,v\Omega/(I + ma^2)$; фазовый объём не сохраняется,
+  и все движения притягиваются к прямолинейному.
+- Шар на вращающемся столе ходит по окружности с частотой $\frac{I}{I + mr^2}\Omega = \frac27\Omega$.
+
+## Упражнения
+
+1. Вертикальный диск радиуса $R$ катится по плоскости: координаты $(x, y)$ точки
+   касания, курс $\theta$, угол поворота диска $\varphi$, связи $\dd x - R\cos\theta\,\dd\varphi = 0$,
+   $\dd y - R\sin\theta\,\dd\varphi = 0$. Проверьте неинтегрируемость условием Фробениуса.
+2. Для саней Чаплыгина найдите характерное время выхода на прямолинейное
+   движение при $m = 1$, $I = 0{,}5$, $a = 0{,}5$, $E = 1$.
+3. С какой частотой обходит окружность на вращающемся столе тонкостенный
+   полый шар ($I = \frac23mr^2$)?
+4. Докажите сохранение энергии для уравнений Даламбера–Лагранжа, если $L$ и
+   $\omega^a$ не зависят от времени.
+5. Найдите дивергенцию векторного поля $(\dot v, \dot\Omega)$ саней Чаплыгина. Где фазовая
+   площадь сжимается, где растягивается?
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. Пусть $\omega^1 = \dd x - R\cos\theta\,\dd\varphi$, $\omega^2 = \dd y - R\sin\theta\,\dd\varphi$. Тогда
+   $\dd\omega^1 = R\sin\theta\,\dd\theta\wedge\dd\varphi$, и
+   $\dd\omega^1\wedge\omega^1\wedge\omega^2 = R\sin\theta\,\dd\theta\wedge\dd\varphi\wedge\dd x\wedge\dd y \ne 0$
+   (при $\sin\theta = 0$ ненулевым будет $\dd\omega^2\wedge\omega^1\wedge\omega^2 = -R\cos\theta\,\dd\theta\wedge\dd\varphi\wedge\dd x\wedge\dd y$). Связи неголономны:
+   диск можно перевести в любое положение с любыми $\theta$, $\varphi$.
+2. Время $\tau = J/(amV)$, $J = I + ma^2 = 0{,}75$, $V = \sqrt{2E/m} = \sqrt2$: $\tau = 0{,}75/(0{,}5\sqrt2) \approx 1{,}06$.
+   Через несколько $\tau$ ($\tanh 5 \approx 0{,}9999$) движение практически прямолинейно.
+3. $k = \frac{2/3}{2/3 + 1} = \frac25$: частота $\frac25\Omega$, период $\frac52T_\text{стола}$.
+4. $\dot E = \frac{\dd}{\dd t}\bigl(\dot q^i\partial_{\dot q^i}L - L\bigr) = \dot q^i\bigl(\frac{\dd}{\dd t}\partial_{\dot q^i}L - \partial_{q^i}L\bigr) = \lambda_a\,\omega^a_i\dot q^i = 0$.
+5. $\partial\dot v/\partial v + \partial\dot\Omega/\partial\Omega = 0 - mav/(I + ma^2)$. При $v > 0$ (движение центром масс вперёд)
+   площадь сжимается, при $v < 0$ растягивается; поэтому $(V, 0)$ притягивает, $(-V, 0)$
+   отталкивает.
+:::
