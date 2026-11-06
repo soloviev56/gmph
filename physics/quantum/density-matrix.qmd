@@ -1,0 +1,285 @@
+---
+title: "Матрица плотности"
+topic: density-matrix
+order: 16
+description: "Смешанное состояние как положительный оператор со следом 1; разные ансамбли — одна матрица; шар Блоха ρ = ½(1 + r·σ), |r| ≤ 1 ⇔ ρ ≥ 0, чистота (1 + r²)/2; выпуклое множество состояний, чистые — крайние точки; уравнение фон Неймана: вектор Блоха вращается, ṙ = ω e_z × r; редуцированная матрица плотности и частичный след; разложение Шмидта через сингулярное разложение, энтропия запутанности; декогеренция: уравнение Линдблада, дефазировка (T₂) и релаксация (T₁) — вектор Блоха уходит внутрь шара (рисунок); тепловое состояние как максимум энтропии"
+---
+
+Вектор состояния описывает систему, о которой известно всё, что
+вообще можно знать. На практике так бывает редко. Источник частиц
+выдаёт их в случайных состояниях; спин электрона в атоме связан с
+остальными электронами; кубит в квантовом компьютере взаимодействует с
+окружением. Во всех этих случаях система описывается не вектором, а
+**оператором** — матрицей плотности. Геометрия здесь наглядна: если чистые
+состояния кубита — точки сферы Блоха, то смешанные заполняют шар.
+
+Используются [постулаты квантовой механики](/physics/quantum/qm-postulates.qmd) и
+[спин](/physics/quantum/spin.qmd); $\hbar = 1$.
+
+## Смешанные состояния
+
+Пусть система с вероятностью $p_k$ находится в нормированном состоянии $|\psi_k\rangle$.
+Среднее наблюдаемой
+$$
+\langle A\rangle = \sum_kp_k\langle\psi_k|A|\psi_k\rangle = \operatorname{tr}(\rho A), \qquad \rho = \sum_kp_k|\psi_k\rangle\langle\psi_k| .
+$$
+Все предсказания зависят только от $\rho$, а не от того, каким ансамблем она
+получена.
+
+::: {#def-density-matrix}
+**Матрица плотности** (оператор плотности) — оператор $\rho$ на гильбертовом
+пространстве, который
+- самосопряжён и **положителен**: $\langle\varphi|\rho|\varphi\rangle \ge 0$ для всех $\varphi$;
+- имеет **след 1**: $\operatorname{tr}\rho = 1$.
+
+Состояние **чистое**, если $\rho = |\psi\rangle\langle\psi|$ (эквивалентно $\rho^2 = \rho$ или $\operatorname{tr}\rho^2 = 1$), иначе
+**смешанное**. **Чистота** $\operatorname{tr}\rho^2\le1$; **энтропия фон Неймана** $S = -\operatorname{tr}\rho\ln\rho$.
+:::
+
+Множество матриц плотности **выпукло**: смесь $\lambda\rho_1 + (1 - \lambda)\rho_2$ — снова матрица
+плотности. Чистые состояния — его крайние точки: их нельзя
+представить как нетривиальную смесь. Но смешанное состояние
+раскладывается в смесь чистых **неоднозначно**. Неполяризованный пучок —
+это и «половина вверх, половина вниз» по $z$, и то же по $x$:
+
+```{python}
+import numpy as np
+import sympy as sp
+import matplotlib.pyplot as plt
+from scipy.integrate import solve_ivp
+from scipy.linalg import expm, logm
+
+sx = sp.Matrix([[0, 1], [1, 0]])
+sy = sp.Matrix([[0, -sp.I], [sp.I, 0]])
+sz = sp.Matrix([[1, 0], [0, -1]])
+pauli = (sx, sy, sz)
+
+def projector(psi):
+    psi = sp.Matrix(psi)
+    return psi * psi.H / (psi.H * psi)[0]
+
+up, down = [1, 0], [0, 1]
+plus, minus = [1, 1], [1, -1]
+rho_z = (projector(up) + projector(down)) / 2
+rho_x = (projector(plus) + projector(minus)) / 2
+print("ансамбль по z:", rho_z.tolist(), "  ансамбль по x:", rho_x.tolist())
+```
+
+## Шар Блоха
+
+Для кубита любая эрмитова матрица со следом 1 записывается как
+$$
+\rho = \frac12\bigl(1 + \mathbf r\cdot\boldsymbol\sigma\bigr), \qquad \mathbf r = \operatorname{tr}(\rho\,\boldsymbol\sigma) ,
+$$
+где $\mathbf r$ — **вектор Блоха** (для чистого состояния это $\langle\psi|\boldsymbol\sigma|\psi\rangle$). Собственные
+значения $\rho$ равны $\frac12(1\pm|\mathbf r|)$, поэтому положительность равносильна $|\mathbf r|\le1$:
+состояния кубита — **шар Блоха**. На границе ($|\mathbf r| = 1$) — чистые состояния,
+в центре — полностью смешанное $\rho = \frac12$.
+
+```{python}
+x, y, z = sp.symbols("x y z", real=True)
+rho = (sp.eye(2) + x * sx + y * sy + z * sz) / 2
+rr = sp.sqrt(x**2 + y**2 + z**2)
+print("собственные значения:", [sp.simplify(ev) for ev in rho.eigenvals()])
+print("tr ρ² =", sp.simplify((rho * rho).trace()), "= (1 + r²)/2")
+print("tr(ρσ) =", [sp.simplify((rho * s).trace()) for s in pauli])
+```
+
+Чистота $\operatorname{tr}\rho^2 = \frac12(1 + r^2)$ измеряет расстояние до центра шара, а энтропия
+$S = -\lambda_+\ln\lambda_+ - \lambda_-\ln\lambda_-$ меняется от 0 на сфере до $\ln2$ в центре. Разные ансамбли,
+дающие одну точку шара, — разные способы представить эту точку
+центром масс точек сферы с весами $p_k$.
+
+Для систем с $n > 2$ уровнями множество состояний — выпуклое тело
+размерности $n^2 - 1$, но уже не шар: чистые состояния ($\mathbb{CP}^{n-1}$, размерность
+$2n - 2$) составляют лишь малую часть его границы.
+
+**Эволюция.** Из уравнения Шрёдингера $\rho(t) = U\rho\,U^\dagger$, $U = e^{-iHt}$, то есть
+$$
+\dot\rho = -i\,[H, \rho] \qquad\text{(уравнение фон Неймана)}.
+$$
+Унитарная эволюция сохраняет спектр $\rho$, а с ним чистоту и энтропию. Для
+$H = \frac\omega2\sigma_z$ вектор Блоха вращается вокруг оси $z$:
+
+```{python}
+omega_ = sp.Symbol("omega", positive=True)
+H = omega_ / 2 * sz
+rho_dot = -sp.I * (H * rho - rho * H)
+r_dot = sp.Matrix([sp.simplify((rho_dot * s).trace()) for s in pauli])
+print("ṙ =", list(r_dot), "  ω e_z × r =", list(sp.Matrix([0, 0, omega_]).cross(sp.Matrix([x, y, z]))))
+```
+
+## Подсистемы и запутанность
+
+Главный источник смешанных состояний — **часть** большой системы в
+чистом состоянии. Если состояние системы $AB$ есть $|\Psi\rangle\in\mathcal H_A\otimes\mathcal H_B$, то
+средние наблюдаемых вида $A\otimes1$ даёт **редуцированная матрица плотности**
+$$
+\rho_A = \operatorname{tr}_B|\Psi\rangle\langle\Psi|, \qquad (\rho_A)_{ii'} = \sum_j\Psi_{ij}\,\bar\Psi_{i'j},
+$$
+то есть $\rho_A = \Psi\Psi^\dagger$, если записать коэффициенты $\Psi_{ij}$ в матрицу.
+
+::: {#def-schmidt}
+**Разложение Шмидта.** Любое $|\Psi\rangle\in\mathcal H_A\otimes\mathcal H_B$ записывается как
+$$
+|\Psi\rangle = \sum_k\sqrt{\lambda_k}\;|a_k\rangle\otimes|b_k\rangle
+$$
+с ортонормированными $|a_k\rangle$, $|b_k\rangle$ и $\lambda_k\ge0$, $\sum\lambda_k = 1$. Это сингулярное разложение матрицы $\Psi_{ij}$.
+Состояние **запутано**, если в разложении больше одного слагаемого. **Энтропия
+запутанности** $S(\rho_A) = S(\rho_B) = -\sum\lambda_k\ln\lambda_k$.
+:::
+
+Из разложения Шмидта сразу следует, что $\rho_A$ и $\rho_B$ имеют одинаковые
+ненулевые собственные значения $\lambda_k$, даже если размерности $\mathcal H_A$ и $\mathcal H_B$ разные.
+Проверим на случайном состоянии кубита и кутрита и посчитаем энтропию
+запутанности семейства $\cos\theta|00\rangle + \sin\theta|11\rangle$:
+
+```{python}
+rng = np.random.default_rng(3)
+Psi = rng.normal(size=(2, 3)) + 1j * rng.normal(size=(2, 3))
+Psi /= np.linalg.norm(Psi)
+rho_A, rho_B = Psi @ Psi.conj().T, Psi.T @ Psi.conj()          # частичные следы
+schmidt = np.linalg.svd(Psi, compute_uv=False)**2
+print("λ (Шмидт):", np.round(schmidt, 6))
+print("спектр ρ_A:", np.round(np.linalg.eigvalsh(rho_A)[::-1], 6), "  спектр ρ_B:", np.round(np.linalg.eigvalsh(rho_B)[::-1].clip(0), 6) + 0.0)
+
+def entropy(rho_m):
+    w = np.linalg.eigvalsh(rho_m)
+    w = w[w > 1e-15]
+    return max(0.0, float(-(w * np.log(w)).sum()))
+
+for theta_deg in (0, 15, 30, 45):
+    th = np.radians(theta_deg)
+    state = np.array([[np.cos(th), 0], [0, np.sin(th)]])
+    print(f"θ = {theta_deg:2d}°: S(ρ_A) = {entropy(state @ state.T):.4f}" + ("  = ln 2" if theta_deg == 45 else ""))
+```
+
+При $\theta = 45°$ (состояние Белла) $\rho_A = \frac12$: подсистема находится в центре шара
+Блоха, хотя вся система в чистом состоянии. Всё, что можно узнать о ней,
+содержится в корреляциях с партнёром. Геометрически: частичный след —
+проекция, и чистые состояния большой системы проецируются внутрь шара.
+
+## Декогеренция
+
+Если система взаимодействует с окружением, её редуцированная матрица
+плотности эволюционирует не унитарно. При слабой связи и коротких
+временах корреляций окружения получается **уравнение Линдблада**
+$$
+\dot\rho = -i[H, \rho] + \sum_k\Bigl(L_k\rho L_k^\dagger - \frac12\{L_k^\dagger L_k, \rho\}\Bigr) ,
+$$
+наиболее общее марковское уравнение, сохраняющее след и положительность.
+Для кубита важны два процесса:
+
+- **дефазировка** $L = \sqrt{\gamma/2}\,\sigma_z$ (случайные сдвиги частоты): затухают $x$ и $y$ со
+  скоростью $\gamma = 1/T_2$;
+- **релаксация** $L = \sqrt\Gamma\,\sigma_-$, $\sigma_- = |1\rangle\langle0|$ (спонтанный переход в нижнее
+  состояние $|1\rangle$, $z = -1$): $z\to-1$ со скоростью $\Gamma = 1/T_1$, а $x$, $y$ затухают со
+  скоростью $\Gamma/2$.
+
+```{python}
+g_, G_ = sp.symbols("gamma Gamma", positive=True)
+sm = sp.Matrix([[0, 0], [1, 0]])                                  # σ₋ = |1⟩⟨0|
+
+def lindblad_term(L, rho_m):
+    return L * rho_m * L.H - (L.H * L * rho_m + rho_m * L.H * L) / 2
+
+for name, L in (("дефазировка", sp.sqrt(g_ / 2) * sz), ("релаксация", sp.sqrt(G_) * sm)):
+    d_rho = lindblad_term(L, rho)
+    print(f"{name:12}: ṙ =", [sp.simplify((d_rho * s).trace()) for s in pauli])
+```
+
+Вектор Блоха уходит внутрь шара: чистое состояние становится смешанным,
+а суперпозиция $|0\rangle + |1\rangle$ — смесью без интерференции. Это и есть
+**декогеренция**; её время для макроскопических суперпозиций ничтожно,
+поэтому они и не наблюдаются. Совместим прецессию с обоими процессами:
+
+```{python}
+#| label: fig-bloch-decay
+#| fig-cap: 'Вектор Блоха кубита при прецессии вокруг оси z (ω = 2π) с дефазировкой γ = 0,3 и релаксацией Γ = 0,1 (начальное состояние (|0⟩ + |1⟩)/√2, r = (1, 0, 0)). Слева: проекция на плоскость (x, y) — спираль к оси; справа: длина |r| и чистота tr ρ² как функции времени. Состояние стремится к нижнему полюсу z = −1, снова чистому.'
+omega_n, gamma_n, Gamma_n = 2 * np.pi, 0.3, 0.1
+
+def bloch_rhs(_, r):
+    x_, y_, z_ = r
+    rate_xy = gamma_n + Gamma_n / 2
+    return [-omega_n * y_ - rate_xy * x_, omega_n * x_ - rate_xy * y_, -Gamma_n * (z_ + 1)]
+
+T = 40
+tt = np.linspace(0, T, 4000)
+sol = solve_ivp(bloch_rhs, (0, T), [1, 0, 0], t_eval=tt, rtol=1e-10, atol=1e-12)
+length = np.linalg.norm(sol.y, axis=0)
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
+ax1.plot(sol.y[0], sol.y[1], lw=0.8)
+ax1.add_patch(plt.Circle((0, 0), 1, fill=False, ls="--", color="gray"))
+ax1.set(aspect="equal", xlabel="x", ylabel="y", xlim=(-1.1, 1.1), ylim=(-1.1, 1.1))
+ax2.plot(tt, length, label="|r|")
+ax2.plot(tt, (1 + length**2) / 2, label="tr ρ²")
+ax2.plot(tt, sol.y[2], label="z")
+ax2.set(xlabel="t", ylim=(-1.05, 1.05))
+ax2.legend()
+plt.tight_layout()
+plt.show()
+i_min = np.argmin(length)
+print(f"минимум |r| = {length[i_min]:.3f} при t = {tt[i_min]:.2f};  при t = {T}: r = {np.round(sol.y[:, -1], 4)}")
+```
+
+Длина вектора Блоха сначала падает (до 0,41 при $t\approx4$: состояние
+сильно смешано), затем растёт: релаксация переводит кубит в нижнее
+состояние, снова чистое. Окружение при нулевой температуре — это
+«холодильник», который знает, куда сбросить энергию.
+
+## Тепловое состояние
+
+Если о системе известна только средняя энергия, честное описание —
+состояние с **максимальной энтропией** при этом условии. Вариация
+$S - \beta\operatorname{tr}(\rho H) - \mu\operatorname{tr}\rho$ даёт распределение Гиббса
+$$
+\rho = \frac{e^{-\beta H}}{Z}, \qquad Z = \operatorname{tr}e^{-\beta H} .
+$$
+Проверим для кубита $H = \frac\omega2\sigma_z$: у теплового состояния $z = -\operatorname{th}(\beta\omega/2)$, и
+любое другое состояние с той же энергией (тем же $z$, но $x, y\ne0$) имеет
+меньшую энтропию:
+
+```{python}
+beta, om = 2.0, 1.0
+H_n = om / 2 * np.diag([1.0, -1.0])
+rho_th = expm(-beta * H_n) / np.trace(expm(-beta * H_n))
+z_th = np.trace(rho_th @ np.diag([1.0, -1.0])).real
+print(f"z = {z_th:.6f},  −th(βω/2) = {-np.tanh(beta * om / 2):.6f},  S = {entropy(rho_th):.6f}")
+for x_extra in (0.1, 0.3, 0.5):
+    rho_other = 0.5 * (np.eye(2) + x_extra * np.array([[0, 1], [1, 0]]) + z_th * np.diag([1.0, -1.0]))
+    print(f"  та же энергия, x = {x_extra}: S = {entropy(rho_other):.6f}")
+```
+
+## Итоги
+
+- Смешанное состояние — положительный оператор $\rho$ со следом 1, $\langle A\rangle = \operatorname{tr}\rho A$;
+  разложение в смесь чистых неоднозначно.
+- Кубит: $\rho = \frac12(1 + \mathbf r\cdot\boldsymbol\sigma)$, шар Блоха $|\mathbf r|\le1$, чистота $\frac12(1 + r^2)$; множество
+  состояний выпукло, чистые — крайние точки.
+- Редуцированная матрица $\rho_A = \operatorname{tr}_B|\Psi\rangle\langle\Psi|$; разложение Шмидта = сингулярное
+  разложение; энтропия запутанности $-\sum\lambda_k\ln\lambda_k$.
+- Уравнение Линдблада: дефазировка ($T_2$) и релаксация ($T_1$) уводят вектор Блоха
+  внутрь шара — декогеренция.
+- Тепловое состояние $e^{-\beta H}/Z$ — максимум энтропии при заданной энергии.
+
+## Упражнения
+
+1. Источник выдаёт $|0\rangle$ и $|+\rangle = (|0\rangle + |1\rangle)/\sqrt2$ с вероятностью $\frac12$. Найдите $\rho$, вектор
+   Блоха, собственные значения и чистоту.
+2. Докажите, что $\operatorname{tr}\rho^2\le1$, причём равенство только для чистых состояний.
+3. Найдите редуцированную матрицу плотности одного спина в синглетном
+   состоянии $(|01\rangle - |10\rangle)/\sqrt2$ и её энтропию.
+4. При каком $\theta$ энтропия запутанности состояния $\cos\theta|00\rangle + \sin\theta|11\rangle$ равна
+   половине максимальной ($\frac12\ln2$)?
+5. Решите уравнения Блоха с прецессией $\omega$ и дефазировкой $\gamma$ (без
+   релаксации) для $x(t)$, $y(t)$.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $\rho = \frac12\begin{pmatrix}3/2 & 1/2\\ 1/2 & 1/2\end{pmatrix}$, $\mathbf r = (\frac12, 0, \frac12)$, $|\mathbf r| = 1/\sqrt2$; собственные значения
+   $\frac12(1\pm1/\sqrt2)\approx0{,}854$ и $0{,}146$; чистота $\frac12(1 + \frac12) = \frac34$.
+2. $\operatorname{tr}\rho^2 = \sum p_k^2\le\sum p_k = 1$ для собственных значений $0\le p_k\le1$; равенство — когда одно $p_k = 1$.
+3. $\rho_A = \frac12$ (центр шара Блоха), $S = \ln2$ — синглет максимально запутан.
+4. Нужно $-c^2\ln c^2 - s^2\ln s^2 = \frac12\ln2$ ($c = \cos\theta$, $s = \sin\theta$); численно $s^2\approx0{,}110$, $\theta\approx19{,}4°$.
+5. $x + iy = (x_0 + iy_0)\,e^{(i\omega - \gamma)t}$: вращение против часовой стрелки с затуханием, $z$ постоянно.
+:::
