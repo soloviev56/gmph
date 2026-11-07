@@ -1,0 +1,337 @@
+---
+title: "Калибровочные преобразования"
+topic: gauge-transformations
+order: 5
+description: "Калибровка как смена локального сечения главного расслоения (пассивная точка зрения) и как вертикальный автоморфизм (активная); калибровочная группа — функции U(x) со значениями в G; законы 𝒜 → U𝒜U⁻¹ + i dU U⁻¹, ℱ → UℱU⁻¹, Dψ → U Dψ и их проверка для SU(2) (модуль gmph.gauge); композиция, инфинитезимальные преобразования δ𝒜 = −Dε, δℱ = i[ε, ℱ]; чистая калибровка и плоские связности, препятствие — голономия; петли Вильсона W → U W U⁻¹ и инвариантность tr W (численная проверка); наблюдаемые неабелевой теории: компонента ℱ меняется, tr ℱ² — нет (рисунок); фиксация калибровки: аксиальная через перенос, кулоновская для абелева поля через БПФ; большие калибровочные преобразования: e^{inφ} на окружности, число намотки отображения S³ → SU(2), ёж с F(0) = π"
+---
+
+В электродинамике потенциал определён с точностью до градиента, а
+волновая функция — с точностью до фазы:
+$\psi\to e^{i\alpha(x)}\psi$, $\mathcal A\to\mathcal A - \dd\alpha$ не меняет ни уравнений, ни наблюдаемых. В
+статьях о [связностях](/math/bundles/bundle-connections.qmd) и [главных
+расслоениях](/math/bundles/principal-bundles.qmd) этот закон появился как
+следствие смены тривиализации. Здесь калибровочные преобразования
+рассматриваются как самостоятельный объект: они образуют
+бесконечномерную группу, её действие на связностях определяет, что в
+калибровочной теории наблюдаемо, а глобальная топология группы даёт
+«большие» преобразования, которые нельзя получить из малых.
+
+Обозначения — физические, из [конвенций](/conventions.qmd) (раздел «Калибровочные поля»):
+$D_\mu = \partial_\mu + i\mathcal A_\mu$, $\mathcal A_\mu$ — эрмитовы матрицы, связь с математической формой связности
+$A = i\mathcal A$. Используются [главные расслоения](/math/bundles/principal-bundles.qmd) и
+[связность в векторном расслоении](/math/bundles/bundle-connections.qmd).
+
+## Две точки зрения
+
+**Пассивная.** Поле материи — сечение ассоциированного расслоения; его
+компоненты $\psi$ записаны в тривиализации, заданной локальным сечением $s$
+главного расслоения. Другое сечение $s' = s\,h(x)$ даёт другие компоненты,
+$\psi' = \rho(h)^{-1}\psi$ (статья о [главных расслоениях](/math/bundles/principal-bundles.qmd)). Обозначив $U = \rho(h)^{-1}$,
+получаем $\psi\to U\psi$: калибровочное преобразование — это смена «системы
+отсчёта» в каждом слое, выбранная независимо в каждой точке.
+
+**Активная.** Тривиализацию оставим, а сдвинем само расслоение.
+
+::: {#def-gauge-transformation}
+**Калибровочное преобразование** главного $G$-расслоения $P\to M$ — диффеоморфизм
+$\Phi: P\to P$, сохраняющий слои и перестановочный с действием группы:
+$$
+\pi\circ\Phi = \pi, \qquad \Phi(pg) = \Phi(p)\,g .
+$$
+Такие преобразования образуют **калибровочную группу** $\mathcal G$. В тривиализации
+$\Phi(s(x)) = s(x)\,u(x)$ с функцией $u: U\to G$, и при смене сечения $u$ преобразуется
+сопряжением; поэтому $\mathcal G$ — это сечения расслоения $P\times_GG$ со слоем $G$ и
+действием $g\cdot u = gug^{-1}$. Произведение в $\mathcal G$ — поточечное.
+:::
+
+Над тривиальным расслоением (в одной карте) калибровочная группа — это
+просто функции $U(x)$ со значениями в $G$; формулы обеих точек зрения
+совпадают, и дальше мы работаем с ними. Группа $\mathcal G$ бесконечномерна: в
+каждой точке пространства-времени — своя копия $G$.
+
+## Законы преобразования
+
+Из требования $(D_\mu\psi)' = U\,D_\mu\psi$ ([конвенции](/conventions.qmd)) получаются законы
+$$
+\psi\to U\psi, \qquad \mathcal A_\mu\to U\mathcal A_\mu U^{-1} + i\,(\partial_\mu U)\,U^{-1}, \qquad \mathcal F_{\mu\nu}\to U\mathcal F_{\mu\nu}U^{-1} .
+$$
+Функции `gauge_transform`, `field_strength` и `adjoint_derivative` модуля `gmph.gauge`
+реализуют эти формулы. Проверим их для группы $\mathrm{SU}(2)$ на конкретной
+неплоской связности в плоскости $(x, y)$: ковариантность $D\psi$, закон
+композиции (сначала $U_1$, потом $U_2$ — то же, что $U_2U_1$) и обращение кривизны в
+нуль у чистой калибровки. Тригонометрию с матрицами SymPy упрощает
+медленно, поэтому тождества проверяются в точках с точностью 30 знаков:
+
+```{python}
+import numpy as np
+import sympy as sp
+import matplotlib.pyplot as plt
+from gmph.gauge import gauge_transform, field_strength, adjoint_derivative, wilson_line
+
+x, y = sp.symbols("x y", real=True)
+sigma = [sp.Matrix([[0, 1], [1, 0]]), sp.Matrix([[0, -sp.I], [sp.I, 0]]), sp.Matrix([[1, 0], [0, -1]])]
+
+def su2(angle, n):
+    """exp(i·angle·n·σ) для единичного вектора n — элемент SU(2)."""
+    return sp.cos(angle) * sp.eye(2) + sp.I * sp.sin(angle) * sum((ni * s for ni, s in zip(n, sigma)), sp.zeros(2))
+
+points = [{x: sp.Rational(1, 3), y: sp.Rational(-2, 7)}, {x: sp.Rational(5, 4), y: sp.Rational(3, 2)}]
+
+def max_at_points(M):
+    """Наибольший модуль элементов матрицы в контрольных точках."""
+    return max(float(abs(sp.N(v.subs(p), 30))) for p in points for v in M)
+
+A = [(x * y * sigma[0] + (1 - x) * sigma[2]) / 2, (y**2 * sigma[1] + x * sigma[0] - y * sigma[2]) / 3]
+U1, U2 = su2(x, (1, 0, 0)), su2(x * y, (0, 0, 1))
+U = U2 * U1
+A_U = gauge_transform(A, U, (x, y), simplify=False)
+
+psi = sp.Matrix([x**2 + sp.I * y, 1 - x * y])
+cov = max(max_at_points((U * psi).diff(c) + sp.I * A_U[m] * (U * psi) - U * (psi.diff(c) + sp.I * A[m] * psi))
+          for m, c in enumerate((x, y)))
+twice = gauge_transform(gauge_transform(A, U1, (x, y), simplify=False), U2, (x, y), simplify=False)
+comp = max(max_at_points(a - b) for a, b in zip(twice, A_U))
+F = field_strength(A, (x, y))[(0, 1)]
+F_U = field_strength(A_U, (x, y), simplify=False)[(0, 1)]
+pure = field_strength(gauge_transform([sp.zeros(2)] * 2, U, (x, y), simplify=False), (x, y), simplify=False)[(0, 1)]
+print(f"(Dψ)' − U Dψ:          {cov:.0e}")
+print(f"U₂ после U₁ − (U₂U₁):  {comp:.0e}")
+print(f"ℱ' − UℱU⁻¹:            {max_at_points(F_U - U * F * U.inv()):.0e}")
+print(f"ℱ чистой калибровки:   {max_at_points(pure):.0e}")
+```
+
+**Инфинитезимальные преобразования.** При $U = 1 + i\varepsilon$, $\varepsilon(x)$ — эрмитова матрица
+(элемент алгебры Ли), в первом порядке
+$$
+\delta\psi = i\varepsilon\psi, \qquad \delta\mathcal A_\mu = -D_\mu\varepsilon \equiv -\bigl(\partial_\mu\varepsilon + i[\mathcal A_\mu, \varepsilon]\bigr), \qquad \delta\mathcal F_{\mu\nu} = i[\varepsilon, \mathcal F_{\mu\nu}] .
+$$
+Связность сдвигается на ковариантную производную параметра — в
+абелевом случае просто на $-\partial_\mu\varepsilon$, а кривизна поворачивается в
+присоединённом представлении:
+
+```{python}
+e = sp.Symbol("e")
+eps = x * sigma[2] + y**2 * sigma[0] - x * y * sigma[1]
+A_e = gauge_transform(A, sp.eye(2) + sp.I * e * eps, (x, y), simplify=False)
+first_order = lambda M: M.applyfunc(lambda z: sp.diff(z, e).subs(e, 0))
+for m, D in enumerate(adjoint_derivative(A, eps, (x, y))):
+    print(f"δ𝒜_{'xy'[m]} + D_{'xy'[m]}ε =", sp.expand(first_order(A_e[m] - A[m]) + D).tolist())
+F_e = field_strength(A_e, (x, y), simplify=False)[(0, 1)]
+print("δℱ − i[ε, ℱ] =", sp.expand(first_order(F_e) - sp.I * (eps * F - F * eps)).tolist())
+```
+
+## Чистая калибровка и плоские связности
+
+Связность, полученная из нулевой, $\mathcal A = i\,\dd U\,U^{-1}$, называется **чистой
+калибровкой**; её кривизна равна нулю (последняя строка первой ячейки).
+Обратно, если $\mathcal F = 0$ в односвязной области, связность — чистая калибровка:
+перенос $W(x_0\to x)$ не зависит от пути, и $U(x) = W(x_0\to x)^{-1}$ переводит $\mathcal A$ в нуль.
+Без односвязности это неверно: на окружности абелева связность $\mathcal A = a\,\dd\varphi$
+плоская при любом $a$, но $\mathcal A - \dd\alpha = 0$ требует $\alpha = a\varphi$, и функция $e^{ia\varphi}$
+однозначна только при целом $a$. Препятствие — **голономия** $e^{-2\pi ia}$: плоская
+связность вокруг соленоида в эффекте [Ааронова–Бома](/physics/quantum/aharonov-bohm.qmd) не сводится к нулю
+никакой калибровкой.
+
+## Петли Вильсона
+
+Перенос вдоль кривой $x(t)$ — решение $\dot W = -i\mathcal A_\mu\dot x^\mu W$, $W(t_0) = 1$ (функция `wilson_line`).
+Поскольку $\psi\to U\psi$ в обоих концах,
+$$
+W[C]\to U(x_1)\,W[C]\,U(x_0)^{-1}, \qquad\text{для замкнутой петли}\quad W\to U(x_0)\,W\,U(x_0)^{-1} .
+$$
+Сама голономия меняется сопряжением, а её след — **петля Вильсона**
+$\operatorname{tr}W[C]$ — калибровочно инвариантен. Проверим численно: перенесём по
+окружностям радиуса $R$ в исходной калибровке и после преобразования
+$U(x, y)$, зависящего от точки:
+
+```{python}
+U_big = su2((x**2 + y**2) / 2, (sp.Rational(3, 5), 0, sp.Rational(4, 5))) * su2(x - y, (0, 1, 0))
+A_big = gauge_transform(A, U_big, (x, y), simplify=False)
+A_num, A_big_num = sp.lambdify((x, y), A, "numpy"), sp.lambdify((x, y), A_big, "numpy")
+U_num = sp.lambdify((x, y), U_big, "numpy")
+
+for R in (0.5, 1.0, 1.5):
+    path = lambda t: (R * np.cos(t), R * np.sin(t))
+    velocity = lambda t: (-R * np.sin(t), R * np.cos(t))
+    W = wilson_line(lambda p: A_num(*p), path, velocity, 0, 2 * np.pi)
+    W_big = wilson_line(lambda p: A_big_num(*p), path, velocity, 0, 2 * np.pi)
+    U0 = np.array(U_num(R, 0.0), dtype=complex)
+    print(f"R = {R}: tr W = {np.trace(W).real:+.10f}, после преобразования {np.trace(W_big).real:+.10f};"
+          f"  |W' − U W U⁻¹| = {np.abs(W_big - U0 @ W @ np.linalg.inv(U0)).max():.0e},  |W' − W| = {np.abs(W_big - W).max():.2f}")
+```
+
+Матрицы голономии в двух калибровках заметно различаются ($|W' - W|$ порядка
+единицы), а их следы совпадают с точностью интегрирования.
+
+Так же обстоит дело с полем в точке. В абелевой теории $\mathcal F$ инвариантна —
+электрическое и магнитное поля наблюдаемы. В неабелевой $\mathcal F\to U\mathcal FU^{-1}$:
+отдельная «цветовая» компонента $f^a = \frac12\operatorname{tr}(\sigma_a\mathcal F_{xy})$ зависит от калибровки, а
+инвариантны только величины вроде $\operatorname{tr}\mathcal F_{xy}^2$:
+
+```{python}
+#| label: fig-gauge-observables
+#| fig-cap: 'Неабелева кривизна в двух калибровках (одна и та же связность из текста, преобразование U(x, y) из ячейки с петлями Вильсона). Слева и в центре — компонента f³ = ½tr(σ₃ℱ_xy) до и после преобразования: картины совершенно разные. Справа — длина вектора f, |f|² = ½tr ℱ_xy², одинаковая в обеих калибровках (максимальное расхождение напечатано под рисунком).'
+F_num = sp.lambdify((x, y), F, "numpy")
+X, Y = np.meshgrid(np.linspace(-1.5, 1.5, 151), np.linspace(-1.5, 1.5, 151))
+f3, f3_U, inv, inv_U = (np.empty_like(X) for _ in range(4))
+for idx in np.ndindex(X.shape):
+    Fp = np.array(F_num(X[idx], Y[idx]), dtype=complex)
+    Up = np.array(U_num(X[idx], Y[idx]), dtype=complex)
+    Fp_U = Up @ Fp @ np.linalg.inv(Up)
+    f3[idx], f3_U[idx] = np.trace(np.diag([1, -1]) @ Fp).real / 2, np.trace(np.diag([1, -1]) @ Fp_U).real / 2
+    inv[idx], inv_U[idx] = np.trace(Fp @ Fp).real / 2, np.trace(Fp_U @ Fp_U).real / 2
+
+fig, axes = plt.subplots(1, 3, figsize=(11, 3.6), sharey=True)
+lim = np.abs([f3, f3_U]).max()
+for ax, data, title in zip(axes[:2], (f3, f3_U), ("f³, исходная калибровка", "f³, после U(x, y)")):
+    im = ax.pcolormesh(X, Y, data, cmap="RdBu_r", vmin=-lim, vmax=lim, shading="auto")
+    ax.set(title=title, xlabel="x", aspect="equal")
+fig.colorbar(im, ax=axes[:2], shrink=0.8)
+im2 = axes[2].pcolormesh(X, Y, np.sqrt(inv_U), cmap="viridis", shading="auto")
+axes[2].set(title="|f| = √(½tr ℱ²), обе", xlabel="x", aspect="equal")
+fig.colorbar(im2, ax=axes[2], shrink=0.8)
+axes[0].set_ylabel("y")
+plt.show()
+print(f"max |f³' − f³| = {np.abs(f3_U - f3).max():.2f},  max |tr ℱ'² − tr ℱ²|/2 = {np.abs(inv_U - inv).max():.0e}")
+```
+
+Наблюдаемые неабелевой калибровочной теории строятся из
+калибровочно-инвариантных комбинаций: петель Вильсона, $\operatorname{tr}\mathcal F_{\mu\nu}\mathcal F^{\mu\nu}$,
+$\bar\psi\psi$ и т. п.
+
+## Фиксация калибровки
+
+Калибровочно-эквивалентные связности описывают одно физическое
+состояние, поэтому физическое пространство конфигураций — это
+пространство орбит $\{\mathcal A\}/\mathcal G$. Для вычислений из каждой орбиты выбирают
+представителя, накладывая **условие калибровки**.
+
+- **Аксиальная калибровка** $\mathcal A_x = 0$: переносим репер вдоль линий $x$ из прямой $x = 0$
+  и берём $U(x, y) = W\bigl((0, y)\to(x, y)\bigr)^{-1}$. Тогда $\partial_xU = iU\mathcal A_x$, и $\mathcal A'_x = 0$ — так же, как
+  плоская связность сводится к нулю. Остаётся свобода $U(y)$, не зависящая от $x$.
+- **Кулоновская калибровка** $\nabla\cdot\boldsymbol{\mathcal A} = 0$ и **калибровка Лоренца** $\partial_\mu\mathcal A^\mu = 0$. В
+  абелевом случае условие линейно: из $\mathcal A' = \mathcal A - \dd\alpha$ следует уравнение Пуассона
+  $\nabla^2\alpha = \nabla\cdot\boldsymbol{\mathcal A}$ (в плоских координатах).
+
+Проверим кулоновскую калибровку на периодической сетке, решая
+уравнение для $\alpha$ быстрым преобразованием Фурье. Поле $B = \partial_x\mathcal A_y - \partial_y\mathcal A_x$ при
+этом не должно меняться:
+
+```{python}
+n_grid, L_box = 128, 2 * np.pi
+kx = np.fft.fftfreq(n_grid, d=L_box / n_grid) * 2 * np.pi
+KX, KY = np.meshgrid(kx, kx, indexing="ij")
+K2 = KX**2 + KY**2
+K2[0, 0] = 1.0                                           # нулевая гармоника α не нужна
+xs = np.arange(n_grid) * L_box / n_grid
+XX, YY = np.meshgrid(xs, xs, indexing="ij")
+Ax = np.sin(XX + 2 * YY) + 0.5 * np.cos(3 * XX) + 0.3
+Ay = np.cos(XX) * np.sin(YY) - 0.4 * np.sin(2 * XX - YY)
+
+def spectral(f, kfac):
+    return np.fft.ifft2(kfac * np.fft.fft2(f)).real
+
+div_A = spectral(Ax, 1j * KX) + spectral(Ay, 1j * KY)
+alpha_hat = -np.fft.fft2(div_A) / K2                     # ∇²α = ∇·𝒜
+alpha_hat[0, 0] = 0
+Ax_c = Ax - np.fft.ifft2(1j * KX * alpha_hat).real       # 𝒜' = 𝒜 − ∇α
+Ay_c = Ay - np.fft.ifft2(1j * KY * alpha_hat).real
+B = spectral(Ay, 1j * KX) - spectral(Ax, 1j * KY)
+B_c = spectral(Ay_c, 1j * KX) - spectral(Ax_c, 1j * KY)
+print(f"max|∇·𝒜| = {np.abs(div_A).max():.2f}  →  max|∇·𝒜'| = {np.abs(spectral(Ax_c, 1j * KX) + spectral(Ay_c, 1j * KY)).max():.0e}")
+print(f"max|B' − B| = {np.abs(B_c - B).max():.0e};  средние ⟨𝒜_x⟩ = {Ax_c.mean():.3f}, ⟨𝒜_y⟩ = {Ay_c.mean():+.3f} не изменились")
+```
+
+Средние значения $\langle\mathcal A_x\rangle$, $\langle\mathcal A_y\rangle$ кулоновская калибровка не трогает: на торе это
+голономии вдоль двух циклов, настоящие степени свободы (упражнение 5). В
+неабелевом случае условие $\partial_\mu\mathcal A^\mu = 0$ нелинейно по $U$ и может иметь на орбите
+несколько решений (неоднозначность Грибова), так что калибровка
+выбирает представителя лишь локально.
+
+## Большие калибровочные преобразования
+
+Калибровочная группа может быть несвязной. На окружности
+$U = e^{in\varphi}$ с целым $n$ — законное преобразование, но непрерывно деформировать
+его в единицу нельзя: число оборотов фазы — топологический инвариант.
+Оно сдвигает $\oint\mathcal A$ на $-2\pi n$, не меняя голономии $e^{-i\oint\mathcal A}$.
+
+В трёх измерениях с условием $U\to1$ на бесконечности пространство
+компактифицируется в сферу $S^3$, и преобразование $\mathrm{SU}(2)$ — это отображение
+$S^3\to\mathrm{SU}(2)\cong S^3$. Его **число намотки**
+$$
+w[U] = \frac{1}{24\pi^2}\int\operatorname{tr}\bigl(U^{-1}\dd U\wedge U^{-1}\dd U\wedge U^{-1}\dd U\bigr)
+$$
+— целое ($\pi_3(\mathrm{SU}(2)) = \mathbb Z$). Посчитаем его для «ежа» $U = \exp\bigl(iF(r)\,\mathbf n\cdot\boldsymbol\sigma\bigr)$,
+$\mathbf n = \mathbf r/r$, с $F(\infty) = 0$. Плотность 3-формы в координатах $(r, \theta, \varphi)$ — сумма по
+перестановкам $\operatorname{tr}(L_aL_bL_c)$ со знаком, $L_a = U^{-1}\partial_aU$:
+
+```{python}
+from itertools import permutations
+from sympy.combinatorics import Permutation
+
+r, th, ph = sp.symbols("r theta phi", positive=True)
+F_r = sp.Function("F")(r)
+n_vec = (sp.sin(th) * sp.cos(ph), sp.sin(th) * sp.sin(ph), sp.cos(th))
+U_h, U_h_inv = su2(F_r, n_vec), su2(-F_r, n_vec)
+L = [sp.simplify(U_h_inv * U_h.diff(c)) for c in (r, th, ph)]
+density = sum(Permutation(list(p)).signature() * (L[p[0]] * L[p[1]] * L[p[2]]).trace()
+              for p in permutations(range(3)))
+radial = sp.integrate(sp.integrate(sp.simplify(density), (th, 0, sp.pi)), (ph, 0, 2 * sp.pi)) / (24 * sp.pi**2)
+radial = sp.simplify(radial)
+print("dw/dr = (2/π) sin²F · F':", sp.simplify((radial - 2 / sp.pi * sp.sin(F_r)**2 * F_r.diff(r)).rewrite(sp.exp)) == 0)
+f, F0 = sp.symbols("f F_0")
+w_of_F0 = sp.integrate(2 / sp.pi * sp.sin(f)**2, (f, F0, 0))       # ∫ от r = 0 (F = F₀) до ∞ (F = 0)
+print("w =", sp.simplify(w_of_F0), "  при F(0) = π, 2π, π/2:", [w_of_F0.subs(F0, v) for v in (sp.pi, 2 * sp.pi, sp.pi / 2)])
+```
+
+Число намотки зависит только от $F(0)$: $w = -\frac1\pi\bigl(F_0 - \sin F_0\cos F_0\bigr)$. Гладкость $U$ в
+начале координат требует $U(0) = \pm1$ независимо от направления $\mathbf n$, то есть
+$F_0 = k\pi$ — и тогда $w = -k$ целое. При $F_0 = \pi/2$ получилось бы $w = -\frac12$, но такое $U$
+в нуле разрывно. (Знак $w$ — дело ориентации: $U^{-1}$ имеет $w = +k$.)
+
+Физически малые преобразования (связные с единицей) — избыточность
+описания: закон Гаусса требует, чтобы физические состояния были им
+инвариантны. Большие преобразования с $w \ne 0$ могут умножать состояние
+на фазу $e^{iw\theta}$; угол $\theta$ — новый параметр неабелевой теории
+(θ-вакуумы, инстантоны; см. тему «Поля Янга–Миллса»).
+
+## Итоги
+
+- Калибровочное преобразование — смена локального сечения (пассивно) или вертикальный
+  автоморфизм главного расслоения (активно); группа $\mathcal G$ — функции $U(x)$ со значениями в $G$.
+- $\psi\to U\psi$, $\mathcal A\to U\mathcal AU^{-1} + i\,\dd U\,U^{-1}$, $\mathcal F\to U\mathcal FU^{-1}$, $D\psi\to U\,D\psi$; инфинитезимально $\delta\mathcal A = -D\varepsilon$, $\delta\mathcal F = i[\varepsilon, \mathcal F]$.
+- Чистая калибровка $i\,\dd U\,U^{-1}$ плоская; плоская связность в односвязной области — чистая
+  калибровка, иначе препятствие — голономия.
+- Голономия меняется сопряжением, петля Вильсона $\operatorname{tr}W$ инвариантна; в неабелевой теории
+  наблюдаемы только инвариантные комбинации ($\operatorname{tr}\mathcal F^2$, а не компоненты $\mathcal F$).
+- Фиксация калибровки — выбор представителя орбиты; абелева кулоновская калибровка — уравнение Пуассона.
+- Большие преобразования: $e^{in\varphi}$ на окружности, число намотки $S^3\to\mathrm{SU}(2)$; ёж с $F(0) = k\pi$ имеет $w = -k$.
+
+## Упражнения
+
+1. Проверьте вручную закон композиции: если сначала применить $U_1$, затем $U_2$, то
+   $\mathcal A$ преобразуется так же, как при одном преобразовании $U_2U_1$.
+2. Выведите $\delta\mathcal F_{\mu\nu} = i[\varepsilon, \mathcal F_{\mu\nu}]$ из $\mathcal F\to U\mathcal FU^{-1}$ и проверьте, что $\delta\mathcal A = -D\varepsilon$ даёт тот же
+   результат через $\delta\mathcal F_{\mu\nu} = D_\mu\delta\mathcal A_\nu - D_\nu\delta\mathcal A_\mu$.
+3. На окружности дана связность $\mathcal A = a\,\dd\varphi$. Найдите все $a'$, калибровочно
+   эквивалентные $a$, и инвариант орбиты.
+4. Чему равно число намотки ежа с $F(0) = 2\pi$, $F(\infty) = 0$? А произведения двух ежей с $F(0) = \pi$?
+5. Абелева связность на торе $[0, L_x]\times[0, L_y]$ в кулоновской калибровке. Какие
+   калибровочные преобразования сохраняют условие $\nabla\cdot\boldsymbol{\mathcal A} = 0$, и как они меняют средние
+   $\langle\mathcal A_x\rangle$, $\langle\mathcal A_y\rangle$? Что инвариантно?
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $U_2(U_1\mathcal AU_1^{-1} + i\,\dd U_1U_1^{-1})U_2^{-1} + i\,\dd U_2U_2^{-1} = (U_2U_1)\mathcal A(U_2U_1)^{-1} + i\bigl(U_2\,\dd U_1 + \dd U_2\,U_1\bigr)(U_2U_1)^{-1}$,
+   а $U_2\,\dd U_1 + \dd U_2\,U_1 = \dd(U_2U_1)$. Проверено в первой ячейке: расхождение $\sim10^{-139}$.
+2. $(1 + i\varepsilon)\mathcal F(1 - i\varepsilon) = \mathcal F + i[\varepsilon, \mathcal F] + O(\varepsilon^2)$. Через связность: $-(D_\mu D_\nu - D_\nu D_\mu)\varepsilon = -i[\mathcal F_{\mu\nu}, \varepsilon]$
+   (коммутатор ковариантных производных в присоединённом представлении) $= i[\varepsilon, \mathcal F_{\mu\nu}]$.
+3. $\mathcal A - \dd\alpha$ с однозначной $e^{i\alpha}$: $\alpha = n\varphi + \beta(\varphi)$, $\beta$ периодична; постоянная часть меняется
+   только на целое, $a' = a - n$ (непостоянные добавки уходят из $\mathcal A$ малой калибровкой). Инвариант —
+   голономия $e^{-2\pi ia}$, то есть $a\bmod1$.
+4. $w = -\frac1\pi(2\pi - 0) = -2$. Число намотки аддитивно: $w[U_1U_2] = w[U_1] + w[U_2] = -2$ (в
+   $\operatorname{tr}(\dots)$ перекрёстные слагаемые дают полный дифференциал).
+5. Условие сохраняется при $\nabla^2\alpha = 0$; на торе с однозначной $e^{i\alpha}$ это
+   $\alpha = c + 2\pi(nx/L_x + my/L_y)$. Они сдвигают $\langle\mathcal A_x\rangle$ на $-2\pi n/L_x$ и $\langle\mathcal A_y\rangle$ на $-2\pi m/L_y$.
+   Инвариантны голономии $e^{-i\langle\mathcal A_x\rangle L_x}$, $e^{-i\langle\mathcal A_y\rangle L_y}$ и, конечно, поле $B$.
+:::
