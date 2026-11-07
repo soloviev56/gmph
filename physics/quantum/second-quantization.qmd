@@ -1,0 +1,293 @@
+---
+title: "Вторичное квантование"
+topic: second-quantization
+order: 21
+description: "Пространство Фока как сумма симметричных или антисимметричных степеней одночастичного пространства; операторы рождения и уничтожения, коммутаторы для бозонов и антикоммутаторы для фермионов; представление Йордана–Вигнера (матрицы, проверка CAR); полевые операторы; одно- и двухчастичные операторы Σh_ij a†_i a_j и ½ΣW_ijkl a†_i a†_j a_l a_k — проверка совпадения спектров с первым квантованием в секторе N = 2 для фермионов и бозонов; модель Хаббарда на двух узлах: синглет и триплет, E₀ = (U − √(U² + 16t²))/2, обменное J = 4t²/U (рисунок); преобразование Боголюбова для бозонов — симплектическая матрица, спектр ω = √(ε² − Δ²) (проверка в усечённом пространстве Фока); для фермионов — ортогональная"
+---
+
+Волновая функция $N$ [тождественных частиц](/physics/quantum/identical-particles.qmd) — симметричная
+или антисимметричная функция $N$ аргументов, и работать с ней неудобно:
+нужно всё время следить за (анти)симметризацией, а число частиц
+фиксировано. **Вторичное квантование** заменяет её описанием «сколько
+частиц в каком состоянии» и вводит операторы, меняющие эти числа, —
+как операторы $a$, $a^\dagger$ [квантового осциллятора](/physics/quantum/quantum-oscillator.qmd) меняют число
+квантов. Статистика частиц прячется в алгебру операторов, а
+гамильтонианы записываются одинаково при любом $N$. Это язык теории
+многих тел и квантовой теории поля.
+
+## Пространство Фока
+
+Пусть $\mathcal H_1$ — пространство одной частицы с базисом $|\varphi_1\rangle, |\varphi_2\rangle, \dots$. Состояния $N$
+бозонов — симметричная степень $S^N\mathcal H_1$, фермионов — антисимметричная
+$\Lambda^N\mathcal H_1$ (та же внешняя алгебра, что у [дифференциальных форм](/math/forms/differential-forms.qmd),
+только над $\mathbb C$).
+
+::: {#def-fock}
+**Пространство Фока** — прямая сумма по всем числам частиц:
+$$
+\mathcal F_\pm = \bigoplus_{N = 0}^\infty S^N\mathcal H_1\ \text{(бозоны)} \quad\text{или}\quad \bigoplus_{N = 0}^{\dim\mathcal H_1}\Lambda^N\mathcal H_1\ \text{(фермионы)} .
+$$
+Базис — **числа заполнения** $|n_1, n_2, \dots\rangle$; у бозонов $n_i = 0, 1, 2, \dots$, у фермионов $n_i\in\{0, 1\}$
+(принцип Паули). $N = 0$ — вакуум $|0\rangle$.
+:::
+
+**Операторы рождения и уничтожения.** Для бозонов $a_i^\dagger$ добавляет частицу в
+состояние $i$: $a_i^\dagger|\dots n_i\dots\rangle = \sqrt{n_i + 1}\,|\dots n_i + 1\dots\rangle$, и
+$$
+[a_i, a_j^\dagger] = \delta_{ij}, \qquad [a_i, a_j] = 0 .
+$$
+Каждая мода — свой осциллятор. Для фермионов антисимметрия требует
+**антикоммутаторов**:
+$$
+\{c_i, c_j^\dagger\} = \delta_{ij}, \qquad \{c_i, c_j\} = 0, \qquad\text{в частности}\quad (c_i^\dagger)^2 = 0 .
+$$
+Матрицы, удовлетворяющие этой алгебре, строятся **преобразованием
+Йордана–Вигнера**: на $n$ модах $\mathcal F_- = (\mathbb C^2)^{\otimes n}$, и
+$$
+c_j = Z\otimes\dots\otimes Z\otimes\sigma\otimes1\otimes\dots\otimes1, \qquad \sigma = \begin{pmatrix}0 & 1\\ 0 & 0\end{pmatrix},\ Z = \begin{pmatrix}1 & 0\\ 0 & -1\end{pmatrix},
+$$
+где «струна» множителей $Z = (-1)^{n}$ на модах слева от $j$ делает операторы на
+разных модах антикоммутирующими. Числа $n$ записаны в базисе $(|0\rangle, |1\rangle)$:
+
+```{python}
+import itertools
+from functools import reduce
+import numpy as np
+import sympy as sp
+import matplotlib.pyplot as plt
+
+rng = np.random.default_rng(0)
+I2, Zm, lower = np.eye(2), np.diag([1.0, -1.0]), np.array([[0.0, 1.0], [0.0, 0.0]])
+
+def kron(*ops):
+    return reduce(np.kron, ops)
+
+def fermion_ops(n):
+    """Операторы уничтожения c_j на n модах (Йордан–Вигнер)."""
+    return [kron(*([Zm] * j + [lower] + [I2] * (n - j - 1))) for j in range(n)]
+
+def boson_ops(n, cutoff):
+    """Операторы уничтожения a_j на n модах, числа заполнения 0..cutoff."""
+    a = np.diag(np.sqrt(np.arange(1, cutoff + 1)), 1)
+    eye = np.eye(cutoff + 1)
+    return [kron(*([eye] * j + [a] + [eye] * (n - j - 1))) for j in range(n)]
+
+n_modes = 4
+c = fermion_ops(n_modes)
+dag = lambda A: A.conj().T
+anti = lambda A, B: A @ B + B @ A
+car = all(np.allclose(anti(c[i], dag(c[j])), np.eye(2**n_modes) * (i == j)) and np.allclose(anti(c[i], c[j]), 0)
+          for i in range(n_modes) for j in range(n_modes))
+print("{c_i, c_j†} = δ_ij, {c_i, c_j} = 0:", car)
+no_string = [kron(*([I2] * j + [lower] + [I2] * (n_modes - j - 1))) for j in range(n_modes)]
+print("без струны Z операторы на разных модах коммутируют:", np.allclose(no_string[0] @ no_string[1] - no_string[1] @ no_string[0], 0))
+```
+
+**Полевые операторы.** Для одночастичных функций $\varphi_i(x)$ оператор
+$\hat\psi(x) = \sum_i\varphi_i(x)\,a_i$ уничтожает частицу в точке $x$; из полноты базиса
+$[\hat\psi(x), \hat\psi^\dagger(y)]_\mp = \delta(x - y)$. Оператор числа частиц $\hat N = \int\hat\psi^\dagger\hat\psi\,\dd x = \sum_ia_i^\dagger a_i$.
+
+## Одно- и двухчастичные операторы
+
+Оператор $\sum_{k=1}^Nh(x_k)$, действующий на каждую частицу, и парное
+взаимодействие $\frac12\sum_{k\ne l}W(x_k, x_l)$ записываются через матричные элементы в
+одночастичном базисе, **независимо от** $N$:
+$$
+\hat H = \sum_{ij}h_{ij}\,a_i^\dagger a_j + \frac12\sum_{ijkl}W_{ij,kl}\,a_i^\dagger a_j^\dagger a_l a_k, \qquad W_{ij,kl} = \langle\varphi_i\varphi_j|W|\varphi_k\varphi_l\rangle .
+$$
+Обратите внимание на порядок $a_la_k$: он нужен, чтобы у фермионов не
+появился лишний знак. Проверим, что это то же самое, что первое
+квантование: возьмём случайные эрмитовы $h$ ($4\times4$) и $W$ (симметричное по
+перестановке частиц), построим $h\otimes1 + 1\otimes h + W$ на $\mathcal H_1\otimes\mathcal H_1$, ограничим на
+антисимметричные (симметричные) векторы и сравним спектр с
+оператором Фока в секторе $N = 2$:
+
+```{python}
+def random_hermitian(d):
+    A = rng.normal(size=(d, d)) + 1j * rng.normal(size=(d, d))
+    return (A + dag(A)) / 2
+
+n = n_modes
+h = random_hermitian(n)
+swap = np.zeros((n * n, n * n))
+for i in range(n):
+    for j in range(n):
+        swap[j * n + i, i * n + j] = 1
+W = random_hermitian(n * n)
+W = (W + swap @ W @ swap) / 2                                    # W(x₁, x₂) = W(x₂, x₁)
+
+def fock_hamiltonian(ops):
+    H = sum(h[i, j] * dag(ops[i]) @ ops[j] for i in range(n) for j in range(n))
+    W4 = W.reshape(n, n, n, n)
+    H = H + 0.5 * sum(W4[i, j, k, l] * dag(ops[i]) @ dag(ops[j]) @ ops[l] @ ops[k]
+                      for i, j, k, l in itertools.product(range(n), repeat=4))
+    return H, sum(dag(o) @ o for o in ops)
+
+def sector(H, N_op, N):
+    """Спектр H на подпространстве с числом частиц N."""
+    vals, vecs = np.linalg.eigh(N_op)
+    B = vecs[:, np.isclose(vals, N)]
+    return np.linalg.eigvalsh(dag(B) @ H @ B)
+
+def first_quantized(sign):
+    """Спектр h⊗1 + 1⊗h + W на (анти)симметричных векторах двух частиц."""
+    H2 = np.kron(h, np.eye(n)) + np.kron(np.eye(n), h) + W
+    vals, vecs = np.linalg.eigh((np.eye(n * n) + sign * swap) / 2)
+    B = vecs[:, vals > 0.5]
+    return np.linalg.eigvalsh(dag(B) @ H2 @ B)
+
+for name, ops, sign in (("фермионы", c, -1), ("бозоны", boson_ops(n, 2), +1)):
+    H_F, N_F = fock_hamiltonian(ops)
+    e_fock, e_first = sector(H_F, N_F, 2), first_quantized(sign)
+    print(f"{name}: dim сектора N = 2 — {len(e_fock)};  [H, N] = 0: {np.allclose(H_F @ N_F, N_F @ H_F)};"
+          f"  max|ΔE| с первым квантованием {np.abs(e_fock - e_first).max():.0e}")
+```
+
+Размерности — $\binom42 = 6$ для фермионов и $\binom52 = 10$ для бозонов, как и должно
+быть. Гамильтониан сохраняет число частиц: каждое слагаемое
+содержит поровну операторов рождения и уничтожения.
+
+## Модель Хаббарда на двух узлах
+
+Электроны на решётке с перескоком $t$ между соседними узлами и
+отталкиванием $U$ на одном узле:
+$$
+H = -t\sum_{\langle ij\rangle,\sigma}\bigl(c_{i\sigma}^\dagger c_{j\sigma} + c_{j\sigma}^\dagger c_{i\sigma}\bigr) + U\sum_in_{i\uparrow}n_{i\downarrow} .
+$$
+Это простейшая модель сильно коррелированных электронов (магнетизм,
+переход Мотта, высокотемпературная сверхпроводимость). На двух узлах с
+двумя электронами сектор шестимерен, и всё считается точно:
+
+```{python}
+#| label: fig-hubbard
+#| fig-cap: 'Двухузельная модель Хаббарда с двумя электронами: уровни энергии в зависимости от U/t (синие — спиновые синглеты S = 0, красные — триплет S = 1, трёхкратно вырожденный, E = 0). При U ≫ t основное состояние — синглет с энергией ≈ −4t²/U (тонкая линия): эффективное антиферромагнитное взаимодействие J = 4t²/U. Справа — вероятность двойного заполнения узла в основном состоянии.'
+modes = fermion_ops(4)                                    # порядок мод: 1↑, 1↓, 2↑, 2↓
+n_op = [dag(m) @ m for m in modes]
+
+def hubbard_dimer(t_hop, U):
+    hop = sum(dag(modes[s]) @ modes[2 + s] + dag(modes[2 + s]) @ modes[s] for s in (0, 1))
+    return -t_hop * hop + U * (n_op[0] @ n_op[1] + n_op[2] @ n_op[3])
+
+N_tot = sum(n_op)
+S_z = (n_op[0] - n_op[1] + n_op[2] - n_op[3]) / 2
+S_plus = dag(modes[0]) @ modes[1] + dag(modes[2]) @ modes[3]
+S2 = S_plus.T @ S_plus + S_z @ S_z + S_z                  # S² = S₋S₊ + S_z² + S_z
+vals, vecs = np.linalg.eigh(N_tot)
+B2 = vecs[:, np.isclose(vals, 2)]
+
+Us = np.linspace(0, 12, 121)
+levels, spins, double_occ = [], [], []
+for U in Us:
+    e, v = np.linalg.eigh(dag(B2) @ hubbard_dimer(1.0, U) @ B2)
+    levels.append(e)
+    spins.append(np.real(np.diag(dag(v) @ dag(B2) @ S2 @ B2 @ v)))
+    g = B2 @ v[:, 0]
+    double_occ.append(np.real(dag(g) @ (n_op[0] @ n_op[1] + n_op[2] @ n_op[3]) @ g))
+levels, spins = np.array(levels), np.array(spins)
+
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4), gridspec_kw={"width_ratios": [1.6, 1]})
+for k in range(6):
+    triplet = spins[:, k] > 1
+    ax1.plot(Us[~triplet], levels[~triplet, k], ".", ms=2, color="tab:blue")
+    ax1.plot(Us[triplet], levels[triplet, k], ".", ms=2, color="tab:red")
+ax1.plot(Us[20:], -4 / Us[20:], color="k", lw=0.8)
+ax1.plot([], [], "o", ms=4, color="tab:blue", label="синглеты, S = 0")
+ax1.plot([], [], "o", ms=4, color="tab:red", label="триплет, S = 1")
+ax1.set(xlabel="U / t", ylabel="E / t", ylim=(-3, 13))
+ax1.legend()
+ax2.plot(Us, double_occ)
+ax2.set(xlabel="U / t", ylabel="⟨n↑n↓⟩ на двух узлах")
+plt.tight_layout()
+plt.show()
+
+Uq, tq = sp.symbols("U t", positive=True)
+E0 = (Uq - sp.sqrt(Uq**2 + 16 * tq**2)) / 2
+for U in (0.0, 4.0, 12.0):
+    print(f"U/t = {U:4}: E₀ численно {np.linalg.eigvalsh(dag(B2) @ hubbard_dimer(1.0, U) @ B2)[0]:+.6f},"
+          f"  (U − √(U² + 16t²))/2 = {float(E0.subs({Uq: U, tq: 1})):+.6f}")
+print("разложение E₀ при U ≫ t:", sp.series(E0.subs(Uq, 1 / sp.Symbol("x", positive=True)), sp.Symbol("x", positive=True), 0, 3).removeO().subs(sp.Symbol("x", positive=True), 1 / Uq))
+```
+
+При $U = 0$ электроны независимы, и основное состояние — оба на
+связывающей орбитали ($E = -2t$), двойное заполнение 1/2. При $U\gg t$
+двойное заполнение подавлено, электроны локализованы по одному на узле,
+а слабый виртуальный перескок понижает энергию синглета на $4t^2/U$ —
+так из кулоновского отталкивания и принципа Паули возникает
+антиферромагнитный обмен (механизм сверхобмена).
+
+## Преобразование Боголюбова
+
+Квадратичный гамильтониан, не сохраняющий число частиц, например
+$H = \varepsilon(a^\dagger a + b^\dagger b) + \Delta(a^\dagger b^\dagger + ab)$ (рождение пар — так устроены возбуждения
+сверхтекучего бозе-газа и параметрический усилитель), диагонализуется
+**линейной заменой** $\alpha = ua + vb^\dagger$, $\beta = ub + va^\dagger$. Новые операторы должны
+удовлетворять тем же коммутаторам: $[\alpha, \alpha^\dagger] = u^2 - v^2 = 1$, то есть $u = \operatorname{ch}r$, $v = \operatorname{sh}r$.
+В переменных $(a, b, a^\dagger, b^\dagger)$ это значит, что матрица преобразования $T$
+сохраняет форму $K = \operatorname{diag}(1, 1, -1, -1)$ коммутаторов: $TKT^\dagger = K$ — это **симплектическая**
+группа (для эрмитовых координат и импульсов — $\mathrm{Sp}(4, \mathbb R)$), как у канонических
+преобразований классической механики. Для фермионов те же условия
+выделяют **ортогональную** группу (в базисе майорановских операторов
+$c + c^\dagger$, $i(c^\dagger - c)$). При $\operatorname{th}2r = \Delta/\varepsilon$
+$$
+H = \omega(\alpha^\dagger\alpha + \beta^\dagger\beta) + \omega - \varepsilon, \qquad \omega = \sqrt{\varepsilon^2 - \Delta^2} .
+$$
+Проверим и симплектичность, и спектр — диагонализацией в усечённом
+пространстве Фока (до 30 квантов в каждой моде):
+
+```{python}
+eps_b, Delta = 1.0, 0.6
+r = np.arctanh(Delta / eps_b) / 2
+u, v = np.cosh(r), np.sinh(r)
+T = np.array([[u, 0, 0, v], [0, u, v, 0], [0, v, u, 0], [v, 0, 0, u]])        # (α, β, α†, β†) через (a, b, a†, b†)
+K = np.diag([1, 1, -1, -1])
+print("T K T† = K:", np.allclose(T @ K @ T.T, K))
+
+a, b = boson_ops(2, 30)
+H_pair = eps_b * (dag(a) @ a + dag(b) @ b) + Delta * (dag(a) @ dag(b) + a @ b)
+charge = dag(a) @ a - dag(b) @ b                           # сохраняется: пары рождаются вместе
+vals, vecs = np.linalg.eigh(charge)
+B0 = vecs[:, np.isclose(vals, 0)]
+E_num = np.linalg.eigvalsh(dag(B0) @ H_pair @ B0)[:4]
+omega = np.sqrt(eps_b**2 - Delta**2)
+print("нижние уровни (сектор n_a = n_b):", np.round(E_num, 8))
+print("ω(n_α + n_β) + ω − ε при n_α = n_β:", np.round([2 * omega * k + omega - eps_b for k in range(4)], 8))
+```
+
+Основное состояние имеет энергию $\omega - \varepsilon < 0$ — ниже «пустого» вакуума: это
+**сжатое** состояние, содержащее пары. При $\Delta\to\varepsilon$ частота $\omega\to0$, а при $\Delta > \varepsilon$
+гамильтониан неограничен снизу — неустойчивость (параметрическая
+генерация).
+
+## Итоги
+
+- Пространство Фока $\bigoplus_NS^N\mathcal H_1$ или $\bigoplus_N\Lambda^N\mathcal H_1$; базис — числа заполнения.
+- $[a_i, a_j^\dagger] = \delta_{ij}$ для бозонов, $\{c_i, c_j^\dagger\} = \delta_{ij}$ для фермионов; матрицы Йордана–Вигнера со струной $Z$.
+- $\hat H = \sum h_{ij}a_i^\dagger a_j + \frac12\sum W_{ij,kl}a_i^\dagger a_j^\dagger a_la_k$ при любом $N$; в секторе $N = 2$ совпадает с первым квантованием.
+- Хаббард на двух узлах: $E_0 = \frac{U - \sqrt{U^2 + 16t^2}}{2}$, сверхобмен $J = 4t^2/U$.
+- Боголюбов: бозонные линейные канонические преобразования — симплектические, фермионные —
+  ортогональные; $\omega = \sqrt{\varepsilon^2 - \Delta^2}$.
+
+## Упражнения
+
+1. Докажите, что $[\hat N, a_i^\dagger] = a_i^\dagger$ (и для бозонов, и для фермионов). Почему отсюда следует, что
+   $a_i^\dagger$ увеличивает число частиц на единицу?
+2. Какова размерность сектора с $N$ частицами для $n$ мод: фермионы, бозоны?
+3. Найдите энергию триплета и синглетов двухузельной модели Хаббарда при $U = 0$ и
+   проверьте разложение $E_0\approx-4t^2/U$.
+4. Покажите, что $\alpha = ua + vb^\dagger$ удовлетворяет $[\alpha, \alpha^\dagger] = u^2 - v^2$, и найдите число частиц $\langle a^\dagger a\rangle$
+   в основном состоянии гамильтониана Боголюбова.
+5. Проверьте, что одночастичный оператор $\sum h_{ij}c_i^\dagger c_j$ коммутирует с $\hat N$, а $c_1^\dagger c_2^\dagger$ — нет.
+   Что это значит для сверхпроводящего состояния БКШ?
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $[a_j^\dagger a_j, a_i^\dagger] = a_j^\dagger[a_j, a_i^\dagger]_\mp\pm\dots = \delta_{ij}a_i^\dagger$ — тождество $[AB, C] = A\{B, C\} - \{A, C\}B$ для фермионов даёт тот же
+   результат. Если $\hat N|\psi\rangle = N|\psi\rangle$, то $\hat Na_i^\dagger|\psi\rangle = (N + 1)a_i^\dagger|\psi\rangle$.
+2. Фермионы $\binom nN$, бозоны $\binom{n + N - 1}{N}$; полные размерности $2^n$ и $\infty$.
+3. При $U = 0$: $-2t$ (оба электрона на связывающей орбитали, синглет), $0$ — четырёхкратно (по одному
+   электрону на связывающей и разрыхляющей: триплет и синглет), $+2t$ (оба на разрыхляющей). Разложение: $E_0 = -\frac{4t^2}{U} + O(t^4/U^3)$ (последняя строка ячейки).
+4. $[\alpha, \alpha^\dagger] = u^2[a, a^\dagger] + v^2[b^\dagger, b] = u^2 - v^2$. В основном состоянии $\alpha|0_\alpha\rangle = 0$, и
+   $\langle a^\dagger a\rangle = v^2 = \operatorname{sh}^2r$; при $\Delta/\varepsilon = 0{,}6$: $\operatorname{th}2r = 0{,}6$, $v^2 = \frac12(\varepsilon/\omega - 1) = 0{,}125$.
+5. $c_i^\dagger c_j$ сохраняет $\hat N$; $[\hat N, c_1^\dagger c_2^\dagger] = 2c_1^\dagger c_2^\dagger$. Состояние БКШ — суперпозиция разных $N$ (как
+   сжатое состояние из пар), его описывают преобразованием Боголюбова для фермионов.
+:::
