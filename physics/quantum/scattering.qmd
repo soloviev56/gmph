@@ -1,0 +1,255 @@
+---
+title: "Теория рассеяния"
+topic: scattering
+order: 22
+description: "Постановка задачи: ψ ~ e^{ikz} + f(θ)e^{ikr}/r, dσ/dΩ = |f|²; уравнение Липпмана–Швингера с функцией Грина e^{ikr}/4πr оператора −(∇² + k²) (проверка SymPy); борновское приближение f = −(2m/ħ²q)∫rV sin qr dr, потенциал Юкавы и формула Резерфорда; парциальные волны: f = Σ(2l+1)e^{iδ_l}sin δ_l P_l/k, фазы из сшивки с функциями Бесселя, оптическая теорема Im f(0) = kσ/4π (численно); борн против точного решения для потенциала Юкавы при слабой и сильной связи (рисунок); твёрдая сфера: σ → 4πa² при k → 0 и → 2πa² при ka ≫ 1 (рисунок); длина рассеяния прямоугольной ямы и её расходимость при появлении связанного состояния, теорема Левинсона"
+---
+
+Почти всё, что известно о строении вещества — ядро атома, кварки внутри
+протона, межатомные потенциалы, — получено из опытов по рассеянию:
+пучок частиц падает на мишень, и измеряется, сколько частиц уходит в
+каждом направлении. Теория рассеяния связывает это распределение с
+потенциалом взаимодействия. Задача — уже не на собственные значения, как
+для [связанных состояний](/physics/quantum/schrodinger-1d.qmd), а на решение с заданной асимптотикой
+при непрерывной энергии; главный инструмент — [функции Грина](/math/analysis/green-functions.qmd), а для
+центральных потенциалов — разложение по [сферическим
+функциям](/math/lie/spherical-harmonics.qmd).
+
+Обозначения: $E = \hbar^2k^2/2m$, $U(\mathbf r) = 2mV(\mathbf r)/\hbar^2$; в численных примерах $\hbar = m = 1$.
+
+## Амплитуда и сечение
+
+::: {#def-scattering-amplitude}
+Стационарное состояние рассеяния на потенциале, убывающем быстрее $1/r$, —
+решение уравнения $(\nabla^2 + k^2)\psi = U\psi$ с асимптотикой
+$$
+\psi(\mathbf r)\approx e^{ikz} + f(\theta, \varphi)\,\frac{e^{ikr}}{r}, \qquad r\to\infty .
+$$
+Функция $f$ — **амплитуда рассеяния**. Поток частиц, уходящих в телесный угол
+$\dd\Omega$, отнесённый к плотности потока в пучке, — **дифференциальное
+сечение** $\dd\sigma/\dd\Omega = |f|^2$; полное сечение $\sigma = \int|f|^2\dd\Omega$.
+:::
+
+**Уравнение Липпмана–Швингера.** Функция Грина оператора $-(\nabla^2 + k^2)$ с
+расходящейся волной — $G_+(\mathbf r) = \frac{e^{ikr}}{4\pi r}$ (знак как у ньютонова потенциала $1/4\pi r$ в статье о
+функциях Грина). Перенеся $U\psi$ в правую часть как источник,
+$$
+\psi(\mathbf r) = e^{ikz} - \int G_+(\mathbf r - \mathbf r')\,U(\mathbf r')\,\psi(\mathbf r')\,\dd^3r', \qquad
+f(\theta) = -\frac{1}{4\pi}\int e^{-i\mathbf k'\cdot\mathbf r'}U(\mathbf r')\psi(\mathbf r')\,\dd^3r' ,
+$$
+где $\mathbf k' = k\hat{\mathbf r}$ — волновой вектор в направлении наблюдения (вдали $|\mathbf r - \mathbf r'|\approx r - \hat{\mathbf r}\cdot\mathbf r'$).
+
+```{python}
+import numpy as np
+import sympy as sp
+import matplotlib.pyplot as plt
+from scipy.integrate import solve_ivp, quad
+from scipy.special import spherical_jn, spherical_yn, eval_legendre
+
+r, k, q, mu, V0 = sp.symbols("r k q mu V_0", positive=True)
+G = sp.exp(sp.I * k * r) / (4 * sp.pi * r)
+radial_laplacian = lambda F: sp.diff(r**2 * sp.diff(F, r), r) / r**2
+print("−(∇² + k²)G₊ = 0 при r > 0:", sp.simplify(-(radial_laplacian(G) + k**2 * G)) == 0,
+      ";  r·G₊ → 1/4π при r → 0:", sp.limit(r * G, r, 0))
+```
+
+## Борновское приближение
+
+Если потенциал слаб, в интеграл можно подставить вместо $\psi$ падающую волну.
+Тогда амплитуда — фурье-образ потенциала по **переданному импульсу**
+$\mathbf q = \mathbf k' - \mathbf k$, $q = 2k\sin\frac\theta2$ ([конвенции](/conventions.qmd) о преобразовании Фурье):
+$$
+f_B(\theta) = -\frac{m}{2\pi\hbar^2}\,\tilde V(\mathbf q) = -\frac{2m}{\hbar^2q}\int_0^\infty r\,V(r)\sin qr\,\dd r .
+$$
+Для **потенциала Юкавы** $V = V_0e^{-\mu r}/r$ и в пределе $\mu\to0$ — для кулоновского
+$V = Z_1Z_2e^2/r$:
+
+```{python}
+m_, hbar_, E_, Zee, th = sp.symbols("m hbar E Z_1Z_2e^2 theta", positive=True)
+f_yukawa = sp.simplify(-2 * m_ / (hbar_**2 * q) * sp.integrate(r * V0 * sp.exp(-mu * r) / r * sp.sin(q * r), (r, 0, sp.oo)))
+print("f_Б(Юкава) =", f_yukawa)
+f_coulomb = f_yukawa.subs({mu: 0, V0: Zee})
+k_of_E = sp.sqrt(2 * m_ * E_) / hbar_
+dsigma = sp.simplify((f_coulomb**2).subs(q, 2 * k_of_E * sp.sin(th / 2)))
+print("dσ/dΩ (μ → 0) =", dsigma, ";  = (Z₁Z₂e²/4E)²/sin⁴(θ/2):", sp.simplify(dsigma - (Zee / (4 * E_))**2 / sp.sin(th / 2)**4) == 0)
+```
+
+Получилась **формула Резерфорда** (1911) — та же, что даёт классическая механика
+для гиперболических орбит в [задаче Кеплера](/physics/mechanics/kepler.qmd), причём для кулоновского поля
+она оказывается точной. Опыты Гейгера и Марсдена с α-частицами, подтвердившие её,
+открыли атомное ядро. Юкава в 1935 году предложил потенциал с $\mu = m_\pi c/\hbar$ для
+ядерных сил: масса переносчика задаёт радиус взаимодействия.
+
+## Парциальные волны
+
+Для центрального потенциала решение симметрично относительно оси $z$, и
+его раскладывают по полиномам Лежандра. Вне потенциала радиальная
+функция — комбинация сферических функций Бесселя $j_l(kr)$ и Неймана $y_l(kr)$, а
+взаимодействие сводится к **фазовым сдвигам** $\delta_l$: $R_l\propto\cos\delta_l\,j_l(kr) - \sin\delta_l\,y_l(kr)$. Сравнение с
+разложением плоской волны $e^{ikz} = \sum_l(2l+1)i^lj_l(kr)P_l(\cos\theta)$ даёт
+$$
+f(\theta) = \frac1k\sum_l(2l+1)\,e^{i\delta_l}\sin\delta_l\,P_l(\cos\theta), \qquad \sigma = \frac{4\pi}{k^2}\sum_l(2l+1)\sin^2\delta_l .
+$$
+Сравнив $\operatorname{Im}f(0) = \frac1k\sum(2l+1)\sin^2\delta_l$ с $\sigma$, получаем **оптическую теорему** $\operatorname{Im}f(0) = \frac{k\sigma}{4\pi}$ —
+следствие сохранения вероятности: рассеянная волна забирает поток у
+падающей за счёт интерференции впереди.
+
+Фазы найдём численно: проинтегрируем радиальное уравнение
+$u'' = [U(r) + l(l+1)/r^2 - k^2]u$ для $u = rR_l$ от нуля до радиуса $a$, где потенциал уже
+пренебрежимо мал, и сошьём логарифмическую производную $\gamma = R_l'/R_l$ с
+внешним решением:
+$$
+\operatorname{tg}\delta_l = \frac{k\,j_l'(ka) - \gamma\,j_l(ka)}{k\,y_l'(ka) - \gamma\,y_l(ka)} .
+$$
+
+```{python}
+def phase_shift(U, l, k_, a):
+    """δ_l для потенциала U(r) = 2mV/ħ², сшивка при r = a."""
+    r0 = 1e-6                                              # u ∝ r^{l+1} у нуля; масштаб u не важен
+    sol = solve_ivp(lambda rr, y: [y[1], (U(rr) + l * (l + 1) / rr**2 - k_**2) * y[0]],
+                    (r0, a), [1.0, (l + 1) / r0], rtol=1e-11, atol=0)
+    u, du = sol.y[0, -1], sol.y[1, -1]
+    gamma = du / u - 1 / a                                 # R = u/r
+    x = k_ * a
+    num = k_ * spherical_jn(l, x, derivative=True) - gamma * spherical_jn(l, x)
+    den = k_ * spherical_yn(l, x, derivative=True) - gamma * spherical_yn(l, x)
+    return np.arctan(num / den)
+
+def amplitude(deltas, k_, theta):
+    return sum((2 * l + 1) * np.exp(1j * d) * np.sin(d) * eval_legendre(l, np.cos(theta)) for l, d in enumerate(deltas)) / k_
+
+def total_cross_section(deltas, k_):
+    return 4 * np.pi / k_**2 * sum((2 * l + 1) * np.sin(d)**2 for l, d in enumerate(deltas))
+
+yukawa = lambda V: (lambda rr: 2 * V * np.exp(-rr) / rr)   # U = 2mV/ħ², μ = 1
+k_val = 1.0
+for V in (-0.2, -1.5):
+    deltas = [phase_shift(yukawa(V), l, k_val, 30.0) for l in range(12)]
+    sigma = total_cross_section(deltas, k_val)
+    print(f"V₀ = {V}: δ₀..δ₃ = {np.round(deltas[:4], 4)};  Im f(0) = {amplitude(deltas, k_val, 0.0).imag:.6f},  kσ/4π = {k_val * sigma / (4 * np.pi):.6f}")
+```
+
+Сравним дифференциальные сечения с борновскими. В единицах $\hbar = m = \mu = 1$
+борновская амплитуда $f_B = -2V_0/(q^2 + 1)$; условие применимости
+$|V_0|m/\hbar^2\mu\ll1$ (потенциал не способен заметно исказить волну на своём радиусе):
+
+```{python}
+#| label: fig-born
+#| fig-cap: 'Рассеяние на притягивающем потенциале Юкавы V₀e^{−r}/r при k = 1 (ħ = m = 1): точное сечение из 12 парциальных волн (линии) и борновское приближение (пунктир). При слабой связи (V₀ = −0,2) кривые почти совпадают; при сильной (V₀ = −1,5) борновское приближение ошибается в разы: назад почти втрое, вперёд в 1,6 раза (s-фаза уже не мала, в яме есть связанный уровень).'
+thetas = np.linspace(0.01, np.pi, 300)
+fig, ax = plt.subplots(figsize=(7, 4))
+for V, color in ((-0.2, "tab:blue"), (-1.5, "tab:red")):
+    deltas = [phase_shift(yukawa(V), l, k_val, 30.0) for l in range(12)]
+    exact = np.abs(amplitude(deltas, k_val, thetas))**2
+    q_vals = 2 * k_val * np.sin(thetas / 2)
+    born = (2 * V / (q_vals**2 + 1))**2
+    ax.semilogy(np.degrees(thetas), exact, color=color, label=f"точно, V₀ = {V}")
+    ax.semilogy(np.degrees(thetas), born, "--", color=color, label=f"Борн, V₀ = {V}")
+    print(f"V₀ = {V}: dσ/dΩ при θ = 0,01: точно {exact[0]:.4f}, Борн {born[0]:.4f};  при θ = π: точно {exact[-1]:.4f}, Борн {born[-1]:.4f}")
+ax.set(xlabel="θ, градусы", ylabel="dσ/dΩ")
+ax.legend(fontsize=8)
+plt.tight_layout()
+plt.show()
+```
+
+## Твёрдая сфера
+
+Для непроницаемой сферы радиуса $a$ волновая функция обращается в нуль
+на поверхности, и $\operatorname{tg}\delta_l = j_l(ka)/y_l(ka)$. При малых $k$ работает только $s$-волна,
+$\delta_0 = -ka$, и $\sigma\to4\pi a^2$ — **вчетверо больше** геометрического сечения: медленная
+частица «чувствует» сферу как целое, это волновой эффект. При $ka\gg1$
+существенны $l\lesssim ka$, и $\sigma\to2\pi a^2$ — вдвое больше геометрического: к
+отражённым лучам добавляется дифракционный пик вперёд, без которого не
+было бы тени за сферой.
+
+```{python}
+#| label: fig-hard-sphere
+#| fig-cap: 'Полное сечение рассеяния на твёрдой сфере радиуса a в единицах πa² в зависимости от ka (сумма по l ≤ ka + 20). Медленные частицы: σ → 4πa²; быстрые: σ медленно приближается к 2πa² (геометрическое сечение плюс дифракционный пик вперёд).'
+def hard_sphere_sigma(ka):
+    ls = np.arange(int(ka) + 21)
+    deltas = np.arctan(spherical_jn(ls, ka) / spherical_yn(ls, ka))
+    return 4 * np.pi / ka**2 * np.sum((2 * ls + 1) * np.sin(deltas)**2)
+
+kas = np.geomspace(0.01, 60, 300)
+sig = np.array([hard_sphere_sigma(x) for x in kas]) / np.pi
+fig, ax = plt.subplots(figsize=(7, 3.6))
+ax.semilogx(kas, sig)
+ax.axhline(4, color="0.6", ls="--", lw=0.8)
+ax.axhline(2, color="0.6", ls="--", lw=0.8)
+ax.text(0.012, 3.75, "4πa²", fontsize=9)
+ax.text(30, 1.85, "2πa²", fontsize=9)
+ax.set(xlabel="ka", ylabel="σ / πa²", ylim=(1.5, 4.3))
+plt.tight_layout()
+plt.show()
+for x in (0.01, 1.0, 10.0, 60.0):
+    print(f"ka = {x:5}: σ/πa² = {hard_sphere_sigma(x) / np.pi:.4f}")
+```
+
+## Длина рассеяния и связанные состояния
+
+При $k\to0$ $\delta_0\approx-ka_s$, где $a_s$ — **длина рассеяния**, и $\sigma\to4\pi a_s^2$. Для
+прямоугольной ямы глубины $V_0$ и радиуса $R$, $K = \sqrt{2mV_0}/\hbar$,
+$$
+a_s = R\Bigl(1 - \frac{\operatorname{tg}KR}{KR}\Bigr) .
+$$
+Когда яма углубляется так, что в ней вот-вот появится новый связанный
+$s$-уровень ($KR\to\pi/2, 3\pi/2, \dots$), $a_s\to\pm\infty$: рассеяние резонансное, сечение
+огромно. Так обстоит дело в системе нейтрон–протон в синглетном
+состоянии ($a_s\approx-23{,}7$ фм при радиусе сил около 2 фм) — виртуальный уровень
+почти на нуле энергии; в ультрахолодных газах длину рассеяния меняют
+магнитным полем (резонанс Фешбаха). По **теореме Левинсона** $\delta_0(0) - \delta_0(\infty) = N\pi$, где
+$N$ — число связанных $s$-состояний. Проверим формулу и теорему численно:
+
+```{python}
+R_well = 1.0
+
+def well_phase(k_, KR):
+    """δ₀ прямоугольной ямы точно: tg(δ₀ + kR) = (k/κ) tg(κR), κ = √(k² + K²); ветвь не выбрана."""
+    kap = np.sqrt(k_**2 + (KR / R_well)**2)
+    return np.arctan(k_ / kap * np.tan(kap * R_well)) - k_ * R_well
+
+for KR in (1.0, 1.5, 1.6, 3.0, 4.0):
+    U_well = lambda rr, K2=KR**2: -K2 * (rr < R_well)
+    small_k = 1e-3
+    d0 = phase_shift(U_well, 0, small_k, 3.0)
+    a_formula = R_well * (1 - np.tan(KR) / KR)
+    # фаза, продолженная по непрерывности от больших k (где δ → 0) к k → 0
+    ks = np.linspace(200.0, small_k, 200001)
+    d_cont = np.unwrap(2 * well_phase(ks, KR)) / 2
+    n_bound = int(KR / np.pi + 0.5)                      # уровни при KR > π/2, 3π/2, ...
+    print(f"KR = {KR}: a_s по формуле {a_formula:+8.3f}, из численной δ₀ {-np.tan(d0) / small_k:+8.3f};"
+          f"  δ₀(0) − δ₀(∞) ≈ {round((d_cont[-1] - d_cont[0]) / np.pi, 2) + 0.0:+.2f}π, связанных s-уровней {n_bound}")
+```
+
+## Итоги
+
+- $\psi\approx e^{ikz} + f\,e^{ikr}/r$, $\dd\sigma/\dd\Omega = |f|^2$; уравнение Липпмана–Швингера с $G_+ = e^{ikr}/4\pi r$.
+- Борн: $f_B = -\frac{m}{2\pi\hbar^2}\tilde V(\mathbf q)$; Юкава $\to$ Резерфорд при $\mu\to0$; применимость $|V_0|m/\hbar^2\mu\ll1$.
+- Парциальные волны: $f = \frac1k\sum(2l+1)e^{i\delta_l}\sin\delta_lP_l$, $\sigma = \frac{4\pi}{k^2}\sum(2l+1)\sin^2\delta_l$; оптическая теорема.
+- Твёрдая сфера: $4\pi a^2$ при $k\to0$, $2\pi a^2$ при $ka\gg1$.
+- Длина рассеяния расходится при появлении связанного уровня; теорема Левинсона $\delta_0(0) - \delta_0(\infty) = N\pi$.
+
+## Упражнения
+
+1. Получите формулу Резерфорда как предел борновской амплитуды для потенциала
+   Юкавы. Почему для кулоновского поля полное сечение бесконечно?
+2. Найдите $\delta_0$ для твёрдой сферы точно и разложите при $ka\ll1$. Почему $\sigma = 4\pi a^2$, а не $\pi a^2$?
+3. Выведите оптическую теорему из разложения по парциальным волнам.
+4. При какой энергии борновское приближение становится применимым для
+   потенциала Юкавы с $|V_0|m/\hbar^2\mu\sim1$? Указание: при $ka\gg1$ условие — $|V|\ll\hbar v/a$.
+5. При какой глубине прямоугольной ямы ($R$ фиксирован) длина рассеяния
+   впервые обращается в бесконечность? Что происходит с её знаком при
+   переходе через это значение?
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $f_B = -\frac{2mV_0}{\hbar^2(q^2 + \mu^2)}\to-\frac{2mZ_1Z_2e^2}{\hbar^2q^2}$, $|f|^2 = \bigl(\frac{Z_1Z_2e^2}{4E}\bigr)^2\frac{1}{\sin^4(\theta/2)}$ (вторая ячейка). Интеграл $\int\frac{\dd\Omega}{\sin^4(\theta/2)}$
+   расходится при $\theta\to0$: дальнодействующий потенциал отклоняет даже далёкие частицы.
+2. $\operatorname{tg}\delta_0 = j_0(ka)/y_0(ka) = -\operatorname{tg}ka$, $\delta_0 = -ka$; $\sigma\approx\frac{4\pi}{k^2}\sin^2ka\to4\pi a^2$. Длина волны больше сферы, классических
+   траекторий нет; сечение — полная площадь поверхности сферы, а не её тени.
+3. $\operatorname{Im}f(0) = \frac1k\sum(2l+1)\operatorname{Im}(e^{i\delta_l}\sin\delta_l)P_l(1) = \frac1k\sum(2l+1)\sin^2\delta_l = \frac{k}{4\pi}\sigma$ (в ячейке с фазами — до 6 знаков).
+4. Глубина потенциала на радиусе $1/\mu$: $|V|\sim|V_0|\mu$; условие $|V_0|\mu\ll\hbar v\mu = \hbar^2k\mu/m$ — то есть $k\gg|V_0|m/\hbar^2\sim\mu$:
+   при энергиях $E\gg\hbar^2\mu^2/2m$ борновское приближение работает и для сильной связи.
+5. При $KR = \pi/2$, то есть $V_0 = \frac{\pi^2\hbar^2}{8mR^2}$; $a_s$ уходит в $-\infty$ слева и возвращается из $+\infty$ справа, когда
+   появляется связанный уровень (таблица в последней ячейке: при $KR = 1{,}5$ $a_s < 0$, при $1{,}6$ — $a_s > 0$).
+:::
