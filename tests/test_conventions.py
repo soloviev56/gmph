@@ -500,3 +500,19 @@ def test_cartan_structure_signs():
     # R^1_212 в репере = R^r_φrφ / f² ; гауссова кривизна K = −f''/f
     assert sp.simplify(R[0][1][0][1] - R_coord[0][1][0][1] / f**2) == 0
     assert sp.simplify(R[0][1][0][1] + sp.diff(f, r, 2) / f) == 0
+
+
+def test_gravitation_signs():
+    """r_s = 2kM/c²: g_00 = 1 − r_s/r → 1 + 2Φ/c²; R_00 = +∇²Φ/c² в слабом поле (знак уравнений Эйнштейна)."""
+    from gmph.riemann import christoffel, riemann, ricci
+    r, k, M, c = sp.symbols("r k M c", positive=True)
+    r_s = 2 * k * M / c**2
+    assert sp.simplify((1 - r_s / r) - (1 + 2 * (-k * M / r) / c**2)) == 0
+    t, x, y, z, eps = sp.symbols("t x y z epsilon")
+    Phi = sp.Function("Phi")(x, y, z)
+    coords = (t, x, y, z)
+    g = sp.diag(1 + 2 * eps * Phi, *[-(1 - 2 * eps * Phi)] * 3)          # c = 1
+    Ric = ricci(riemann(christoffel(g, coords), coords))
+    R00 = sp.series(Ric[0, 0], eps, 0, 2).removeO()
+    lap = sum(sp.diff(Phi, v, 2) for v in (x, y, z))
+    assert sp.simplify(R00 - eps * lap) == 0
