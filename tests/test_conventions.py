@@ -516,3 +516,16 @@ def test_gravitation_signs():
     R00 = sp.series(Ric[0, 0], eps, 0, 2).removeO()
     lap = sum(sp.diff(Phi, v, 2) for v in (x, y, z))
     assert sp.simplify(R00 - eps * lap) == 0
+
+
+def test_chern_class_sign():
+    """c₁ = −tr ℱ/2π; тавтологическое расслоение над сферой Блоха: 𝒜 = −i⟨s|ds⟩, ∫c₁ = −1 = ∫F_Берри/2π."""
+    th, ph = sp.symbols("theta phi", real=True)
+    s = sp.Matrix([sp.cos(th / 2), sp.exp(sp.I * ph) * sp.sin(th / 2)])
+    # индуцированная связность ∇(s f) = s (df + ⟨s|ds⟩ f) = s (df + i𝒜 f)
+    A = [sp.simplify(-sp.I * (s.H * s.diff(v))[0]) for v in (th, ph)]
+    F = sp.simplify(A[1].diff(th) - A[0].diff(ph))
+    c1 = sp.integrate(sp.integrate(-F / (2 * sp.pi), (th, 0, sp.pi)), (ph, 0, 2 * sp.pi))
+    assert c1 == -1
+    A_berry = [sp.simplify(sp.I * (s.H * s.diff(v))[0]) for v in (th, ph)]
+    assert all(sp.simplify(a + b) == 0 for a, b in zip(A, A_berry))

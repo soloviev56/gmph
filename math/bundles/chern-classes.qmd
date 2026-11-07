@@ -1,0 +1,287 @@
+---
+title: "Характеристические классы"
+topic: chern-classes
+order: 6
+description: "Конструкция Черна–Вейля: инвариантные многочлены от кривизны замкнуты и их классы когомологий не зависят от связности; c(E) = det(1 + iF/2π), c₁ = −tr ℱ/2π (новая конвенция); tr F∧F = d tr(A∧dA + ⅔A∧A∧A) — форма Черна–Саймонса (проверка SymPy); первое число Черна тавтологического расслоения над сферой Блоха = −1 и его связь с функцией перехода e^{iφ}; заряд q — число Черна −q; класс Эйлера и формула Гаусса–Бонне для деформированной сферы (gmph.cartan); число Черна зоны на торе Бриллюэна: калибровочно-инвариантная решёточная формула, проверка на сфере, модель Ци–Ву–Чжана — фазовая диаграмма C(m) и распределение кривизны Берри (рисунок), холловская проводимость Ce²/h; второй класс Черна и число инстантонов"
+---
+
+В статьях о [фазе Берри](/physics/quantum/berry-phase.qmd) и [главных
+расслоениях](/math/bundles/principal-bundles.qmd) интеграл кривизны по сфере, делённый на $2\pi$,
+оказался целым числом, и это число не менялось при изменении
+связности. Это частный случай общего факта: из кривизны можно
+построить замкнутые формы, классы когомологий которых зависят только от
+расслоения, а не от связности. Их интегралы — **характеристические
+числа** — целые; в физике это квантование магнитного заряда монополя,
+холловской проводимости, топологического заряда инстантона.
+
+Используются [кривизна связности](/math/bundles/bundle-curvature.qmd) (обозначения $F = \dd A + A\wedge A$,
+$F\to gFg^{-1}$) и [когомологии де Рама](/math/forms/de-rham.qmd). Физическая запись $F = i\mathcal F$ —
+по [конвенциям](/conventions.qmd).
+
+## Конструкция Черна–Вейля
+
+Пусть $P(X)$ — многочлен от матрицы, **инвариантный** относительно сопряжения:
+$P(gXg^{-1}) = P(X)$ (например, $\operatorname{tr}X^k$ или $\det(1 + X)$). Тогда $P(F)$ — 2k-форма, определённая
+глобально: в разных тривиализациях $F$ отличаются сопряжением.
+
+::: {#def-chern-weil}
+**Теорема Черна–Вейля.** Для инвариантного многочлена $P$:
+1. форма $P(F)$ **замкнута**: $\dd P(F) = 0$;
+2. для двух связностей $A_0$, $A_1$ разность $P(F_1) - P(F_0)$ **точна**; класс $[P(F)]\in H^{2k}(M)$
+   зависит только от расслоения.
+
+**Полный класс Черна** комплексного векторного расслоения
+$$
+c(E) = \det\Bigl(1 + \frac{i}{2\pi}F\Bigr) = 1 + c_1 + c_2 + \dots, \qquad c_1 = \frac{i}{2\pi}\operatorname{tr}F, \quad
+c_2 = \frac{1}{8\pi^2}\bigl(\operatorname{tr}F\wedge F - \operatorname{tr}F\wedge\operatorname{tr}F\bigr) .
+$$
+:::
+
+Множитель $i/2\pi$ делает классы вещественными (для унитарной связности $F$
+антиэрмитова) и **целыми**: интеграл $c_k$ по любому замкнутому $2k$-мерному
+циклу — целое число. В физической записи $c_1 = -\frac{1}{2\pi}\operatorname{tr}\mathcal F$; знак закреплён в
+[конвенциях](/conventions.qmd) (раздел «Калибровочные поля»).
+
+Замкнутость — следствие [тождества Бианки](/math/bundles/bundle-curvature.qmd) $\dd F = F\wedge A - A\wedge F$: например,
+$\dd\operatorname{tr}F^2 = \operatorname{tr}(\dd F\wedge F + F\wedge\dd F) = \operatorname{tr}([F, A]\wedge F + F\wedge[F, A]) = 0$ по цикличности следа. Для
+второго утверждения при $k = 1$ всё видно сразу: $\operatorname{tr}F_1 - \operatorname{tr}F_0 = \dd\operatorname{tr}(A_1 - A_0)$, а разность
+связностей — глобальная 1-форма. При $k = 2$ тот же механизм даёт **форму
+Черна–Саймонса**:
+$$
+\operatorname{tr}F\wedge F = \dd\,\mathrm{CS}(A), \qquad \mathrm{CS}(A) = \operatorname{tr}\Bigl(A\wedge\dd A + \frac23A\wedge A\wedge A\Bigr) .
+$$
+Это алгебраическое тождество верно для любых матриц $A_\mu(x)$; проверим его
+в $\mathbb R^4$ для полиномиальной связности $2\times2$. В координатах
+$\operatorname{tr}F\wedge F = \frac14\varepsilon^{\mu\nu\rho\sigma}\operatorname{tr}F_{\mu\nu}F_{\rho\sigma}\,\dd^4x$ и $\dd\,\mathrm{CS} = \varepsilon^{\mu\nu\rho\sigma}\partial_\mu\operatorname{tr}\bigl(A_\nu\partial_\rho A_\sigma + \frac23A_\nu A_\rho A_\sigma\bigr)\dd^4x$:
+
+```{python}
+import itertools
+import numpy as np
+import sympy as sp
+import matplotlib.pyplot as plt
+from sympy import LeviCivita
+from gmph.cartan import connection_forms, curvature_forms
+
+X = sp.symbols("x0:4", real=True)
+A = [sp.Matrix([[X[(m + 1) % 4] * X[m], X[(m + 2) % 4] - X[m]**2],
+                [1 + X[(m + 3) % 4], X[(m + 2) % 4] - X[m] * X[(m + 1) % 4]]]) for m in range(4)]
+F = [[A[n].diff(X[m]) - A[m].diff(X[n]) + A[m] * A[n] - A[n] * A[m] for n in range(4)] for m in range(4)]
+perms = list(itertools.permutations(range(4)))
+trFF = sum(LeviCivita(*p) * (F[p[0]][p[1]] * F[p[2]][p[3]]).trace() for p in perms) / 4
+
+def cs_density(n, r, s):
+    """tr(A_ν ∂_ρA_σ + ⅔ A_νA_ρA_σ)."""
+    return (A[n] * A[s].diff(X[r]) + sp.Rational(2, 3) * A[n] * A[r] * A[s]).trace()
+
+dCS = sum(LeviCivita(*p) * sp.diff(cs_density(p[1], p[2], p[3]), X[p[0]]) for p in perms)
+print("tr F∧F − d CS =", sp.expand(trFF - dCS))
+print("сама форма tr F∧F ≠ 0:", sp.expand(trFF) != 0)
+```
+
+Локально $\operatorname{tr}F\wedge F$ точна всегда; глобально $\mathrm{CS}(A)$ не инвариантна относительно
+калибровочных преобразований, и интеграл $\operatorname{tr}F\wedge F$ по замкнутому многообразию
+может быть ненулевым.
+
+## Первый класс Черна над сферой
+
+**Тавтологическое расслоение** над сферой Блоха: слой над точкой $\mathbf n$ — прямая
+в $\mathbb C^2$, натянутая на спинор $|{+}\mathbf n\rangle$. Связность индуцирована
+проектированием: для сечения $\sigma = s f$ ($s$ — локальный нормированный
+спинор, $f$ — функция) $\nabla\sigma = s\bigl(\dd f + \langle s|\dd s\rangle f\bigr)$, то есть $i\mathcal A = \langle s|\dd s\rangle$, или $\mathcal A = -A_\text{Б}$
+через связность Берри. Посчитаем число Черна в двух картах — с
+сечениями $s_N$, $s_S$ из статьи о [главных расслоениях](/math/bundles/principal-bundles.qmd):
+
+```{python}
+theta, phi = sp.symbols("theta phi", real=True)
+s_N = sp.Matrix([sp.cos(theta / 2), sp.exp(sp.I * phi) * sp.sin(theta / 2)])
+s_S = sp.Matrix([sp.exp(-sp.I * phi) * sp.cos(theta / 2), sp.sin(theta / 2)])
+
+def induced(s):
+    """𝒜 = −i⟨s|ds⟩: компоненты (𝒜_θ, 𝒜_φ)."""
+    return [sp.simplify(-sp.I * (s.H * s.diff(v))[0]) for v in (theta, phi)]
+
+A_N, A_S = induced(s_N), induced(s_S)
+F_N = sp.simplify(A_N[1].diff(theta) - A_N[0].diff(phi))
+c1 = sp.integrate(sp.integrate(-F_N / (2 * sp.pi), (theta, 0, sp.pi)), (phi, 0, 2 * sp.pi))
+print("𝒜_N =", A_N[1], "dφ,  𝒜_S =", A_S[1], "dφ;  ℱ =", F_N, "dθ∧dφ")
+print("∫c₁ = −(1/2π)∫ℱ =", c1)
+# по Стоксу: ∫ℱ = ∮_экватор (𝒜_N − 𝒜_S), экватор ориентирован как граница северной полусферы
+print("через функцию перехода: −(1/2π)∮(𝒜_N − 𝒜_S) =", sp.simplify(sp.integrate(-(A_N[1] - A_S[1]) / (2 * sp.pi), (phi, 0, 2 * sp.pi))))
+```
+
+Число Черна равно $-1$ и целиком определяется функцией перехода: по
+формуле Стокса для двух полусфер $\int_{S^2}\mathcal F = \oint(\mathcal A_N - \mathcal A_S)$, а разность связностей на
+экваторе — калибровочный член $\mathcal A_N - \mathcal A_S = \dd\varphi$ от перехода $s_N = s_Se^{i\varphi}$. Интеграл
+$\oint\dd\varphi = 2\pi\cdot(\text{степень перехода})$, отсюда и целочисленность: $\int c_1 = -\deg g_{SN}$.
+Расслоение заряда $q$ (переход $e^{iq\varphi}$) имеет число Черна $-q$; линейные
+расслоения над $S^2$ классифицируются этим целым числом.
+
+Это объясняет квантование, которое в физике возникает в двух местах.
+Для спина в магнитном поле $\int c_1$ — число Черна уровня (статья о [фазе
+Берри](/physics/quantum/berry-phase.qmd)). Для заряженной частицы в поле монополя $\mathcal A = \frac{e}{\hbar c}A$, и
+целочисленность $\frac{1}{2\pi}\int\mathcal F = \frac{e}{2\pi\hbar c}\cdot4\pi g$ даёт условие Дирака $\frac{2eg}{\hbar c}\in\mathbb Z$ (тема
+«Монополь Дирака»).
+
+## Класс Эйлера и формула Гаусса–Бонне
+
+Касательное расслоение ориентированной поверхности — $\mathrm{SO}(2)$-расслоение,
+его можно считать комплексным линейным ($\mathrm{SO}(2) = \mathrm U(1)$). Форма кривизны
+связности Леви-Чивиты в ортонормированном репере — $\Omega^1{}_2 = K\,e^1\wedge e^2$ ([тетрады и
+структурные уравнения Картана](/math/riemann/tetrads-cartan.qmd)), и характеристический класс
+$e = \Omega^1{}_2/2\pi$ — **класс Эйлера**. Его интеграл не зависит от метрики. Проверим на
+«деформированной сфере» $\dd s^2 = \dd\theta^2 + h(\theta)^2\dd\varphi^2$ с $h = \sin\theta\,(1 + \frac12\sin^2\theta)$:
+
+```{python}
+h = sp.sin(theta) * (1 + sp.Rational(1, 2) * sp.sin(theta)**2)
+omega = connection_forms(sp.diag(1, h), (theta, phi), sp.eye(2))
+Omega = curvature_forms(omega, (theta, phi))
+K = sp.simplify(Omega[0][1][(1, 2)] / h)
+print("ω¹₂ =", omega[0][1], ";  гауссова кривизна K =", K)
+print("∫e = (1/2π)∫Ω¹₂ =", sp.integrate(sp.integrate(Omega[0][1][(1, 2)], (theta, 0, sp.pi)), (phi, 0, 2 * sp.pi)) / (2 * sp.pi))
+```
+
+Кривизна меняет знак ($K < 0$ у полюсов, где поверхность «вдавлена»), но $\frac{1}{2\pi}\int K\,\dd S = 2 = \chi(S^2)$ — **формула
+Гаусса–Бонне**. В статье о [главных расслоениях](/math/bundles/principal-bundles.qmd) то же число 2
+(по модулю) получилось как степень функции перехода расслоения реперов
+сферы. Для тора $\int e = 0$, и расслоение реперов тривиально.
+
+## Число Черна зоны
+
+В кристалле блоховские состояния $|u_n(\mathbf k)\rangle$ зоны $n$ образуют линейное расслоение над
+зоной Бриллюэна — двумерным тором $T^2$. Его число Черна
+$C = \frac{1}{2\pi}\int F_\text{Б}$ — топологический инвариант зоны. Таулесс, Кохмото, Найтингейл и
+ден Нейс (1982) показали, что холловская проводимость заполненной зоны
+равна $\sigma_{xy} = C\,e^2/h$.
+
+Для численного расчёта нужна формула, не требующая гладкой калибровки
+(которой при $C \ne 0$ не существует). Как в дискретной формуле фазы Берри,
+поток кривизны через малую ячейку сетки — фаза произведения
+перекрытий по её границе:
+$$
+F_\square = -\arg\bigl(\langle u_1|u_2\rangle\langle u_2|u_3\rangle\langle u_3|u_4\rangle\langle u_4|u_1\rangle\bigr), \qquad C = \frac{1}{2\pi}\sum_\square F_\square ,
+$$
+и на торе сумма — **точно** целое число при любой сетке, если каждая $F_\square$ по
+модулю меньше $\pi$ (Фукуи, Хацугаи, Судзуки, 2005). Фазы векторов сокращаются,
+поэтому собственные векторы можно брать прямо из `eigh`. Сначала
+проверим формулу на сфере, где ответ известен ($-1$):
+
+```{python}
+def plaquette_flux(u1, u2, u3, u4):
+    """Поток кривизны Берри через ячейку: −arg Π⟨u_i|u_{i+1}⟩."""
+    return -np.angle(np.vdot(u1, u2) * np.vdot(u2, u3) * np.vdot(u3, u4) * np.vdot(u4, u1))
+
+def lattice_chern(states, periodic=(True, True)):
+    """Число Черна по сетке собственных векторов states[i, j] (оси — два параметра)."""
+    n1, n2 = states.shape[:2]
+    m1, m2 = (n1 if periodic[0] else n1 - 1), (n2 if periodic[1] else n2 - 1)
+    flux = np.array([[plaquette_flux(states[i, j], states[(i + 1) % n1, j],
+                                     states[(i + 1) % n1, (j + 1) % n2], states[i, (j + 1) % n2])
+                      for j in range(m2)] for i in range(m1)])
+    return flux.sum() / (2 * np.pi), flux
+
+sigma_np = [np.array([[0, 1], [1, 0]]), np.array([[0, -1j], [1j, 0]]), np.diag([1.0, -1.0])]
+
+def ground_state(H):
+    return np.linalg.eigh(H)[1][:, 0]
+
+# спин ½ в поле вдоль n: H = −n·σ, основное состояние |+n⟩; сетка θ ∈ [0, π], φ периодично
+thetas, phis = np.linspace(0, np.pi, 31), np.linspace(0, 2 * np.pi, 40, endpoint=False)
+sphere = np.array([[ground_state(-(np.sin(t) * np.cos(p) * sigma_np[0] + np.sin(t) * np.sin(p) * sigma_np[1]
+                                   + np.cos(t) * sigma_np[2])) for p in phis] for t in thetas])
+print(f"число Черна |+n⟩ на сфере по решёточной формуле: {lattice_chern(sphere, periodic=(False, True))[0]:+.6f}")
+```
+
+Теперь — простейшая модель изолятора с ненулевым числом Черна,
+**модель Ци–Ву–Чжана** (2006), две зоны на квадратной решётке:
+$$
+H(\mathbf k) = \sin k_x\,\sigma_x + \sin k_y\,\sigma_y + (m + \cos k_x + \cos k_y)\,\sigma_z .
+$$
+Щель закрывается только при $m = 0, \pm2$ (в точках, где все три коэффициента
+обращаются в нуль), и число Черна нижней зоны может меняться только
+там:
+
+```{python}
+#| label: fig-qwz-chern
+#| fig-cap: 'Модель Ци–Ву–Чжана. Слева — число Черна нижней зоны в зависимости от m (решёточная формула на сетке 40 × 40); оно меняется только при закрытии щели (m = 0, ±2, пунктир). Справа — распределение кривизны Берри нижней зоны по зоне Бриллюэна при m = 1 (поток через ячейку, делённый на её площадь); кривизна в основном отрицательна (C = −1; положительна лишь слабо, до 0,06, вдали от этих линий) и сосредоточена вдоль линий k_x = π и k_y = π с наибольшим модулем в точке (π, π).'
+def qwz_lower_band(m, n=40):
+    ks = np.linspace(0, 2 * np.pi, n, endpoint=False)
+    return ks, np.array([[ground_state(np.sin(kx) * sigma_np[0] + np.sin(ky) * sigma_np[1]
+                                       + (m + np.cos(kx) + np.cos(ky)) * sigma_np[2]) for ky in ks] for kx in ks])
+
+masses = np.linspace(-3, 3, 61) + 0.025                  # сдвиг, чтобы не попасть в точку закрытия щели
+cherns = [lattice_chern(qwz_lower_band(m, 24)[1])[0] for m in masses]
+ks, band = qwz_lower_band(1.0)
+C1, flux = lattice_chern(band)
+dk = ks[1] - ks[0]
+
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 3.9))
+ax1.plot(masses, cherns, "o-", ms=3)
+for mc in (-2, 0, 2):
+    ax1.axvline(mc, color="gray", ls="--", lw=0.8)
+ax1.set(xlabel="m", ylabel="число Черна C нижней зоны", yticks=[-1, 0, 1])
+im = ax2.pcolormesh(ks + dk / 2, ks + dk / 2, (flux / dk**2).T, cmap="viridis", shading="auto")
+ax2.set(xlabel="k_x", ylabel="k_y", aspect="equal", title="кривизна Берри, m = 1")
+fig.colorbar(im, ax=ax2)
+plt.tight_layout()
+plt.show()
+for m in (-3, -1, 1, 3):
+    print(f"m = {m:+d}: C = {round(lattice_chern(qwz_lower_band(m)[1])[0], 6) + 0.0:+.6f}")
+i_max = np.unravel_index(np.abs(flux).argmax(), flux.shape)
+print(f"m = 1: C = {C1:+.6f};  максимум |F| в ячейке у k = ({ks[i_max[0]] + dk / 2:.2f}, {ks[i_max[1]] + dk / 2:.2f})")
+```
+
+Число Черна постоянно в каждой фазе и меняет знак вместе с $m$: при
+$|m| > 2$ изолятор тривиален, при $0 < |m| < 2$ — топологический, с холловской
+проводимостью $\pm e^2/h$ без магнитного поля (аномальный квантовый эффект
+Холла; наблюдён в 2013 году в магнитных топологических изоляторах). При
+переходе между фазами $C$ меняется на $\pm1$ — ровно на «монопольный заряд»
+точки вырождения, через которую проходит переход: в точке закрытия щели
+гамильтониан локально $\boldsymbol\sigma\cdot\mathbf d$, как спин в поле. На границе образца с $C\neq0$
+обязательно есть бесщелевые краевые состояния.
+
+## Второй класс Черна и инстантоны
+
+Для $\mathrm{SU}(2)$-расслоения $\operatorname{tr}F = 0$, и первый нетривиальный класс — $c_2 = \frac{1}{8\pi^2}\operatorname{tr}F\wedge F$. Над
+$S^4$ (компактифицированным евклидовым $\mathbb R^4$) его интеграл — целое **число
+инстантонов**. По формуле Черна–Саймонса
+$\int_{\mathbb R^4}\operatorname{tr}F\wedge F = \int_{S^3_\infty}\mathrm{CS}(A)$, а на бесконечности поле — чистая калибровка $A = U^{-1}\dd U$, для
+которой $F = 0$ и $\mathrm{CS} = -\frac13\operatorname{tr}(U^{-1}\dd U)^3$. Так число инстантонов сводится к числу
+намотки $U: S^3\to\mathrm{SU}(2)$ из статьи о [калибровочных
+преобразованиях](/math/bundles/gauge-transformations.qmd) (с точностью до знака, зависящего от ориентации).
+Инстантоны — туннельные переходы между вакуумами с разными числами
+намотки; это тема «Поля Янга–Миллса».
+
+## Итоги
+
+- Инвариантные многочлены от кривизны дают замкнутые формы, классы которых не зависят от
+  связности (Черн–Вейль); $c(E) = \det(1 + \frac{i}{2\pi}F)$, $c_1 = \frac{i}{2\pi}\operatorname{tr}F = -\frac{1}{2\pi}\operatorname{tr}\mathcal F$.
+- $\operatorname{tr}F\wedge F = \dd\,\mathrm{CS}(A)$ локально; интеграл — топологический.
+- Тавтологическое расслоение над $S^2$: $\int c_1 = -1 = -\deg(e^{i\varphi})$; заряд $q$ — число Черна $-q$; квантование
+  монопольного заряда.
+- Класс Эйлера $\Omega^1{}_2/2\pi$: формула Гаусса–Бонне $\frac{1}{2\pi}\int K\,\dd S = \chi$.
+- Число Черна зоны — холловская проводимость в единицах $e^2/h$; решёточная формула даёт точное
+  целое; модель Ци–Ву–Чжана: $C = \pm1$ при $0 < |m| < 2$, $0$ при $|m| > 2$.
+- $\int c_2$ — число инстантонов, равное числу намотки калибровочного преобразования на бесконечности.
+
+## Упражнения
+
+1. Докажите, что $\int_{T^2}c_1 = 0$ для любой связности на тривиальном линейном
+   расслоении над тором. Почему этот довод не работает для зоны с $C \ne 0$?
+2. Найдите $c_1$ и $c_2$ прямой суммы $L_1\oplus L_2$ двух линейных расслоений через $c_1(L_1)$, $c_1(L_2)$.
+3. Для спина 1 в поле (основное состояние $m = +1$ вдоль поля) найдите число Черна
+   решёточной формулой или из статьи о фазе Берри.
+4. Чему равен $\int e$ для тора вращения? Проверьте с метрикой
+   $\dd s^2 = (R + r\cos\theta)^2\dd\varphi^2 + r^2\dd\theta^2$.
+5. Как изменится число Черна нижней зоны модели Ци–Ву–Чжана, если заменить
+   $\sin k_y\to-\sin k_y$ (зеркальное отражение $k_y\to -k_y$)?
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. На тривиальном расслоении связность — глобальная 1-форма, $\mathcal F = \dd\mathcal A$, и $\int_{T^2}\dd\mathcal A = 0$ по Стоксу.
+   При $C \ne 0$ глобального гладкого сечения (глобальной калибровки для $|u(\mathbf k)\rangle$) нет.
+2. $c(L_1\oplus L_2) = (1 + c_1(L_1))(1 + c_1(L_2))$: $c_1 = c_1(L_1) + c_1(L_2)$, $c_2 = c_1(L_1)\wedge c_1(L_2)$.
+3. Фаза Берри уровня $m$ — $-m\Omega$, кривизна $-m\sin\theta\,\dd\theta\wedge\dd\varphi$, число Черна $-2m = -2$.
+4. $\int e = 0$: $\chi(T^2) = 0$. С этой метрикой $K = \frac{\cos\theta}{r(R + r\cos\theta)}$, $\dd S = r(R + r\cos\theta)\,\dd\theta\,\dd\varphi$, и
+   $\int K\,\dd S = 2\pi\int_0^{2\pi}\cos\theta\,\dd\theta = 0$.
+5. Отражение одной оси меняет ориентацию зоны Бриллюэна: $C\to-C$ ($+1\leftrightarrow-1$ в топологических фазах).
+:::
