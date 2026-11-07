@@ -1,0 +1,256 @@
+---
+title: "Интеграл по траекториям"
+topic: path-integral
+order: 20
+description: "Пропагатор K = ⟨x_b|e^{−iHT/ħ}|x_a⟩ и закон композиции; разбиение времени: K = lim ∫Πdx (m/2πiħε)^{N/2} e^{iS_N/ħ}; свободная частица: свёртка гауссовых ядер в мнимом времени (SymPy) и K = √(m/2πiħT) e^{iS_кл/ħ}; гауссовы интегралы и детерминанты, формула Гельфанда–Яглома для det(−∂²+ω²) (численно); осциллятор: ядро Мелера, проверка уравнения Шрёдингера, S_кл из принципа наименьшего действия, префактор Ван Флека √(−∂²S/∂x_a∂x_b/2πiħ); классический предел как стационарная фаза; евклидово время и статистическая сумма; Монте-Карло по траекториям для ангармонического осциллятора: E₀ по теореме вириала и плотность |ψ₀|² против точной диагонализации (рисунок); заряд в магнитном поле — фаза e^{ie∫A·dx/ħc} и топологические классы путей"
+---
+
+В статье о [принципе наименьшего действия](/physics/mechanics/least-action.qmd) классическая
+траектория выделялась условием $\delta S = 0$. Фейнман (1948), следуя замечанию
+Дирака, дал квантовой механике формулировку, в которой участвуют
+**все** траектории: амплитуда перехода — сумма $e^{iS/\hbar}$ по всем путям, и
+классический путь выделяется только тем, что вблизи него фазы
+складываются, а не гасят друг друга. Эта формулировка эквивалентна
+[постулатам квантовой механики](/physics/quantum/qm-postulates.qmd), но удобнее для теории поля,
+статистической физики и численного моделирования.
+
+## Пропагатор и разбиение времени
+
+::: {#def-propagator}
+**Пропагатор** — ядро оператора эволюции в координатном представлении:
+$$
+K(x_b, t_b; x_a, t_a) = \langle x_b|e^{-iH(t_b - t_a)/\hbar}|x_a\rangle, \qquad \psi(x_b, t_b) = \int K(x_b, t_b; x_a, t_a)\,\psi(x_a, t_a)\,\dd x_a .
+$$
+Он удовлетворяет уравнению Шрёдингера по $(x_b, t_b)$ с начальным условием
+$K\to\delta(x_b - x_a)$ и **закону композиции** $K(b, a) = \int K(b, c)K(c, a)\,\dd x_c$.
+:::
+
+Разобьём интервал $T = t_b - t_a$ на $N$ шагов $\varepsilon = T/N$ и вставим между
+множителями $e^{-iH\varepsilon/\hbar}$ разложения единицы. Для $H = p^2/2m + V(x)$ при малом $\varepsilon$
+$\langle x_{j+1}|e^{-iH\varepsilon/\hbar}|x_j\rangle\approx\sqrt{\frac{m}{2\pi i\hbar\varepsilon}}\exp\bigl[\frac{i}{\hbar}\bigl(\frac{m(x_{j+1} - x_j)^2}{2\varepsilon} - \varepsilon V(x_j)\bigr)\bigr]$ (гауссов интеграл
+по импульсу), и
+$$
+K(b, a) = \lim_{N\to\infty}\Bigl(\frac{m}{2\pi i\hbar\varepsilon}\Bigr)^{N/2}\int\prod_{j=1}^{N-1}\dd x_j\,\exp\Bigl(\frac{i}{\hbar}S_N\Bigr), \qquad
+S_N = \sum_{j=0}^{N-1}\Bigl[\frac{m(x_{j+1} - x_j)^2}{2\varepsilon} - \varepsilon V(x_j)\Bigr]
+$$
+— $S_N$ есть действие ломаной, а интеграл по промежуточным точкам — «сумма по
+путям» $\int\mathcal Dx\,e^{iS[x]/\hbar}$.
+
+**Свободная частица.** Интегралы с $e^{i(\dots)}$ осциллируют, и SymPy с ними
+справляется плохо; удобно перейти к **мнимому времени** $t = -i\tau$, где ядра
+становятся вещественными гауссианами (ядро уравнения теплопроводности), и
+вернуться в конце. Закон композиции для двух шагов:
+
+```{python}
+import numpy as np
+import sympy as sp
+import matplotlib.pyplot as plt
+from scipy.linalg import eigh_tridiagonal
+
+x, y, z = sp.symbols("x y z", real=True)
+m, hbar, tau1, tau2, T, w = sp.symbols("m hbar tau_1 tau_2 T omega", positive=True)
+
+def heat_kernel(dx, tau):
+    """Евклидов пропагатор свободной частицы √(m/2πħτ) exp(−m dx²/2ħτ)."""
+    return sp.sqrt(m / (2 * sp.pi * hbar * tau)) * sp.exp(-m * dx**2 / (2 * hbar * tau))
+
+composed = sp.integrate(heat_kernel(z - y, tau2) * heat_kernel(y - x, tau1), (y, -sp.oo, sp.oo), conds="none")
+ratio = sp.powsimp(sp.expand_power_base(composed / heat_kernel(z - x, tau1 + tau2), force=True), force=True)
+print("∫K(z, τ₂; y)K(y, τ₁; x)dy = K(z, τ₁+τ₂; x):", sp.simplify(ratio) == 1)
+```
+
+После $N$ шагов получается $K_E = \sqrt{m/2\pi\hbar\tau}\,e^{-m(x_b - x_a)^2/2\hbar\tau}$, а при $\tau = iT$
+$$
+K_\text{св}(x_b, T; x_a) = \sqrt{\frac{m}{2\pi i\hbar T}}\exp\Bigl(\frac{i}{\hbar}\frac{m(x_b - x_a)^2}{2T}\Bigr) = \sqrt{\frac{m}{2\pi i\hbar T}}\,e^{iS_\text{кл}/\hbar} :
+$$
+показатель — действие классической траектории $x(t) = x_a + (x_b - x_a)t/T$.
+
+## Гауссовы интегралы и детерминанты
+
+Если действие квадратично, интеграл по путям гауссов. Для $n$
+переменных и положительной матрицы $A$
+$$
+\int\exp\Bigl(-\frac12x^{\mathsf T}Ax + J^{\mathsf T}x\Bigr)\dd^nx = \frac{(2\pi)^{n/2}}{\sqrt{\det A}}\exp\Bigl(\frac12J^{\mathsf T}A^{-1}J\Bigr),
+$$
+поэтому квадратичное действие $S = S_\text{кл} + \frac12\delta x\cdot A\,\delta x$ даёт $K\propto e^{iS_\text{кл}/\hbar}(\det A)^{-1/2}$ — нужен
+**детерминант оператора** флуктуаций. Для евклидова осциллятора на
+отрезке длины $T$ с закреплёнными концами это $-\partial_\tau^2 + \omega^2$; на сетке — трёхдиагональная
+матрица. Отношение к свободному детерминанту имеет предел
+$\frac{\det(-\partial^2 + \omega^2)}{\det(-\partial^2)} = \frac{\operatorname{sh}\omega T}{\omega T}$ (Гельфанд и Яглом, 1960: детерминант равен значению на конце
+решения уравнения $(-\partial^2 + \omega^2)y = 0$ с $y(0) = 0$, $y'(0) = 1$):
+
+```{python}
+def log_det_fluct(n, T_, omega):
+    """log det дискретного оператора (−∂² + ω²)ε² на n − 1 внутренних узлах."""
+    eps_ = T_ / n
+    diag = np.full(n - 1, 2.0 + (omega * eps_)**2)
+    return np.sum(np.log(eigh_tridiagonal(diag, -np.ones(n - 2), eigvals_only=True)))
+
+T_val, w_val = 2.0, 1.5
+for n in (10, 100, 1000):
+    ratio = np.exp(log_det_fluct(n, T_val, w_val) - log_det_fluct(n, T_val, 0.0))
+    print(f"N = {n:4d}: det(−∂² + ω²)/det(−∂²) = {ratio:.6f}")
+print(f"sh(ωT)/(ωT) = {np.sinh(w_val * T_val) / (w_val * T_val):.6f}")
+```
+
+## Гармонический осциллятор
+
+Для $V = \frac12m\omega^2x^2$ классическая траектория с $x(0) = x_a$, $x(T) = x_b$ даёт действие
+$S_\text{кл} = \frac{m\omega}{2\sin\omega T}\bigl[(x_a^2 + x_b^2)\cos\omega T - 2x_ax_b\bigr]$, а флуктуационный детерминант
+(после поворота $\operatorname{sh}\omega T\to\sin\omega T$) — префактор. В итоге **ядро Мелера**
+$$
+K = \sqrt{\frac{m\omega}{2\pi i\hbar\sin\omega T}}\exp\Bigl(\frac{i}{\hbar}S_\text{кл}\Bigr) .
+$$
+Префактор совпадает с формулой **Ван Флека** $\sqrt{-\frac{1}{2\pi i\hbar}\frac{\partial^2S_\text{кл}}{\partial x_a\partial x_b}}$, точной для
+квадратичных действий. Проверим всё сразу: действие на решении
+уравнения движения, формулу Ван Флека и уравнение Шрёдингера:
+
+```{python}
+t = sp.Symbol("t", real=True)
+xa, xb = sp.symbols("x_a x_b", real=True)
+x_cl = (xa * sp.sin(w * (T - t)) + xb * sp.sin(w * t)) / sp.sin(w * T)        # x(0) = x_a, x(T) = x_b
+lagr = m * x_cl.diff(t)**2 / 2 - m * w**2 * x_cl**2 / 2
+S_cl = sp.simplify(sp.integrate(sp.expand(lagr), (t, 0, T)))
+S_formula = m * w / (2 * sp.sin(w * T)) * ((xa**2 + xb**2) * sp.cos(w * T) - 2 * xa * xb)
+print("уравнение движения:", sp.simplify(x_cl.diff(t, 2) + w**2 * x_cl) == 0, ";  S_кл совпадает с формулой:", sp.simplify(sp.fu(S_cl - S_formula)) == 0)
+vv = sp.sqrt(-S_formula.diff(xa, xb) / (2 * sp.pi * sp.I * hbar))
+print("Ван Флек:", sp.simplify(vv**2 - m * w / (2 * sp.pi * sp.I * hbar * sp.sin(w * T))) == 0)
+K_mehler = sp.sqrt(m * w / (2 * sp.pi * sp.I * hbar * sp.sin(w * T))) * sp.exp(sp.I * S_formula / hbar)
+schr = sp.I * hbar * K_mehler.diff(T) + hbar**2 / (2 * m) * K_mehler.diff(xb, 2) - m * w**2 * xb**2 / 2 * K_mehler
+print("iħ∂_TK − HK = 0:", sp.simplify(sp.fu(sp.simplify(schr / K_mehler))) == 0)
+```
+
+При $\omega T = \pi$ префактор расходится, а $S_\text{кл}\to\infty$ при $x_b \ne -x_a$: все траектории из
+$x_a$ через полпериода собираются в $-x_a$ (каустика), и $K\propto\delta(x_b + x_a)$ — волновая
+функция через полпериода отражается, $\psi(x, \pi/\omega) = e^{-i\pi/2}\psi(-x, 0)$ (упражнение 2).
+
+## Классический предел
+
+В сумме $\int\mathcal Dx\,e^{iS[x]/\hbar}$ при $S\gg\hbar$ соседние пути дают сильно различающиеся фазы и
+гасят друг друга — кроме окрестности пути, где $S$ **стационарно**: $\delta S = 0$.
+Так из квантовой механики получается принцип наименьшего (точнее,
+стационарного) действия — так же, как геометрическая оптика из
+волновой. Ширина «трубки» существенных путей — там, где $\delta^2S\sim\hbar$. Для
+свободной частицы со смещением $\delta x = a\sin(\pi t/T)$ действие $S = S_\text{кл} + \frac{m\pi^2a^2}{4T}$, и
+существенны $|a|\lesssim\sqrt{\hbar T/m}$ — для пылинки массой 1 мкг за 1 с это $3\cdot10^{-13}$ м, а для
+электрона — около сантиметра.
+
+## Мнимое время и статистическая физика
+
+Подстановка $t = -i\tau$ превращает $e^{-iHt/\hbar}$ в $e^{-H\tau/\hbar}$, а фазу — в вещественный вес:
+$$
+Z(\beta) = \operatorname{tr}e^{-\beta H} = \int_{x(0) = x(\beta\hbar)}\mathcal Dx\,e^{-S_E[x]/\hbar}, \qquad S_E = \int_0^{\beta\hbar}\Bigl[\frac m2\dot x^2 + V(x)\Bigr]\dd\tau .
+$$
+Статистическая сумма — интеграл по **замкнутым** путям в мнимом времени, с
+положительным весом, как у [канонического ансамбля](/physics/statistical/canonical-ensemble.qmd)
+классических «полимеров». При большом $\beta$ основное состояние
+доминирует, и средние по путям дают его свойства. Это основа
+квантового метода Монте-Карло.
+
+Проверим на ангармоническом осцилляторе $V = \frac12x^2 + \frac14x^4$ ($\hbar = m = \omega = 1$): сетка
+из $N = 128$ узлов с шагом $\varepsilon = 0{,}125$ ($\beta = 16$), алгоритм Метрополиса,
+узлы обновляются в шахматном порядке (чётные, затем нечётные — так они
+независимы при данных соседях). Энергию основного состояния даёт
+**теорема вириала** $E_0 = \langle V + \frac12xV'\rangle$; сравним с точной диагонализацией:
+
+```{python}
+#| label: fig-pimc
+#| fig-cap: 'Квантовый Монте-Карло по траекториям для ангармонического осциллятора V = x²/2 + x⁴/4 (ħ = m = ω = 1): гистограмма координат всех узлов всех сохранённых путей в мнимом времени (β = 16) и плотность |ψ₀(x)|² основного состояния из точной диагонализации (линия). Пунктир — |ψ₀|² гармонического осциллятора без x⁴ для сравнения. Вставка — один типичный путь x(τ).'
+rng = np.random.default_rng(1)
+V = lambda q: q**2 / 2 + q**4 / 4
+dV = lambda q: q + q**3
+N_t, eps = 128, 0.125
+
+def local_action(q, left, right):
+    """Часть евклидова действия, зависящая от узла q."""
+    return ((right - q)**2 + (q - left)**2) / (2 * eps) + eps * V(q)
+
+path = np.zeros(N_t)
+saved = []
+for sweep in range(30000):
+    for parity in (0, 1):
+        idx = np.arange(parity, N_t, 2)
+        left, right = path[idx - 1], path[(idx + 1) % N_t]
+        trial = path[idx] + rng.uniform(-0.6, 0.6, idx.size)
+        accept = rng.random(idx.size) < np.exp(-(local_action(trial, left, right) - local_action(path[idx], left, right)))
+        path[idx] = np.where(accept, trial, path[idx])
+    if sweep >= 2000 and sweep % 5 == 0:
+        saved.append(path.copy())
+saved = np.array(saved)
+
+virial = np.mean(V(saved) + saved * dV(saved) / 2, axis=1)            # по каждому пути
+blocks = virial[: len(virial) // 50 * 50].reshape(50, -1).mean(axis=1)  # 50 блоков против автокорреляции
+E0_mc, E0_err = blocks.mean(), blocks.std(ddof=1) / np.sqrt(len(blocks))
+
+xg = np.linspace(-6, 6, 1201)
+hx = xg[1] - xg[0]
+energies, states = eigh_tridiagonal(1 / hx**2 + V(xg), -0.5 / hx**2 * np.ones(len(xg) - 1))
+psi0_sq = states[:, 0]**2 / hx
+
+fig, ax = plt.subplots(figsize=(7, 4))
+ax.hist(saved.ravel(), bins=80, range=(-3, 3), density=True, alpha=0.5, label="Монте-Карло по путям")
+ax.plot(xg, psi0_sq, color="k", label="|ψ₀|², диагонализация")
+ax.plot(xg, np.exp(-xg**2) / np.sqrt(np.pi), "--", color="0.5", label="|ψ₀|² без x⁴")
+ax.set(xlim=(-3, 3), xlabel="x", ylabel="плотность")
+ax.legend(loc="upper left", fontsize=8)
+inset = ax.inset_axes([0.68, 0.55, 0.3, 0.4])
+inset.plot(np.arange(N_t) * eps, saved[-1], lw=0.8)
+inset.set_xlabel("τ", fontsize=8)
+inset.tick_params(labelsize=7)
+plt.tight_layout()
+plt.show()
+print(f"E₀: Монте-Карло {E0_mc:.3f} ± {E0_err:.3f},  диагонализация {energies[0]:.4f}  (E₁ = {energies[1]:.4f})")
+print(f"⟨x²⟩: Монте-Карло {np.mean(saved**2):.4f},  точно {np.sum(xg**2 * psi0_sq) * hx:.4f};  e^(−β(E₁−E₀)) = {np.exp(-16 * (energies[1] - energies[0])):.0e}")
+```
+
+Вклад возбуждённых состояний при $\beta = 16$ подавлен множителем $e^{-\beta(E_1 - E_0)}\sim10^{-10}$, и
+Монте-Карло воспроизводит энергию и плотность основного состояния в
+пределах статистической погрешности (шаг $\varepsilon$ даёт систематическую ошибку
+порядка $\varepsilon^2$, здесь меньшую статистической). Тот же метод с
+фермионами наталкивается на «проблему знака» — веса перестают быть
+положительными.
+
+## Заряд в магнитном поле
+
+С векторным потенциалом лагранжиан получает слагаемое $\frac ec\mathbf A\cdot\dot{\mathbf x}$, и каждый путь —
+множитель $\exp\bigl(\frac{ie}{\hbar c}\int\mathbf A\cdot\dd\mathbf x\bigr)$. Для двух путей с общими концами
+разность фаз — поток через петлю, $\frac{e}{\hbar c}\oint\mathbf A\cdot\dd\mathbf x = \frac{e\Phi}{\hbar c}$. Если поле сосредоточено в
+недоступной области (соленоид), пути распадаются на **топологические
+классы** по числу оборотов $n$ вокруг неё, и
+$K = \sum_nK_n\,e^{ien\Phi/\hbar c}$ — эффект [Ааронова–Бома](/physics/quantum/aharonov-bohm.qmd) в формулировке
+Фейнмана: фаза зависит от класса пути, а не от поля на нём.
+
+## Итоги
+
+- $K(b, a) = \langle x_b|e^{-iHT/\hbar}|x_a\rangle = \int\mathcal Dx\,e^{iS[x]/\hbar}$ — предел интегралов по ломаным с $S_N$.
+- Свободная частица: $K = \sqrt{m/2\pi i\hbar T}\,e^{iS_\text{кл}/\hbar}$; осциллятор — ядро Мелера; для квадратичных действий
+  $K = (\text{Ван Флек})\cdot e^{iS_\text{кл}/\hbar}$, префактор — детерминант флуктуаций (Гельфанд–Яглом).
+- Классический предел — стационарная фаза, $\delta S = 0$.
+- В мнимом времени $Z = \int\mathcal Dx\,e^{-S_E/\hbar}$ по замкнутым путям: основа квантового Монте-Карло.
+- Магнитное поле — фаза $e^{ie\int A/\hbar c}$; пути вокруг соленоида делятся на классы.
+
+## Упражнения
+
+1. Сверните $N$ евклидовых ядер свободной частицы и покажите, что множители
+   $(m/2\pi\hbar\varepsilon)^{1/2}$ дают ровно $(m/2\pi\hbar\tau)^{1/2}$.
+2. Найдите $K$ осциллятора при $T\to\pi/\omega$ и покажите, что $\psi(x, \pi/\omega) = e^{-i\pi/2}\psi(-x, 0)$.
+3. Проверьте формулу Ван Флека для свободной частицы.
+4. Найдите $\langle x^2\rangle$ гармонического осциллятора при температуре $T$ из евклидова
+   пропагатора и проверьте при $\beta\hbar\omega = 2$.
+5. Покажите, что при высокой температуре ($\beta\to0$) интеграл по замкнутым путям в мнимом времени
+   даёт классическую статистическую сумму $Z\approx\int\frac{\dd x\,\dd p}{2\pi\hbar}e^{-\beta H}$.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. Каждая свёртка (первая ячейка) складывает «времена»: $\tau = \sum\varepsilon$, а префакторы
+   $\sqrt{m/2\pi\hbar\tau_1}\sqrt{m/2\pi\hbar\tau_2}\cdot\sqrt{2\pi\hbar\tau_1\tau_2/m(\tau_1 + \tau_2)} = \sqrt{m/2\pi\hbar(\tau_1 + \tau_2)}$ — по индукции получается ядро на время $N\varepsilon$.
+2. Через собственные функции: $K = \sum_n\psi_n(x_b)\psi_n(x_a)e^{-i(n + 1/2)\omega T}$; при $\omega T = \pi$ множитель
+   $e^{-i\pi/2}(-1)^n$, а $(-1)^n\psi_n(x_b) = \psi_n(-x_b)$, и по полноте $K = e^{-i\pi/2}\delta(x_b + x_a)$. Отсюда
+   $\psi(x, \pi/\omega) = e^{-i\pi/2}\psi(-x, 0)$. В формуле Мелера это видно как предел $\sin\omega T\to0$: гауссиан
+   $\sqrt{m\omega/2\pi i\hbar\sin\omega T}\,e^{im\omega(x_b + x_a)^2/2\hbar\sin\omega T}$ стягивается в δ-функцию, а фаза $e^{-i\pi/2}$ — индекс Маслова.
+3. $S = m(x_b - x_a)^2/2T$, $-\partial^2S/\partial x_a\partial x_b = m/T$, префактор $\sqrt{m/2\pi i\hbar T}$ — совпадает.
+4. $\langle x^2\rangle = \frac{\hbar}{2m\omega}\operatorname{cth}\frac{\beta\hbar\omega}{2}$; при $\beta\hbar\omega = 2$: $\frac12\operatorname{cth}1\approx0{,}657$ (в единицах $\hbar/m\omega$).
+5. Путь длины $\beta\hbar$ отходит от начальной точки на тепловую длину $\lambda\sim\hbar\sqrt{\beta/m}\to0$, и $V$ на нём
+   можно считать постоянным: $Z\approx\int\dd x\,e^{-\beta V(x)}K_E(x, \beta\hbar; x) = \sqrt{\frac{m}{2\pi\hbar^2\beta}}\int\dd x\,e^{-\beta V(x)}$, а
+   $\sqrt{m/2\pi\hbar^2\beta} = \int\frac{\dd p}{2\pi\hbar}e^{-\beta p^2/2m}$.
+:::
