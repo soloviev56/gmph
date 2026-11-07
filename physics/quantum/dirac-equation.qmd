@@ -1,0 +1,317 @@
+---
+title: "Уравнение Дирака"
+topic: dirac-equation
+order: 19
+description: "Уравнение (iħγ^μ∂_μ − mc)ψ = 0 как квадратный корень из уравнения Клейна–Гордона; гамильтонова форма H = cα·p + βmc², H² = p²c² + m²c⁴, двукратно вырожденные уровни ±E; сохраняющийся ток cψ̄γ^μψ с положительной плотностью ψ†ψ; спинорная ковариантность ψ' = Sψ — плоская волна в покое после буста S остаётся решением; полный момент J = L + ħΣ/2 коммутирует с H, а L — нет; нерелятивистский предел — уравнение Паули с g = 2; атом водорода: точные уровни Дирака, разложение до α⁴ и тонкая структура 2p (10,94 ГГц); дрожание (Zitterbewegung): интерференция положительных и отрицательных частот у волнового пакета (численно, рисунок); безмассовый случай и уравнения Вейля"
+---
+
+Уравнение [Клейна–Гордона](/physics/fields/klein-gordon.qmd) — второго порядка по времени,
+и его плотность заряда не знакоопределённа, так что $|\varphi|^2$ нельзя считать
+плотностью вероятности. Дирак (1928) искал уравнение первого порядка,
+каждое решение которого удовлетворяло бы уравнению Клейна–Гордона. Для
+этого нужен квадратный корень из волнового оператора — его дают
+матрицы алгебры Клиффорда из статьи об [алгебрах Клиффорда и спинорах](/math/lie/clifford-spinors.qmd).
+В результате получилось уравнение для частицы со [спином](/physics/quantum/spin.qmd) ½,
+с правильным магнитным моментом, тонкой структурой водорода — и
+решениями с отрицательной энергией, предсказавшими позитрон.
+
+Сигнатура $(+,-,-,-)$, $x^0 = ct$, $\{\gamma^\mu, \gamma^\nu\} = 2\eta^{\mu\nu}$ ([конвенции](/conventions.qmd)); матрицы Дирака — в
+представлении Дирака, $\boldsymbol\Sigma = \operatorname{diag}(\boldsymbol\sigma, \boldsymbol\sigma)$.
+
+## Уравнение и его гамильтонова форма
+
+::: {#def-dirac-equation}
+**Уравнение Дирака** для свободной частицы массы $m$:
+$$
+\bigl(i\hbar\gamma^\mu\partial_\mu - mc\bigr)\psi = 0 ,
+$$
+где $\psi(x)$ — четырёхкомпонентный столбец (биспинор). Умножив слева на
+$\gamma^0$ и выделив $\partial_t$, получим **гамильтонову форму**
+$$
+i\hbar\,\partial_t\psi = H\psi, \qquad H = c\,\boldsymbol\alpha\cdot\hat{\mathbf p} + \beta mc^2, \qquad \alpha^i = \gamma^0\gamma^i,\ \beta = \gamma^0 .
+$$
+:::
+
+Умножив уравнение на $(i\hbar\gamma^\nu\partial_\nu + mc)$, получаем $-(\hbar^2\gamma^\nu\gamma^\mu\partial_\nu\partial_\mu + m^2c^2)\psi = 0$, а
+симметричная часть $\gamma^\nu\gamma^\mu$ равна $\eta^{\mu\nu}$: каждая компонента $\psi$ подчиняется
+уравнению Клейна–Гордона. В гамильтоновой форме то же утверждение —
+$H^2 = c^2\mathbf p^2 + m^2c^4$, для чего $\alpha^i$ и $\beta$ должны попарно антикоммутировать и иметь
+квадрат 1:
+
+```{python}
+import numpy as np
+import sympy as sp
+import matplotlib.pyplot as plt
+from scipy.linalg import expm
+
+s0, Z = sp.eye(2), sp.zeros(2)
+sig = [sp.Matrix([[0, 1], [1, 0]]), sp.Matrix([[0, -sp.I], [sp.I, 0]]), sp.Matrix([[1, 0], [0, -1]])]
+
+def block(a, b, c, d):
+    return sp.Matrix(sp.BlockMatrix([[a, b], [c, d]]))
+
+gam = [block(s0, Z, Z, -s0)] + [block(Z, s, -s, Z) for s in sig]      # представление Дирака
+beta, alpha = gam[0], [gam[0] * g for g in gam[1:]]
+Sigma = [block(s, Z, Z, s) for s in sig]
+
+px, py, pz = sp.symbols("p_x p_y p_z", real=True)
+m, c, hbar = sp.symbols("m c hbar", positive=True)
+p_vec = (px, py, pz)
+H = c * sum((a * p for a, p in zip(alpha, p_vec)), sp.zeros(4)) + beta * m * c**2
+
+anti = lambda A, B: A * B + B * A
+ok = all(anti(a, b) == (2 * sp.eye(4) if i == j else sp.zeros(4))
+         for i, a in enumerate(alpha + [beta]) for j, b in enumerate(alpha + [beta]))
+print("{α_i, α_j} = 2δ_ij, {α_i, β} = 0, β² = 1:", ok)
+print("H² − (c²p² + m²c⁴) =", sp.simplify(H * H - (c**2 * sum(p**2 for p in p_vec) + m**2 * c**4) * sp.eye(4)) == sp.zeros(4))
+print("собственные значения H(p_x):", H.subs({py: 0, pz: 0}).eigenvals())
+```
+
+При каждом импульсе — два уровня $+E_p$ и два $-E_p$, $E_p = \sqrt{c^2p^2 + m^2c^4}$: двукратное
+вырождение — две проекции спина, а знак энергии — новое. Решения с
+$-E_p$ нельзя просто отбросить: они нужны для полноты, и любое внешнее поле
+их примешивает. Дирак истолковал их как заполненное «море» электронов,
+дыра в котором — позитрон (открыт в 1932); последовательная картина
+появляется во вторичном квантовании (тема «Вторичное квантование»).
+
+## Ток и плотность вероятности
+
+**Сопряжённый спинор** $\bar\psi = \psi^\dagger\gamma^0$ удовлетворяет $\bar\psi(i\hbar\overleftarrow{\partial_\mu}\gamma^\mu + mc) = 0$. Сложив
+уравнения, умноженные на $\bar\psi$ слева и на $\psi$ справа, получим сохранение тока
+$$
+j^\mu = c\,\bar\psi\gamma^\mu\psi, \qquad \partial_\mu j^\mu = 0, \qquad j^0 = c\,\psi^\dagger\psi \ge 0 .
+$$
+В отличие от уравнения Клейна–Гордона, плотность $\psi^\dagger\psi$ положительна: с её
+вероятностным смыслом Дирак и связывал своё уравнение. Плотность
+тока $\mathbf j = c\,\psi^\dagger\boldsymbol\alpha\psi$ — значит, **оператор скорости** равен $c\boldsymbol\alpha$, его собственные значения $\pm c$
+(к этому мы вернёмся при обсуждении дрожания).
+
+## Ковариантность
+
+При преобразовании Лоренца $x' = \Lambda x$ спинор преобразуется матрицей $S(\Lambda)$ из
+статьи об [алгебрах Клиффорда](/math/lie/clifford-spinors.qmd): $\psi'(x') = S\psi(x)$, $S^{-1}\gamma^\mu S = \Lambda^\mu{}_\nu\gamma^\nu$. Тогда
+$(i\hbar\gamma^\mu\partial'_\mu - mc)\psi' = S(i\hbar\gamma^\mu\partial_\mu - mc)\psi$, и уравнение сохраняет вид. Проверим на
+плоской волне $\psi = u\,e^{-ip_\mu x^\mu/\hbar}$, для которой уравнение принимает вид $(\gamma^\mu p_\mu - mc)u = 0$:
+возьмём частицу в покое и применим буст вдоль $x$ с быстротой $\vartheta$:
+
+```{python}
+eta = sp.diag(1, -1, -1, -1)
+K_x = sp.zeros(4)
+K_x[0, 1] = K_x[1, 0] = 1                                    # Λ = exp(ϑK_x) — буст вдоль x
+
+def spinor_generator(G):
+    """¼ G_αβ γ^α γ^β — генератор спинорного представления (статья об алгебрах Клиффорда)."""
+    G_low = eta * G
+    return sum((G_low[a, b] * gam[a] * gam[b] for a in range(4) for b in range(4)), sp.zeros(4)) / 4
+
+th = sp.Symbol("vartheta", real=True)
+Lam = sp.simplify((th * K_x).exp())
+S = sp.simplify((th * spinor_generator(K_x)).exp())
+print("S(ϑ) =", S.tolist())
+
+u_rest = sp.Matrix([1, 0, 0, 0])
+p_rest_up = sp.Matrix([m * c, 0, 0, 0])                      # p^μ частицы в покое
+p_up = Lam * p_rest_up
+p_low = eta * p_up
+slash = lambda p: sum((gam[k] * p[k] for k in range(4)), sp.zeros(4))
+print("p^μ после буста:", sp.simplify(p_up.T))
+print("(γ^μp_μ − mc)·Su_rest =", sp.simplify((slash(p_low) - m * c * sp.eye(4)) * S * u_rest).T)
+```
+
+Спинор движущейся частицы $u(p) = S\,u_\text{покоя}$ содержит нижние компоненты порядка
+$\operatorname{th}(\vartheta/2) = pc/(E + mc^2)$: для медленной частицы они малы, для ультрарелятивистской
+сравнимы с верхними. Это и используется в нерелятивистском пределе.
+
+## Спин
+
+Полный момент должен сохраняться. Орбитальный момент $\mathbf L = \mathbf r\times\hat{\mathbf p}$ не
+коммутирует с $H$: из $[p_x, L_z] = -i\hbar p_y$, $[p_y, L_z] = i\hbar p_x$ получаем $[H, L_z] = -i\hbar c(\alpha_xp_y - \alpha_yp_x)$.
+Недостающее слагаемое даёт спин $\frac\hbar2\boldsymbol\Sigma$:
+
+```{python}
+comm_L = c * (alpha[0] * (-sp.I * hbar * py) + alpha[1] * (sp.I * hbar * px))      # [H, L_z]
+comm_S = H * Sigma[2] - Sigma[2] * H                                               # [H, Σ_z]
+print("[H, L_z] = 0:", sp.simplify(comm_L) == sp.zeros(4), ";  [H, L_z + ħΣ_z/2] = 0:", sp.simplify(comm_L + hbar / 2 * comm_S) == sp.zeros(4))
+```
+
+Спин ½ не вводится руками: он следует из того, что $H$ содержит
+матрицы Клиффорда, а $\frac\hbar2\boldsymbol\Sigma$ — генераторы поворотов в спинорном
+представлении.
+
+## Нерелятивистский предел и $g = 2$
+
+Включим электромагнитное поле минимальной связью ([конвенции](/conventions.qmd)):
+$\hat{\mathbf p}\to\hat{\boldsymbol\pi} = \hat{\mathbf p} - \frac ec\mathbf A$, $H = c\boldsymbol\alpha\cdot\hat{\boldsymbol\pi} + \beta mc^2 + e\phi$. Для стационарного состояния с энергией
+$E = mc^2 + \varepsilon$ и $\psi = (\varphi, \chi)$ уравнения для верхней и нижней пар компонент
+$$
+(\varepsilon - e\phi)\,\varphi = c\,\boldsymbol\sigma\cdot\hat{\boldsymbol\pi}\,\chi, \qquad (\varepsilon - e\phi + 2mc^2)\,\chi = c\,\boldsymbol\sigma\cdot\hat{\boldsymbol\pi}\,\varphi .
+$$
+При $|\varepsilon - e\phi|\ll mc^2$ нижние компоненты малы, $\chi\approx\frac{\boldsymbol\sigma\cdot\hat{\boldsymbol\pi}}{2mc}\varphi$, и
+$$
+\varepsilon\,\varphi = \Bigl[\frac{(\boldsymbol\sigma\cdot\hat{\boldsymbol\pi})^2}{2m} + e\phi\Bigr]\varphi = \Bigl[\frac{\hat{\boldsymbol\pi}^2}{2m} - \frac{e\hbar}{2mc}\boldsymbol\sigma\cdot\mathbf B + e\phi\Bigr]\varphi
+$$
+— **уравнение Паули** с $g = 2$; тождество $(\boldsymbol\sigma\cdot\hat{\boldsymbol\pi})^2 = \hat{\boldsymbol\pi}^2 - \frac{e\hbar}{c}\boldsymbol\sigma\cdot\mathbf B$ проверено в
+статье о [спине](/physics/quantum/spin.qmd). В уравнении Паули $g = 2$ было «угадано»,
+а здесь оно следует из релятивистского уравнения первого порядка.
+Следующие порядки по $1/c^2$ дают релятивистскую поправку к кинетической
+энергии $-p^4/8m^3c^2$, спин-орбитальное взаимодействие и член Дарвина.
+
+## Атом водорода
+
+В кулоновском поле $e\phi = -Ze^2/r$ уравнение Дирака решается точно. Уровни
+зависят от главного числа $n$ и полного момента $j$, $\kappa = j + \frac12$:
+$$
+E_{nj} = mc^2\left[1 + \left(\frac{Z\alpha}{n - \kappa + \sqrt{\kappa^2 - Z^2\alpha^2}}\right)^2\right]^{-1/2}, \qquad \alpha = \frac{e^2}{\hbar c}\approx\frac1{137} .
+$$
+Разложим по $Z\alpha$:
+
+```{python}
+n_q, a_q = sp.symbols("n alpha", positive=True)
+kap = sp.Symbol("kappa", positive=True)
+E_dirac = (1 + (a_q / (n_q - kap + sp.sqrt(kap**2 - a_q**2)))**2)**sp.Rational(-1, 2)     # в единицах mc², Z = 1
+expansion = sp.series(E_dirac, a_q, 0, 6).removeO()
+fine = 1 - a_q**2 / (2 * n_q**2) - a_q**4 / (2 * n_q**4) * (n_q / kap - sp.Rational(3, 4))
+print("E/mc² до α⁴ совпадает с 1 − α²/2n² − (α⁴/2n⁴)(n/(j+½) − 3/4):", sp.simplify(expansion - fine) == 0)
+
+alpha_fs, mc2_eV, h_eVs, me_mp = 1 / 137.035999, 510998.95, 4.135667696e-15, 1 / 1836.15267
+
+def level(n, kappa, Z=1):
+    """Уровень Дирака в единицах mc²."""
+    za = Z * alpha_fs
+    return (1 + (za / (n - kappa + np.sqrt(kappa**2 - za**2)))**2)**-0.5
+
+split = (level(2, 2) - level(2, 1)) * mc2_eV / h_eVs / (1 + me_mp)    # приведённая масса
+print(f"2p₃/₂ − 2p₁/₂ в водороде: {split / 1e9:.3f} ГГц;  длина волны перехода {2.998e10 / split:.2f} см")
+```
+
+Первый член — уровни Бора, второй — **тонкая структура**: она снимает
+вырождение по $j$, но не по $l$. Расщепление $2p_{3/2} - 2p_{1/2}$ по Дираку
+(с приведённой массой) — 10,94 ГГц; измеренное значение около 10,97 ГГц.
+Уровни $2s_{1/2}$ и $2p_{1/2}$ по Дираку совпадают точно; их расщепление на 1,06 ГГц
+(лэмбовский сдвиг, 1947) и аномальный момент $g - 2\approx\alpha/\pi$ — уже эффекты
+квантовой электродинамики.
+
+## Дрожание (Zitterbewegung)
+
+Оператор скорости $c\boldsymbol\alpha$ не коммутирует с $H$, и его собственные значения $\pm c$. Для
+волнового пакета это проявляется так: если пакет содержит и
+положительные, и отрицательные частоты, их интерференция даёт быстрые
+колебания среднего положения с частотой около $2E_p/\hbar$ и амплитудой
+порядка комптоновской длины $\hbar/mc$ (Шрёдингер, 1930). Посчитаем это в одномерной
+модели $H = c\sigma_xp + \sigma_zmc^2$ (двухкомпонентная версия; $\hbar = c = m = 1$): пакет
+$\psi_0 = (e^{-x^2/4\sigma^2 + ip_0x}, 0)$ эволюционирует точно в импульсном представлении,
+$e^{-iH(p)t} = \cos E_pt - i\,\frac{H(p)}{E_p}\sin E_pt$. Сравним $\langle x\rangle$ с «классическим»
+средним — взвешенной суммой центров его положительно- и
+отрицательно-частотных частей, полученных проекторами $\frac12(1\pm H/E_p)$:
+
+```{python}
+#| label: fig-zitterbewegung
+#| fig-cap: 'Дрожание волнового пакета в одномерной модели Дирака (ħ = c = m = 1, σ = 2, p₀ = 1). Вверху — ⟨x⟩(t) пакета (синяя линия) и средневзвешенное центров его положительно- и отрицательно-частотных частей (пунктир), которые движутся равномерно. Внизу — их разность: колебания с частотой около 2E(p₀) = 2√2, затухающие по мере того, как две части пакета расходятся.'
+N_x, L_x = 4096, 400.0
+xg = (np.arange(N_x) - N_x / 2) * L_x / N_x
+pg = 2 * np.pi * np.fft.fftfreq(N_x, L_x / N_x)
+E_p = np.sqrt(pg**2 + 1)
+width, p0 = 2.0, 1.0
+
+def evolve(psi_k, t):
+    """exp(−iH(p)t) для H(p) = pσ_x + σ_z, покомпонентно в импульсном представлении."""
+    a, b = psi_k
+    cos, sin = np.cos(E_p * t), np.sin(E_p * t) / E_p
+    return np.array([cos * a - 1j * sin * (a + pg * b), cos * b - 1j * sin * (pg * a - b)])
+
+def project(psi_k, sign):
+    """Проектор ½(1 ± H/E) на положительные (+1) или отрицательные (−1) частоты."""
+    a, b = psi_k
+    return np.array([(a + sign * (a + pg * b) / E_p) / 2, (b + sign * (pg * a - b) / E_p) / 2])
+
+def centroid(psi_k, t):
+    """(Σx|ψ|², Σ|ψ|²) в момент t."""
+    dens = np.sum(np.abs(np.fft.ifft(evolve(psi_k, t), axis=1))**2, axis=0)
+    return np.sum(xg * dens), np.sum(dens)
+
+phi0 = np.exp(-xg**2 / (4 * width**2) + 1j * p0 * xg)
+psi_k = np.fft.fft(np.array([phi0, 0 * phi0]), axis=1)
+plus, minus = project(psi_k, +1), project(psi_k, -1)
+times = np.linspace(0, 30, 1201)
+x_full, x_smooth = [], []
+for t in times:
+    (sx, w), (sp_, wp), (sm, wm) = centroid(psi_k, t), centroid(plus, t), centroid(minus, t)
+    x_full.append(sx / w)
+    x_smooth.append((sp_ + sm) / (wp + wm))
+x_full, x_smooth = np.array(x_full), np.array(x_smooth)
+jitter = x_full - x_smooth
+
+fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(7, 5), sharex=True)
+ax1.plot(times, x_full, lw=1.2, label="⟨x⟩ пакета")
+ax1.plot(times, x_smooth, "--", color="k", lw=1, label="средневзвешенное частей ±E")
+ax1.set_ylabel("x, единицы ħ/mc")
+ax1.legend()
+ax2.plot(times, jitter, color="tab:red", lw=1)
+ax2.set(xlabel="t, единицы ħ/mc²", ylabel="разность", xlim=(0, 15))
+plt.tight_layout()
+plt.show()
+
+w_plus = np.sum(np.abs(plus)**2) / np.sum(np.abs(psi_k)**2)
+freq = np.fft.rfftfreq(len(times), times[1] - times[0]) * 2 * np.pi
+print(f"доля положительных частот {w_plus:.3f};  максимум |разности| {np.abs(jitter).max():.3f} ħ/mc;"
+      f"  при t > 20: {np.abs(jitter[times > 20]).max():.0e}")
+print(f"частота колебаний (пик спектра) {freq[np.abs(np.fft.rfft(jitter)).argmax()]:.2f},  2E(p₀) = {2 * np.sqrt(p0**2 + 1):.2f}")
+```
+
+Амплитуда колебаний — доли комптоновской длины, частота близка к $2E(p_0)/\hbar$ (пик
+немного смещён, потому что пакет содержит разные импульсы). Пакет,
+составленный только из положительных частот, не дрожит. Для
+электрона $2mc^2/\hbar\approx1{,}6\cdot10^{21}$ с$^{-1}$, а амплитуда $\sim\hbar/2mc\approx2\cdot10^{-13}$ м: прямо
+наблюдать эффект нельзя. Он означает, что локализовать электрон точнее
+комптоновской длины одними положительными частотами невозможно —
+одноэлектронная интерпретация на этих масштабах перестаёт работать.
+
+## Безмассовый случай
+
+В представлении Вейля $\gamma^\mu = \begin{pmatrix}0 & \sigma^\mu\\ \bar\sigma^\mu & 0\end{pmatrix}$ и $\psi = (\psi_L, \psi_R)$ уравнение Дирака
+распадается на пару уравнений, связанных массой:
+$$
+i\hbar\,\sigma^\mu\partial_\mu\psi_R = mc\,\psi_L, \qquad i\hbar\,\bar\sigma^\mu\partial_\mu\psi_L = mc\,\psi_R .
+$$
+При $m = 0$ это два независимых **уравнения Вейля**: левый и правый спиноры
+из статьи об [алгебрах Клиффорда](/math/lie/clifford-spinors.qmd) — разные частицы
+определённой спиральности (упражнение 5). Масса связывает их, и только
+массивная частица может иметь обе спиральности.
+
+## Итоги
+
+- $(i\hbar\gamma^\mu\partial_\mu - mc)\psi = 0$ — квадратный корень из уравнения Клейна–Гордона; $H = c\boldsymbol\alpha\cdot\hat{\mathbf p} + \beta mc^2$,
+  $H^2 = c^2p^2 + m^2c^4$, уровни $\pm E_p$, каждый дважды.
+- Ток $j^\mu = c\bar\psi\gamma^\mu\psi$ сохраняется, плотность $\psi^\dagger\psi\ge0$; скорость — $c\boldsymbol\alpha$.
+- Ковариантность: $\psi' = S(\Lambda)\psi$ со спинорным представлением; $u(p) = Su_\text{покоя}$.
+- Сохраняется $\mathbf J = \mathbf L + \frac\hbar2\boldsymbol\Sigma$: спин ½ встроен в уравнение.
+- Нерелятивистский предел — уравнение Паули с $g = 2$; водород: тонкая структура
+  $-\frac{\alpha^4}{2n^4}(\frac{n}{j + 1/2} - \frac34)mc^2$, $2p_{3/2} - 2p_{1/2} = 10{,}94$ ГГц.
+- Интерференция положительных и отрицательных частот — дрожание с частотой $\approx2E/\hbar$.
+- При $m = 0$ — уравнения Вейля для левого и правого спиноров.
+
+## Упражнения
+
+1. Найдите собственные векторы $H(p_z)$ с энергией $+E_p$ и проверьте, что они
+   собственные для $\Sigma_z$. Чему равна спиральность $\boldsymbol\Sigma\cdot\mathbf p/|\mathbf p|$?
+2. Докажите сохранение тока $\partial_\mu(\bar\psi\gamma^\mu\psi) = 0$, используя уравнение Дирака и эрмитово
+   сопряжённое к нему (указание: $\gamma^0\gamma^{\mu\dagger}\gamma^0 = \gamma^\mu$).
+3. Насколько расщеплены уровни $2p_{3/2}$ и $2p_{1/2}$ иона He$^+$ ($Z = 2$)? Используйте
+   разложение до $(Z\alpha)^4$ и сравните с водородом.
+4. Оцените частоту и амплитуду дрожания для электрона.
+5. Покажите, что при $m = 0$ плоская волна $\psi_R\,e^{-ip\cdot x/\hbar}$ с $E > 0$ имеет спиральность $+\frac12$, а
+   $\psi_L$ — спиральность $-\frac12$.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. Для $\mathbf p = p\,\mathbf e_z$ векторы $(E + mc^2,\ 0,\ cp,\ 0)$ и $(0,\ E + mc^2,\ 0,\ -cp)$ (с точностью до нормировки)
+   — собственные для $\Sigma_z$ со значениями $+1$ и $-1$: спиральность $\pm\frac12$ (в единицах $\hbar$, $\frac\hbar2\Sigma_z$).
+2. Сопряжённое уравнение $-i\hbar\,\partial_\mu\psi^\dagger\gamma^{\mu\dagger} = mc\,\psi^\dagger$ умножим справа на $\gamma^0$; так как $\gamma^{\mu\dagger}\gamma^0 = \gamma^0\gamma^\mu$,
+   получаем $(\partial_\mu\bar\psi)\gamma^\mu = \frac{imc}{\hbar}\bar\psi$, а само уравнение даёт $\gamma^\mu\partial_\mu\psi = -\frac{imc}{\hbar}\psi$. Поэтому
+   $\partial_\mu(\bar\psi\gamma^\mu\psi) = \frac{imc}{\hbar}\bar\psi\psi - \frac{imc}{\hbar}\bar\psi\psi = 0$.
+3. В порядке $(Z\alpha)^4$ расщепление $\frac{(Z\alpha)^4}{2n^4}\,n\bigl(1 - \frac12\bigr)mc^2 = \frac{(Z\alpha)^4}{32}mc^2$ растёт как $Z^4$: в 16 раз больше,
+   чем в водороде, около 175 ГГц (точная формула с приведённой массой $\alpha$-частицы — 175,2 ГГц).
+4. $\omega\approx2mc^2/\hbar = 1{,}55\cdot10^{21}$ с$^{-1}$, амплитуда $\sim\hbar/2mc = 1{,}9\cdot10^{-13}$ м.
+5. При $m = 0$: $\sigma^\mu p_\mu\psi_R = (E/c - \boldsymbol\sigma\cdot\mathbf p)\psi_R = 0$, то есть $\boldsymbol\sigma\cdot\hat{\mathbf p}\,\psi_R = +\psi_R$; для $\psi_L$:
+   $(E/c + \boldsymbol\sigma\cdot\mathbf p)\psi_L = 0$, $\boldsymbol\sigma\cdot\hat{\mathbf p}\,\psi_L = -\psi_L$.
+:::
