@@ -1,0 +1,261 @@
+---
+title: "Квантовые газы"
+topic: quantum-gases
+order: 6
+description: "Большое каноническое распределение в пространстве Фока, ρ = e^{−β(H−μN)}/Ξ: числа заполнения Ферми–Дирака и Бозе–Эйнштейна (SymPy и проверка матрицей плотности); идеальный газ: nλ³ = f_{3/2}(z) или g_{3/2}(z), PV = (2/3)U для любой статистики (численно); вырожденный ферми-газ: энергия Ферми меди 7 эВ, разложение Зоммерфельда μ(T) и C = π²NT/2T_F против точного счёта (рисунок); бозе-конденсация: T_c = (2πħ²/m)(n/ζ(3/2))^{2/3}, доля конденсата 1 − (T/T_c)^{3/2}, излом теплоёмкости 1,925 (рисунок), числа для рубидия; излучение чёрного тела: μ = 0, закон Стефана–Больцмана, максимум x = 2,821, реликтовое излучение — 411 фотонов в см³"
+---
+
+Классический идеальный газ из статьи о [каноническом и большом
+каноническом распределениях](/physics/statistical/canonical-ensemble.qmd) годится, пока среднее
+расстояние между частицами велико по сравнению с тепловой длиной волны
+$\lambda = \sqrt{2\pi\hbar^2/mT}$. При $n\lambda^3\gtrsim1$ волновые функции перекрываются, и
+становится важно, что частицы [тождественны](/physics/quantum/identical-particles.qmd): фермионы не
+могут занимать одно состояние, а бозоны «предпочитают» занятые. Так
+устроены электроны в металле, вещество белых карликов и нейтронных
+звёзд, жидкий гелий, ультрахолодные атомы и излучение.
+
+Температура — в энергетических единицах ($k_B = 1$) кроме числовых примеров,
+обозначения $\beta = 1/T$, $\Omega = -T\ln\Xi$ — как в статье о каноническом распределении.
+
+## Распределения Ферми–Дирака и Бозе–Эйнштейна
+
+Для невзаимодействующих частиц $H = \sum_i\varepsilon_in_i$ и $N = \sum_in_i$ в базисе чисел
+заполнения ([вторичное квантование](/physics/quantum/second-quantization.qmd)), и большое каноническое
+распределение $\rho = e^{-\beta(H - \mu N)}/\Xi$ ([матрица плотности](/physics/quantum/density-matrix.qmd))
+распадается в произведение по одночастичным уровням:
+$\Xi = \prod_i\Xi_i$, $\Xi_i = \sum_{n_i}e^{-\beta(\varepsilon_i - \mu)n_i}$, где $n_i\in\{0, 1\}$ для фермионов и $n_i = 0, 1, 2, \dots$ для бозонов:
+
+```{python}
+import numpy as np
+import sympy as sp
+import matplotlib.pyplot as plt
+from mpmath import polylog, zeta, re as mp_re
+from scipy.optimize import brentq
+
+x_s, beta_s = sp.symbols("x beta", positive=True)       # x = β(ε − μ), для бозонов x > 0
+n_s = sp.Symbol("n", integer=True, nonnegative=True)
+Xi_fermi = 1 + sp.exp(-x_s)
+Xi_bose = 1 / (1 - sp.exp(-x_s))                          # геометрическая прогрессия
+for name, Xi in (("фермионы", Xi_fermi), ("бозоны", Xi_bose)):
+    occupation = sp.simplify(-sp.diff(sp.log(Xi), x_s))   # ⟨n⟩ = −∂ln Ξ_i/∂x
+    print(f"{name}: ⟨n⟩ =", occupation)
+```
+
+$$
+\bar n(\varepsilon) = \frac{1}{e^{(\varepsilon - \mu)/T} + 1}\ \ \text{(Ферми–Дирак)}, \qquad \bar n(\varepsilon) = \frac{1}{e^{(\varepsilon - \mu)/T} - 1}\ \ \text{(Бозе–Эйнштейн)}, \qquad
+\Omega = \mp T\sum_i\ln\bigl(1 \pm e^{-(\varepsilon_i - \mu)/T}\bigr) .
+$$
+При $e^{(\varepsilon - \mu)/T}\gg1$ оба переходят в распределение Больцмана. Для бозонов $\mu$ меньше
+наименьшего $\varepsilon_i$, иначе числа заполнения отрицательны. Проверим то же самое
+«в лоб»: оператор $H - \mu N$ диагонален в базисе чисел заполнения
+$|n_1, n_2, n_3\rangle$, так что матрица плотности на пространстве Фока трёх уровней — диагональная
+матрица весов $e^{-\beta\sum(\varepsilon_i - \mu)n_i}$ (для бозонов числа заполнения обрезаны на 80):
+
+```{python}
+levels, T_val, mu_val = np.array([0.3, 0.8, 1.5]), 0.5, 0.1
+for occupations, sign, name in ((np.arange(2), +1, "Ферми–Дирак"), (np.arange(81), -1, "Бозе–Эйнштейн")):
+    grid = np.array(np.meshgrid(*[occupations] * 3, indexing="ij")).reshape(3, -1)   # все |n₁, n₂, n₃⟩
+    weights = np.exp(-((levels - mu_val) @ grid) / T_val)
+    rho_diag = weights / weights.sum()                                                # диагональ ρ
+    from_rho = grid @ rho_diag                                                        # tr(ρ n_i)
+    formula = 1 / (np.exp((levels - mu_val) / T_val) + sign)
+    print(f"{name}: размерность {grid.shape[1]},  tr(ρn_i) = {np.round(from_rho, 6)},  формула {np.round(formula, 6)}")
+```
+
+## Идеальный газ в ящике
+
+Для свободных частиц в объёме $V$ сумма по уровням — интеграл с
+плотностью состояний $g(\varepsilon) = \frac{gV}{4\pi^2}\bigl(\frac{2m}{\hbar^2}\bigr)^{3/2}\sqrt\varepsilon$ ($g$ — спиновое вырождение). Через
+**фугитивность** $z = e^{\mu/T}$ и функции $f_\nu(z) = -\mathrm{Li}_\nu(-z)$, $g_\nu(z) = \mathrm{Li}_\nu(z)$ (полилогарифмы):
+$$
+n\lambda^3 = g\,f_{3/2}(z)\ \text{или}\ g\,g_{3/2}(z), \qquad \frac{P}{T} = \frac{g}{\lambda^3}\,f_{5/2}(z)\ \text{или}\ \frac{g}{\lambda^3}\,g_{5/2}(z) .
+$$
+При $z\ll1$ обе функции $\approx z$, и $P = nT$. Для **любой** статистики и закона
+дисперсии $\varepsilon\propto p^2$ выполняется $PV = \frac23U$ (интегрирование по частям в $\Omega$ с
+$g(\varepsilon)\propto\sqrt\varepsilon$). Проверим численно, в единицах, где $g(\varepsilon) = \sqrt\varepsilon$:
+
+```{python}
+from scipy.integrate import quad
+
+def thermodynamics(z, T, sign):
+    """(Ω, U, N) при g(ε) = √ε; sign = +1 — фермионы, −1 — бозоны."""
+    occ = lambda e: 1 / (np.exp(e / T) / z + sign)
+    Omega = -sign * T * quad(lambda e: np.sqrt(e) * np.log(1 + sign * z * np.exp(-e / T)), 0, np.inf)[0]
+    U = quad(lambda e: np.sqrt(e) * e * occ(e), 0, np.inf)[0]
+    N = quad(lambda e: np.sqrt(e) * occ(e), 0, np.inf)[0]
+    return Omega, U, N
+
+for z, T, sign, name in ((3.0, 0.7, +1, "фермионы"), (0.8, 1.3, -1, "бозоны")):
+    Omega, U, N = thermodynamics(z, T, sign)
+    print(f"{name}: PV = −Ω = {-Omega:.6f},  (2/3)U = {2 * U / 3:.6f}")
+```
+
+## Вырожденный ферми-газ
+
+При $T = 0$ фермионы заполняют все состояния с $\varepsilon < \varepsilon_F$; из $N = \int_0^{\varepsilon_F}g(\varepsilon)\,\dd\varepsilon$ при $g = 2$:
+$$
+\varepsilon_F = \frac{\hbar^2}{2m}\bigl(3\pi^2n\bigr)^{2/3}, \qquad U_0 = \frac35N\varepsilon_F, \qquad P_0 = \frac25n\varepsilon_F .
+$$
+Давление вырождения не исчезает при $T = 0$: оно держит белые карлики
+против гравитации. Для электронов проводимости меди:
+
+```{python}
+hbar, m_e, kB, eV = 1.054571817e-34, 9.1093837e-31, 1.380649e-23, 1.602176634e-19
+n_cu = 8.47e28                                           # м⁻³, один электрон на атом
+eps_F = hbar**2 / (2 * m_e) * (3 * np.pi**2 * n_cu)**(2 / 3)
+print(f"медь: ε_F = {eps_F / eV:.2f} эВ,  T_F = {eps_F / kB:.0f} K,  v_F = {np.sqrt(2 * eps_F / m_e) / 1e6:.2f}·10⁶ м/с,"
+      f"  P₀ = {0.4 * n_cu * eps_F / 1e9:.0f} ГПа")
+```
+
+$T_F\approx8\cdot10^4$ К: при комнатной температуре электронный газ сильно
+вырожден, $T/T_F\sim4\cdot10^{-3}$. Возбуждаются только электроны в слое шириной
+$\sim T$ у поверхности Ферми, поэтому теплоёмкость мала и линейна по $T$.
+**Разложение Зоммерфельда** $\int_0^\infty\varphi(\varepsilon)\bar n\,\dd\varepsilon\approx\int_0^\mu\varphi\,\dd\varepsilon + \frac{\pi^2}{6}T^2\varphi'(\mu)$ даёт
+$$
+\mu(T)\approx\varepsilon_F\Bigl[1 - \frac{\pi^2}{12}\Bigl(\frac{T}{\varepsilon_F}\Bigr)^2\Bigr], \qquad C\approx\frac{\pi^2}{2}N\frac{T}{T_F} .
+$$
+Сравним с точным расчётом через полилогарифмы ($\varepsilon_F = 1$, $N$ фиксировано):
+$f_{3/2}(z) = \frac{4}{3\sqrt\pi}(T_F/T)^{3/2}$, $U/N = \frac32T\,f_{5/2}(z)/f_{3/2}(z)$:
+
+```{python}
+#| label: fig-fermi
+#| fig-cap: 'Идеальный ферми-газ (ε_F = 1). Слева — распределение Ферми–Дирака при T/T_F = 0,02; 0,1; 0,3; 1: ступенька размывается на ширину ~T, а химический потенциал (точки) смещается вниз. Справа — теплоёмкость на частицу: точный расчёт (линия), линейный закон Зоммерфельда π²T/2T_F (пунктир) и классический предел 3/2.'
+f_nu = lambda nu, z: float(mp_re(-polylog(nu, -z)))      # f_ν(z) = −Li_ν(−z)
+
+def fermi_mu(T):
+    """μ(T) при ε_F = 1 из f_{3/2}(e^{μ/T}) = (4/3√π) T^{−3/2}."""
+    target = 4 / (3 * np.sqrt(np.pi)) * T**-1.5
+    log_z = brentq(lambda lz: f_nu(1.5, np.exp(lz)) - target, -50, 200)
+    return T * log_z
+
+def fermi_energy_per_particle(T):
+    z = np.exp(fermi_mu(T) / T)
+    return 1.5 * T * f_nu(2.5, z) / f_nu(1.5, z)
+
+Ts = np.linspace(0.01, 2.0, 120)
+heat = np.gradient([fermi_energy_per_particle(T) for T in Ts], Ts)
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 3.9))
+eps_grid = np.linspace(0, 2.5, 400)
+for T in (0.02, 0.1, 0.3, 1.0):
+    mu = fermi_mu(T)
+    line, = ax1.plot(eps_grid, 1 / (np.exp((eps_grid - mu) / T) + 1), label=f"T/T_F = {T}")
+    ax1.plot(mu, 0.5, "o", color=line.get_color(), ms=4)
+ax1.set(xlabel="ε / ε_F", ylabel="n̄(ε)")
+ax1.legend(fontsize=8)
+ax2.plot(Ts, heat, label="точно")
+ax2.plot(Ts[Ts < 0.6], np.pi**2 / 2 * Ts[Ts < 0.6], "--", label="π²T/2T_F")
+ax2.axhline(1.5, color="0.6", lw=0.8, label="классический газ")
+ax2.set(xlabel="T / T_F", ylabel="C / N")
+ax2.legend(fontsize=8)
+plt.tight_layout()
+plt.show()
+for T in (0.05, 0.1, 0.2):
+    print(f"T/T_F = {T}: μ = {fermi_mu(T):.5f}, Зоммерфельд {1 - np.pi**2 / 12 * T**2:.5f};"
+          f"  C/N = {np.interp(T, Ts, heat):.4f}, π²T/2 = {np.pi**2 / 2 * T:.4f}")
+```
+
+## Бозе-эйнштейновская конденсация
+
+Для бозонов $\mu\le0$, а $g_{3/2}(z)\le g_{3/2}(1) = \zeta(3/2)\approx2{,}612$. Значит, интеграл по
+непрерывному спектру вмещает не больше $\zeta(3/2)V/\lambda^3$ частиц. Ниже температуры
+$$
+T_c = \frac{2\pi\hbar^2}{m}\Bigl(\frac{n}{\zeta(3/2)}\Bigr)^{2/3}
+$$
+избыток частиц собирается на **нижнем уровне** — макроскопическая доля
+$N_0/N = 1 - (T/T_c)^{3/2}$ (Эйнштейн, 1925). Конденсат — одно квантовое состояние,
+занятое большим числом частиц; его наблюдали в парах рубидия и натрия
+в 1995 году. Теплоёмкость при $T < T_c$ растёт как $T^{3/2}$, а при $T_c$ имеет излом:
+
+```{python}
+#| label: fig-bec
+#| fig-cap: 'Идеальный бозе-газ. Слева — доля частиц в конденсате N₀/N = 1 − (T/T_c)^{3/2}. Справа — теплоёмкость на частицу: ниже T_c она растёт как T^{3/2} и достигает 1,925 в точке перехода (излом), выше T_c убывает к классическому значению 3/2 (пунктир).'
+g_nu = lambda nu, z: float(mp_re(polylog(nu, z)))         # g_ν(z) = Li_ν(z)
+zeta32, zeta52 = float(zeta(1.5)), float(zeta(2.5))
+
+def bose_energy_per_particle(T):
+    """U/N в единицах T_c при фиксированной плотности; T тоже в единицах T_c."""
+    if T <= 1:
+        return 1.5 * T * zeta52 / zeta32 * T**1.5
+    z = brentq(lambda zz: g_nu(1.5, zz) - zeta32 * T**-1.5, 1e-12, 1 - 1e-15)
+    return 1.5 * T * g_nu(2.5, z) / g_nu(1.5, z)
+
+Tb = np.linspace(0.02, 3.0, 300)
+heat_b = np.gradient([bose_energy_per_particle(T) for T in Tb], Tb)
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 3.6))
+ax1.plot(Tb, np.clip(1 - Tb**1.5, 0, None))
+ax1.set(xlabel="T / T_c", ylabel="N₀ / N")
+ax2.plot(Tb, heat_b)
+ax2.axhline(1.5, color="0.6", ls="--", lw=0.8)
+ax2.set(xlabel="T / T_c", ylabel="C / N")
+plt.tight_layout()
+plt.show()
+left = (bose_energy_per_particle(1 - 1e-6) - bose_energy_per_particle(1 - 2e-4)) / (2e-4 - 1e-6)
+right = (bose_energy_per_particle(1 + 2e-4) - bose_energy_per_particle(1 + 1e-6)) / (2e-4 - 1e-6)
+print(f"C/N при T_c: (15/4)ζ(5/2)/ζ(3/2) = {15 / 4 * zeta52 / zeta32:.4f};  численно слева {left:.3f}, справа {right:.3f}")
+m_rb = 86.909 * 1.66054e-27
+for n_atoms in (1e19, 1e20):
+    Tc = 2 * np.pi * hbar**2 / (m_rb * kB) * (n_atoms / zeta32)**(2 / 3)
+    print(f"⁸⁷Rb при n = {n_atoms:.0e} м⁻³: T_c = {Tc * 1e9:.0f} нК")
+```
+
+В жидком гелии-4 переход в сверхтекучее состояние происходит при 2,17 К
+(расчёт для идеального газа с плотностью жидкого гелия даёт 3,1 К); там
+взаимодействие сильное, и конденсат содержит лишь около 10 % атомов.
+
+## Излучение чёрного тела
+
+Фотоны в полости — бозоны с числом, которое не сохраняется (их
+поглощают и испускают стенки), поэтому $\mu = 0$. Две поляризации и $\varepsilon = \hbar ck$
+дают спектральную плотность энергии (Планк, 1900)
+$$
+u(\omega)\,\dd\omega = \frac{\hbar\omega^3}{\pi^2c^3}\frac{\dd\omega}{e^{\hbar\omega/T} - 1}, \qquad
+u = \frac{\pi^2}{15}\frac{T^4}{(\hbar c)^3}, \qquad n_\gamma = \frac{2\zeta(3)}{\pi^2}\Bigl(\frac{T}{\hbar c}\Bigr)^3 :
+$$
+
+```{python}
+print(f"∫x³/(eˣ − 1)dx = {quad(lambda x: x**3 / np.expm1(x), 0, np.inf)[0]:.10f},  π⁴/15 = {np.pi**4 / 15:.10f}")
+x_peak = brentq(lambda x: 3 * (1 - np.exp(-x)) - x, 1, 5)          # максимум x³/(eˣ − 1)
+c = 2.99792458e8
+sigma_SB = np.pi**2 * kB**4 / (60 * hbar**3 * c**2)
+T_cmb = 2.7255
+n_gamma = 2 * float(zeta(3)) / np.pi**2 * (kB * T_cmb / (hbar * c))**3
+print(f"максимум u(ω) при ħω = {x_peak:.4f} T;  σ = π²k⁴/60ħ³c² = {sigma_SB:.4e} Вт/(м²·К⁴)")
+print(f"реликтовое излучение, T = {T_cmb} K: максимум на {x_peak * kB * T_cmb / (2 * np.pi * hbar) / 1e9:.0f} ГГц,"
+      f"  {n_gamma / 1e6:.0f} фотонов в см³,  u = {np.pi**2 / 15 * (kB * T_cmb)**4 / (hbar * c)**3:.2e} Дж/м³")
+```
+
+Закон Стефана–Больцмана, закон смещения Вина $\hbar\omega_\text{max} = 2{,}821\,T$ и спектр
+реликтового излучения (измеренный спутником COBE в 1990 году с точностью
+$10^{-4}$) — всё следует из одной формулы $\bar n = 1/(e^{\hbar\omega/T} - 1)$.
+
+## Итоги
+
+- $\rho = e^{-\beta(H - \mu N)}/\Xi$ в пространстве Фока даёт $\bar n = 1/(e^{(\varepsilon - \mu)/T}\pm1)$; при малом $\bar n$ — Больцман.
+- Идеальный газ: $n\lambda^3 = f_{3/2}(z)$ или $g_{3/2}(z)$; $PV = \frac23U$ при $\varepsilon\propto p^2$ для любой статистики.
+- Ферми-газ: $\varepsilon_F = \frac{\hbar^2}{2m}(3\pi^2n)^{2/3}$ (медь — 7 эВ), давление вырождения, $C\approx\frac{\pi^2}{2}NT/T_F$.
+- Бозе-газ: конденсация при $T_c = \frac{2\pi\hbar^2}{m}(n/\zeta(3/2))^{2/3}$, $N_0/N = 1 - (T/T_c)^{3/2}$, излом $C$ (1,925).
+- Фотоны: $\mu = 0$, закон Планка, $u\propto T^4$, $\hbar\omega_\text{max} = 2{,}821T$; реликтовое излучение — 411 фотонов в см³.
+
+## Упражнения
+
+1. Покажите, что при $z\ll1$ поправка к уравнению состояния $P = nT(1\pm n\lambda^3/2^{5/2}g)$ — у фермионов
+   давление выше, у бозонов ниже классического. Объясните знак.
+2. Найдите давление вырождения электронов в белом карлике с плотностью
+   $10^9$ кг/м³ (по два нуклона на электрон). Релятивистские ли это электроны?
+3. Выведите $T_c$ из условия $n\lambda^3 = \zeta(3/2)$.
+4. Чему равна теплоёмкость фотонного газа в объёме 1 м³ при 300 К? Сравните
+   с теплоёмкостью воздуха в том же объёме.
+5. Двумерный идеальный бозе-газ: покажите, что конденсации при $T > 0$ нет.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $f_{3/2}(z)\approx z - z^2/2^{3/2}$, $f_{5/2}\approx z - z^2/2^{5/2}$; исключая $z$, $P/nT = 1 + n\lambda^3/(2^{5/2}g)$ для фермионов и
+   с минусом для бозонов. Принцип Паули — эффективное отталкивание, бозе-статистика — притяжение.
+2. $n_e = 10^9/(2\cdot1{,}67\cdot10^{-27})\approx3\cdot10^{35}$ м⁻³, $p_F = \hbar(3\pi^2n)^{1/3}\approx2{,}2\cdot10^{-22}$ кг·м/с $\approx0{,}8\,m_ec$ — электроны
+   умеренно релятивистские; нерелятивистская формула $P_0 = \frac25n\varepsilon_F$ даёт $\approx3\cdot10^{21}$ Па (завышает: при $p_F\sim m_ec$
+   надо учитывать $\varepsilon = \sqrt{p^2c^2 + m^2c^4}$).
+3. При $T = T_c$ и $z\to1$: $n\left(\frac{2\pi\hbar^2}{mT_c}\right)^{3/2} = \zeta(3/2)$, откуда формула в тексте.
+4. $C = 4u/T = \frac{4\pi^2}{15}\frac{k^4T^3}{(\hbar c)^3}\approx8\cdot10^{-8}$ Дж/К; у воздуха ($\approx1{,}2$ кг, $c_V\approx0{,}72$ кДж/(кг·К)) $\approx0{,}9\cdot10^3$ Дж/К — в $10^{10}$ раз больше.
+5. В двух измерениях $g(\varepsilon) = \text{const}$, $n\lambda^2 = g_1(z) = -\ln(1 - z)$ неограниченно растёт при $z\to1$: любую
+   плотность можно разместить в непрерывном спектре.
+:::
