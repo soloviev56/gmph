@@ -1,0 +1,326 @@
+---
+title: "Гравитационные волны"
+topic: gravitational-waves
+order: 6
+description: "Линеаризованная гравитация g = η + h: калибровочная свобода h → h + ∂ξ + ∂ξ как производная Ли, инвариантность линеаризованной кривизны; тензор Эйнштейна G⁽¹⁾ = −½[□h̄ + …] (проверка gmph.riemann), в калибровке Лоренца □h̄_μν = −16πkT_μν/c⁴; плоская волна в поперечно-бесследовой калибровке, две поляризации h₊, h× со спиральностью 2; действие на пробные массы: частицы покоятся в координатах TT, R^x_00x = ½ḧ₊, кольцо частиц (рисунок); квадрупольная формула и мощность излучения двойной звезды 32k⁴μ²M³/5c⁵a⁵; пульсар Халса–Тейлора: dP/dt = −2,40·10⁻¹²; чирп-масса, уравнение для частоты и форма сигнала GW150914 в ньютоновском приближении (рисунок), амплитуда 10⁻²¹"
+---
+
+Уравнения Эйнштейна нелинейны, но вдали от источников поле слабо, и
+метрика мало отличается от метрики Минковского. В первом порядке по
+отклонению уравнения становятся линейными волновыми: возмущения
+геометрии бегут со скоростью света. Эйнштейн получил это в 1916 году,
+но долго сомневался, физичны ли волны или это артефакт координат.
+Ответ даёт [девиация геодезических](/math/riemann/geodesic-deviation.qmd): волна меняет
+расстояния между свободными телами, а это измеримо. Сто лет спустя
+(2015) детекторы LIGO зарегистрировали волны от слияния двух чёрных дыр.
+
+Используются [уравнения Эйнштейна](/physics/gravitation/einstein-equations.qmd) и девиация
+геодезических; сигнатура $(+,-,-,-)$, гравитационная постоянная $k$
+([конвенции](/conventions.qmd)); в выкладках $c = 1$.
+
+## Линеаризованная гравитация
+
+Запишем $g_{\mu\nu} = \eta_{\mu\nu} + h_{\mu\nu}$, $|h|\ll1$, и будем удерживать только первый порядок по $h$;
+индексы поднимаются метрикой $\eta$. Удобна **обращённая по следу** величина
+$\bar h_{\mu\nu} = h_{\mu\nu} - \frac12\eta_{\mu\nu}h$, $h = \eta^{\mu\nu}h_{\mu\nu}$.
+
+**Калибровочная свобода.** Инфинитезимальная замена координат $x^\mu\to x^\mu - \xi^\mu$
+меняет метрику на производную Ли, $\delta g = \mathcal L_\xi g$, то есть
+$$
+h_{\mu\nu}\to h_{\mu\nu} + \partial_\mu\xi_\nu + \partial_\nu\xi_\mu .
+$$
+Это прямой аналог калибровочного преобразования $A_\mu\to A_\mu + \partial_\mu f$, и
+линеаризованная кривизна, как и $F_{\mu\nu}$, от него не зависит. Им можно
+наложить **калибровку Лоренца** (гармоническую) $\partial^\mu\bar h_{\mu\nu} = 0$.
+
+Тензор Эйнштейна в первом порядке посчитаем функциями `riemann` и `ricci`
+из `gmph.riemann`, подставив символы Кристоффеля первого порядка
+$\Gamma^\lambda_{\mu\nu} = \frac12\eta^{\lambda\rho}(\partial_\mu h_{\rho\nu} + \partial_\nu h_{\rho\mu} - \partial_\rho h_{\mu\nu})$. Тождество линейно и содержит только
+вторые производные, поэтому достаточно проверить его на $h_{\mu\nu}$ — произвольных
+квадратичных многочленах:
+
+```{python}
+import random
+import numpy as np
+import sympy as sp
+import matplotlib.pyplot as plt
+from scipy.integrate import solve_ivp
+from gmph.riemann import riemann, ricci
+
+X = sp.symbols("t x y z", real=True)
+eps = sp.Symbol("epsilon")
+eta = sp.diag(1, -1, -1, -1)
+
+def linear_christoffel(h):
+    """ε·Γ^λ_μν первого порядка для g = η + εh."""
+    return [[[eps * eta[l, l] * (sp.diff(h[l, n], X[m]) + sp.diff(h[l, m], X[n]) - sp.diff(h[m, n], X[l])) / 2
+              for n in range(4)] for m in range(4)] for l in range(4)]
+
+def linear_ricci(h):
+    Ric = ricci(riemann(linear_christoffel(h), X))
+    return Ric.applyfunc(lambda e: sp.expand(e).coeff(eps, 1))
+
+d = lambda f, m: sp.diff(f, X[m])
+box = lambda f: sum(eta[m, m] * d(d(f, m), m) for m in range(4))            # □ = ∂_t² − ∇²
+
+random.seed(3)
+monomials = [a * b for i, a in enumerate(X) for b in X[i:]] + list(X)
+h = sp.zeros(4)
+for i in range(4):
+    for j in range(i, 4):
+        h[i, j] = h[j, i] = sum(random.randint(-3, 3) * mono for mono in monomials)
+trace = sum(eta[m, m] * h[m, m] for m in range(4))
+hbar = h - eta * trace / 2
+Ric1 = linear_ricci(h)
+G1 = Ric1 - eta * sum(eta[m, m] * Ric1[m, m] for m in range(4)) / 2
+div = [sum(eta[r, r] * d(hbar[r, n], r) for r in range(4)) for n in range(4)]          # ∂^ρ h̄_ρν
+formula = sp.Matrix(4, 4, lambda m, n: -(box(hbar[m, n]) + eta[m, n] * sum(eta[r, r] * d(div[r], r) for r in range(4))
+                                        - d(div[n], m) - d(div[m], n)) / 2)
+print("G⁽¹⁾_μν + ½[□h̄_μν + η_μν∂^ρ∂^σh̄_ρσ − ∂_μ∂^ρh̄_ρν − ∂_ν∂^ρh̄_ρμ] =", sp.expand(G1 - formula) == sp.zeros(4))
+
+xi = [sum(random.randint(-2, 2) * mono * v for mono in monomials for v in X[:1]) for _ in range(4)]   # ξ_μ
+h_gauge = h + sp.Matrix(4, 4, lambda m, n: d(xi[n], m) + d(xi[m], n))
+print("R⁽¹⁾_μν не меняется при h → h + ∂ξ + ∂ξ:", sp.expand(linear_ricci(h_gauge) - Ric1) == sp.zeros(4))
+```
+
+В калибровке Лоренца остаётся $G^{(1)}_{\mu\nu} = -\frac12\Box\bar h_{\mu\nu}$, и уравнения Эйнштейна
+$G_{\mu\nu} = \frac{8\pi k}{c^4}T_{\mu\nu}$ становятся волновыми:
+$$
+\Box\bar h_{\mu\nu} = -\frac{16\pi k}{c^4}\,T_{\mu\nu}, \qquad \Box = \frac{1}{c^2}\partial_t^2 - \nabla^2 .
+$$
+Для статического источника $\bar h_{00} = 4\Phi/c^2$, и уравнение $00$ — это уравнение
+Пуассона $\nabla^2\Phi = 4\pi k\rho$ (упражнение 1). Решение — запаздывающие потенциалы, как в
+электродинамике.
+
+## Плоская волна и две поляризации
+
+В пустоте $\Box\bar h_{\mu\nu} = 0$. Калибровка Лоренца оставляет свободу $\xi$ с $\Box\xi = 0$, и ею
+можно добиться ещё $h_{0\mu} = 0$, $h = 0$. В этой **поперечно-бесследовой** (TT) калибровке
+волна, бегущая вдоль $z$, имеет всего две компоненты:
+$$
+\dd s^2 = c^2\dd t^2 - (1 + h_+)\,\dd x^2 - (1 - h_+)\,\dd y^2 - 2h_\times\,\dd x\,\dd y - \dd z^2, \qquad h_{+,\times} = h_{+,\times}(t - z/c) .
+$$
+Две **поляризации**, «плюс» и «крест». Проверим, что это решение (тензор Риччи
+первого порядка равен нулю для любых профилей), и найдём компоненты
+кривизны, которые действуют на пробные массы:
+
+```{python}
+h_plus, h_cross = sp.Function("h_plus"), sp.Function("h_cross")
+u = X[0] - X[3]
+h_TT = sp.zeros(4)
+h_TT[1, 1], h_TT[2, 2] = -h_plus(u), h_plus(u)
+h_TT[1, 2] = h_TT[2, 1] = -h_cross(u)
+print("R⁽¹⁾_μν волны TT:", linear_ricci(h_TT) == sp.zeros(4))
+R_TT = riemann(linear_christoffel(h_TT), X)
+first = lambda e: sp.expand(e).coeff(eps, 1)
+ddot = lambda F: F(u).diff(X[0], 2)
+print("R^x_00x = ½ḧ₊:", sp.simplify(first(R_TT[1][0][0][1]) - ddot(h_plus) / 2) == 0,
+      ";  R^x_00y = ½ḧ×:", sp.simplify(first(R_TT[1][0][0][2]) - ddot(h_cross) / 2) == 0,
+      ";  R^z_00z =", first(R_TT[3][0][0][3]))
+print("Γ^i_00 =", [first(linear_christoffel(h_TT)[i][0][0]) for i in (1, 2, 3)])
+```
+
+**Спиральность 2.** При повороте вокруг оси $z$ на угол $\psi$ компоненты $h_{ij}$
+поворачиваются как тензор, и комбинации $h_+\pm ih_\times$ умножаются на $e^{\pm2i\psi}$:
+
+```{python}
+psi = sp.Symbol("psi", real=True)
+hp, hc = sp.symbols("h_+ h_x")
+H2 = sp.Matrix([[hp, hc], [hc, -hp]])                     # поперечная часть h_ij (с точностью до знака)
+Rot = sp.Matrix([[sp.cos(psi), -sp.sin(psi)], [sp.sin(psi), sp.cos(psi)]])
+H2_rot = Rot * H2 * Rot.T
+new_plus, new_cross = H2_rot[0, 0], H2_rot[0, 1]
+print("h₊' + ih×' = e^{2iψ}(h₊ + ih×):", sp.simplify(sp.expand((new_plus + sp.I * new_cross) - sp.exp(2 * sp.I * psi) * (hp + sp.I * hc), complex=True).rewrite(sp.exp)) == 0)
+```
+
+Поворот на $\pi$ переводит волну в себя (у электромагнитной волны для этого
+нужен поворот на $2\pi$): гравитон — частица спина 2. В плоскости,
+перпендикулярной лучу, $h_+$ и $h_\times$ — такие же «квадрупольные» картины,
+повёрнутые на $45^\circ$.
+
+## Действие на пробные массы
+
+Символы $\Gamma^i_{00}$ в калибровке TT равны нулю: частицы, покоившиеся до прихода
+волны, **остаются на тех же координатах** $x, y$. Но координаты TT «растягиваются»
+вместе с волной: собственное расстояние между частицами на оси $x$ на
+расстоянии $L$ равно $\sqrt{1 + h_+}\,L\approx(1 + \frac12h_+)L$. Инвариантно то же видно из
+уравнения девиации $\ddot\xi^i = R^i{}_{00j}\xi^j$ в локальном ортонормированном репере:
+$R^x{}_{00x} = \frac12\ddot h_+$, $R^x{}_{00y} = \frac12\ddot h_\times$, и
+$$
+\ddot\xi^x = \frac12\bigl(\ddot h_+\xi^x + \ddot h_\times\xi^y\bigr), \qquad \ddot\xi^y = \frac12\bigl(\ddot h_\times\xi^x - \ddot h_+\xi^y\bigr), \qquad \ddot\xi^z = 0 .
+$$
+Волна поперечна: вдоль луча расстояния не меняются.
+
+```{python}
+#| label: fig-gw-ring
+#| fig-cap: 'Кольцо свободных частиц в плоскости xy под действием волны, бегущей вдоль z, в четыре момента периода (фаза 0, π/2, π, 3π/2 слева направо); амплитуда h = 0,3 сильно преувеличена (у реальных волн h ~ 10⁻²¹). Вверху — поляризация «плюс», внизу — «крест»: та же картина, повёрнутая на 45°. Серый круг — положение частиц без волны.'
+phi_ring = np.linspace(0, 2 * np.pi, 24, endpoint=False)
+ring = np.array([np.cos(phi_ring), np.sin(phi_ring)])
+amp = 0.3
+fig, axes = plt.subplots(2, 4, figsize=(10, 5.2))
+for row, (name, Hmat) in enumerate((("плюс", np.array([[1, 0], [0, -1]])), ("крест", np.array([[0, 1], [1, 0]])))):
+    for col, phase in enumerate((0, np.pi / 2, np.pi, 3 * np.pi / 2)):
+        ax = axes[row, col]
+        displaced = (np.eye(2) + amp * np.cos(phase) * Hmat / 2) @ ring
+        ax.plot(np.cos(np.linspace(0, 2 * np.pi, 200)), np.sin(np.linspace(0, 2 * np.pi, 200)), color="0.8")
+        ax.plot(*displaced, "o", ms=4, color="tab:blue" if row == 0 else "tab:red")
+        ax.set(xlim=(-1.3, 1.3), ylim=(-1.3, 1.3), aspect="equal", xticks=[], yticks=[])
+        if row == 0:
+            ax.set_title(f"фаза {['0', 'π/2', 'π', '3π/2'][col]}")
+    axes[row, 0].set_ylabel(name)
+plt.tight_layout()
+plt.show()
+```
+
+Детектор LIGO — интерферометр Майкельсона с плечами $L = 4$ км вдоль $x$ и $y$:
+волна $h_+$ удлиняет одно плечо и укорачивает другое на $\frac12hL$, и при $h\sim10^{-21}$
+это $2\cdot10^{-18}$ м — тысячная доля размера протона.
+
+## Квадрупольная формула
+
+Вдали от медленно движущегося источника решение с запаздывающими
+потенциалами даёт в калибровке TT
+$$
+h_{ij}^{TT} = \frac{2k}{c^4R}\,\ddot Q_{ij}^{TT}(t - R/c), \qquad Q_{ij} = \int\rho\,\Bigl(x_ix_j - \frac13\delta_{ij}r^2\Bigr)\dd^3x ,
+$$
+— дипольного излучения нет, потому что сохраняются масса и импульс. Волна
+уносит мощность (Эйнштейн, 1918; Ландау и Лифшиц, т. II, § 110)
+$$
+L = \frac{k}{5c^5}\,\bigl\langle\dddot Q_{ij}\dddot Q_{ij}\bigr\rangle .
+$$
+Для двойной звезды с массами $m_1$, $m_2$ на круговой орбите радиуса $a$ —
+положения $\pm$ относительно центра масс, частота $\Omega^2 = kM/a^3$, $M = m_1 + m_2$, $\mu = m_1m_2/M$:
+
+```{python}
+t_, k_, c_, a_, m1, m2 = sp.symbols("t k c a m_1 m_2", positive=True)
+M_tot, mu = m1 + m2, m1 * m2 / (m1 + m2)
+Om = sp.sqrt(k_ * M_tot / a_**3)
+rel = sp.Matrix([a_ * sp.cos(Om * t_), a_ * sp.sin(Om * t_), 0])            # относительное положение
+Q = mu * (rel * rel.T - sp.eye(3) * (rel.T * rel)[0] / 3)                      # Σm x x = μ r r
+Q3 = Q.diff(t_, 3)
+L_gw = sp.simplify(k_ / (5 * c_**5) * sum(Q3[i, j]**2 for i in range(3) for j in range(3)))
+print("L =", sp.factor(L_gw))
+print("= (32/5)k⁴μ²M³/(c⁵a⁵):", sp.simplify(L_gw - sp.Rational(32, 5) * k_**4 * mu**2 * M_tot**3 / (c_**5 * a_**5)) == 0)
+```
+
+Мощность не зависит от времени (для круговой орбиты), а излучение идёт на
+удвоенной орбитальной частоте: $Q_{ij}$ содержит $\cos2\Omega t$, $\sin2\Omega t$.
+
+**Пульсар Халса–Тейлора.** Двойная нейтронная звезда PSR B1913+16 (открыта в
+1974) теряет энергию на излучение, орбита сжимается, а период
+уменьшается. Для эллиптической орбиты Петерс и Мэтьюз (1963) получили
+$$
+\dot P_b = -\frac{192\pi}{5}\Bigl(\frac{2\pi kM_\text{c}}{c^3P_b}\Bigr)^{5/3}f(e), \qquad M_\text{c} = \frac{(m_1m_2)^{3/5}}{M^{1/5}}, \qquad
+f(e) = \frac{1 + \frac{73}{24}e^2 + \frac{37}{96}e^4}{(1 - e^2)^{7/2}} :
+$$
+
+```{python}
+T_sun = 4.925490947e-6                         # kM☉/c³, с
+m_p, m_c = 1.4398, 1.3886                      # массы пульсара и компаньона, M☉
+P_b, ecc = 0.322997448918 * 86400, 0.6171334
+chirp = (m_p * m_c)**0.6 / (m_p + m_c)**0.2
+f_e = (1 + 73 / 24 * ecc**2 + 37 / 96 * ecc**4) / (1 - ecc**2)**3.5
+P_dot = -192 * np.pi / 5 * (2 * np.pi * chirp * T_sun / P_b)**(5 / 3) * f_e
+print(f"чирп-масса {chirp:.4f} M☉,  f(e) = {f_e:.3f},  dP_b/dt = {P_dot:.4e}  ({P_dot * 3.156e7 * 1e6:.1f} мкс в год)")
+```
+
+Измеренное значение после поправки на ускорение пульсара в Галактике
+совпадает с этим предсказанием с точностью до долей процента —
+первое (косвенное) доказательство существования гравитационных волн
+(Нобелевская премия 1993 года).
+
+## Чирп: слияние двух чёрных дыр
+
+Энергия круговой орбиты $E = -kM\mu/2a$ убывает со скоростью $L$, и частота волны
+$f = \Omega/\pi$ растёт. Из $\dot E = -L$ получается уравнение, в которое массы входят
+только через **чирп-массу** $\mathcal M = \mu^{3/5}M^{2/5}$:
+
+```{python}
+f_sym, Mc = sp.symbols("f M_c", positive=True)
+a_of_f = (k_ * M_tot / (sp.pi * f_sym)**2)**sp.Rational(1, 3)                 # Ω = πf, Ω² = kM/a³
+E_of_f = -k_ * M_tot * mu / (2 * a_of_f)
+L_of_f = L_gw.subs(a_, a_of_f)
+f_dot = sp.simplify(-L_of_f / sp.diff(E_of_f, f_sym))
+target = sp.Rational(96, 5) * sp.pi**sp.Rational(8, 3) * (k_ * Mc / c_**3)**sp.Rational(5, 3) * f_sym**sp.Rational(11, 3)
+chirp_mass = mu**sp.Rational(3, 5) * M_tot**sp.Rational(2, 5)
+print("df/dt = (96/5)π^{8/3}(kℳ/c³)^{5/3}f^{11/3}:", sp.simplify(f_dot - target.subs(Mc, chirp_mass)) == 0)
+```
+
+Интегрируя, $f(t) = \frac{1}{8\pi}\bigl(\frac{5}{\tau}\bigr)^{3/8}\bigl(\frac{kℳ}{c^3}\bigr)^{-5/8}$, где $\tau$ — время до слияния, а амплитуда на
+расстоянии $R$ (для оптимальной ориентации) $h = \frac4R\bigl(\frac{kℳ}{c^2}\bigr)^{5/3}\bigl(\frac{\pi f}{c}\bigr)^{2/3}$. Это
+ньютоновское приближение; у самого слияния ($f\gtrsim f$ последней устойчивой орбиты)
+нужна полная ОТО. Для GW150914 чирп-масса около $30M_\odot$ (в системе детектора),
+расстояние около 410 Мпк:
+
+```{python}
+#| label: fig-chirp
+#| fig-cap: 'Форма сигнала двойной чёрной дыры с чирп-массой 30 M☉ на расстоянии 410 Мпк в ньютоновском приближении: h(t) = h₀(t)cos Φ(t) за последние 0,2 с до момента, когда частота достигает 250 Гц (у GW150914 примерно здесь начинается слияние и формула перестаёт работать). Амплитуда и частота растут вместе — «чирп».'
+Mc_s = 30 * T_sun                                   # kℳ/c³ в секундах
+R_m = 410 * 3.0857e22
+c_SI = 2.998e8
+
+def freq(tau):
+    return (5 / tau)**0.375 * Mc_s**-0.625 / (8 * np.pi)
+
+def strain_amp(f):
+    return 4 / R_m * (Mc_s * c_SI)**(5 / 3) * (np.pi * f / c_SI)**(2 / 3)
+
+tau_end = 5 / (8 * np.pi * 250 * Mc_s**0.625)**(8 / 3)        # τ, при котором f = 250 Гц
+tau_35 = 5 / (8 * np.pi * 35 * Mc_s**0.625)**(8 / 3)
+taus = np.linspace(tau_end + 0.2, tau_end, 20000)
+phase = 2 * np.pi * np.concatenate([[0], np.cumsum(freq(taus[:-1]) * -np.diff(taus))])
+signal = strain_amp(freq(taus)) * np.cos(phase)
+fig, ax = plt.subplots(figsize=(7.5, 3.5))
+ax.plot(tau_end - taus, signal * 1e21, lw=0.8)
+ax.set(xlabel="t − t₂₅₀, с (t₂₅₀ — момент, когда f = 250 Гц)", ylabel="h · 10²¹")
+plt.tight_layout()
+plt.show()
+print(f"от 35 Гц до 250 Гц: {tau_35 - tau_end:.3f} с, около {np.trapezoid(freq(np.linspace(tau_35, tau_end, 200000)), dx=(tau_35 - tau_end) / 200000):.0f} циклов")
+print(f"амплитуда при 35 Гц {strain_amp(35):.1e}, при 150 Гц {strain_amp(150):.1e}, при 250 Гц {strain_amp(250):.1e}")
+```
+
+Порядок величин — ровно тот, что зарегистрировал LIGO 14 сентября 2015 года:
+сигнал длительностью около 0,2 с, частота от 35 до 250 Гц, амплитуда
+$\sim10^{-21}$. По скорости роста частоты определяется чирп-масса, по
+финальной стадии — массы и спины; за слияние излучилось около трёх
+масс Солнца.
+
+## Итоги
+
+- $g = \eta + h$; калибровка $h\to h + \partial\xi + \partial\xi$ (производная Ли), в калибровке Лоренца
+  $\Box\bar h_{\mu\nu} = -\frac{16\pi k}{c^4}T_{\mu\nu}$ — волны со скоростью $c$.
+- В калибровке TT плоская волна — две поляризации $h_+$, $h_\times$, спиральность 2.
+- Свободные частицы покоятся в координатах TT, а собственные расстояния меняются:
+  $\ddot\xi^i = \frac12\ddot h_{ij}\xi^j$ поперёк луча.
+- Квадрупольная формула $L = \frac{k}{5c^5}\langle\dddot Q_{ij}\dddot Q_{ij}\rangle$; для двойной звезды $\frac{32k^4\mu^2M^3}{5c^5a^5}$.
+- Пульсар Халса–Тейлора: $\dot P_b = -2{,}40\cdot10^{-12}$, совпадает с наблюдением.
+- Чирп $\dot f\propto\mathcal M^{5/3}f^{11/3}$; GW150914: 0,2 с, 35–250 Гц, $h\sim10^{-21}$.
+
+## Упражнения
+
+1. Для статического поля $h_{00} = 2\Phi/c^2$, $h_{ij} = 2\Phi\delta_{ij}/c^2$ найдите $\bar h_{\mu\nu}$ и убедитесь, что
+   $\Box\bar h_{00} = -16\pi kT_{00}/c^4$ даёт уравнение Пуассона.
+2. Покажите, что для волны $\bar h_{\mu\nu} = \varepsilon_{\mu\nu}e^{-ik\cdot x}$ калибровка Лоренца означает $k^\mu\varepsilon_{\mu\nu} = 0$. Сколько
+   независимых компонент остаётся после наложения калибровки TT?
+3. Почему нет дипольного гравитационного излучения? Какой величине в
+   электродинамике соответствует $\ddot{\mathbf d}$ и почему у гравитации это ноль?
+4. Оцените мощность гравитационного излучения системы Земля–Солнце.
+5. Оцените время до слияния пульсара Халса–Тейлора двумя способами: (а) как для круговой
+   орбиты с той же частотой волны $f = 2/P_b$, $\tau = \frac{5}{256}\bigl(\frac{k\mathcal M}{c^3}\bigr)^{-5/3}(\pi f)^{-8/3}$; (б) как $\tau = \frac38P_b/|\dot P_b|$ с
+   наблюдаемым $\dot P_b$ (так было бы при $\dot P_b\propto P_b^{-5/3}$). Почему оценки так различаются?
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $h = \eta^{\mu\nu}h_{\mu\nu} = 2\Phi - 3\cdot2\Phi = -4\Phi$ ($c = 1$), $\bar h_{00} = 2\Phi + 2\Phi = 4\Phi$, $\bar h_{ij} = 0$. Для статики $\Box = -\nabla^2$:
+   $-4\nabla^2\Phi = -16\pi k\rho$, то есть $\nabla^2\Phi = 4\pi k\rho$.
+2. $\partial^\mu\bar h_{\mu\nu} = -ik^\mu\varepsilon_{\mu\nu}e^{-ik\cdot x}$. Из 10 компонент симметричного тензора 4 условия Лоренца
+   и ещё 4 от остаточной свободы $\xi$ с $\Box\xi = 0$ — остаётся 2 ($h_+$, $h_\times$).
+3. Дипольный момент массы $\sum m\mathbf r = M\mathbf R_\text{цм}$, и $\ddot{\mathbf d} = M\ddot{\mathbf R}_\text{цм} = 0$ по закону сохранения
+   импульса; магнитному диполю отвечает момент импульса, тоже сохраняющийся. В
+   электродинамике отношение заряда к массе у частиц разное, и $\ddot{\mathbf d}\ne0$.
+4. $L = \frac{32}{5}\frac{k^4\mu^2M^3}{c^5a^5}$ с $\mu\approx M_\oplus$, $M\approx M_\odot$, $a = 1$ а. е.: около 196 Вт.
+5. (а) $\approx1{,}6\cdot10^9$ лет; (б) $\approx1{,}4\cdot10^8$ лет. Нынешнее $\dot P_b$ усилено эксцентриситетом в $f(e)\approx12$ раз
+   (излучение сильнее всего в периастре), поэтому (б) — нижняя оценка, а (а) его не учитывает вовсе.
+   Эксцентриситет уменьшается вместе с орбитой, и интегрирование уравнений Петерса даёт
+   промежуточное значение — около 300 миллионов лет.
+:::
