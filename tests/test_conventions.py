@@ -529,3 +529,18 @@ def test_chern_class_sign():
     assert c1 == -1
     A_berry = [sp.simplify(sp.I * (s.H * s.diff(v))[0]) for v in (th, ph)]
     assert all(sp.simplify(a + b) == 0 for a, b in zip(A, A_berry))
+
+
+def test_yang_mills_normalization():
+    """𝒜 = gA^aσ_a/2: ℱ = gF^aσ_a/2 с F^a = ∂A^a − ∂A^a − gε_abc A^bA^c; −tr ℱ²/2g² = −F^aF^a/4."""
+    from gmph.gauge import field_strength
+    x, y, g = sp.symbols("x y g", real=True)
+    sigma = [sp.Matrix([[0, 1], [1, 0]]), sp.Matrix([[0, -sp.I], [sp.I, 0]]), sp.Matrix([[1, 0], [0, -1]])]
+    comps = [[x * y, 1 - x, y**2], [x + y, x**2, -y]]           # A^a_x, A^a_y
+    A = [g * sum((comps[m][a] * sigma[a] / 2 for a in range(3)), sp.zeros(2)) for m in range(2)]
+    F = field_strength(A, (x, y))[(0, 1)]
+    Fa = [comps[1][a].diff(x) - comps[0][a].diff(y)
+          - g * sum(sp.LeviCivita(a, b, c) * comps[0][b] * comps[1][c] for b in range(3) for c in range(3))
+          for a in range(3)]
+    assert sp.expand(F - g * sum((Fa[a] * sigma[a] / 2 for a in range(3)), sp.zeros(2))) == sp.zeros(2)
+    assert sp.expand((F * F).trace() / (2 * g**2) - sum(f**2 for f in Fa) / 4) == 0

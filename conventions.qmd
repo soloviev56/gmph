@@ -226,6 +226,14 @@ subtitle: "Обозначения и соглашения о знаках, ед�
   + i\,[\mathcal{A}_\mu, \mathcal{A}_\nu], \qquad [D_\mu, D_\nu] = i\,\mathcal{F}_{\mu\nu}.$$
   Знак «+» перед $i\mathcal{A}_\mu$ выбран так, чтобы формулы совпадали с
   разделом «Электродинамика» без перемены знака у потенциала.
+- Неабелевы поля $\mathrm{SU}(N)$: $\mathcal A_\mu = g\,A^a_\mu T_a$ с эрмитовыми генераторами,
+  $\operatorname{tr}(T_aT_b) = \frac12\delta_{ab}$, $[T_a, T_b] = if_{abc}T_c$ (для $\mathrm{SU}(2)$ $T_a = \sigma_a/2$, $f_{abc} = \varepsilon_{abc}$). Тогда
+  $\mathcal F_{\mu\nu} = g\,F^a_{\mu\nu}T_a$,
+  $$F^a_{\mu\nu} = \partial_\mu A^a_\nu - \partial_\nu A^a_\mu - g f_{abc}A^b_\mu A^c_\nu .$$
+  Лагранжиан Янга–Миллса записывается в рационализованных единицах ($\hbar = c = 1$, как в
+  литературе по квантовой теории поля):
+  $$\mathcal L = -\frac{1}{2g^2}\operatorname{tr}\mathcal F_{\mu\nu}\mathcal F^{\mu\nu} = -\frac14F^a_{\mu\nu}F^{a\,\mu\nu};$$
+  абелев лагранжиан $-F^2/16\pi$ раздела «Электродинамика» переходит в $-\frac14F^2$ заменой $A\to A/\sqrt{4\pi}$, $e\to\sqrt{4\pi}\,e$.
 - Классы Черна — по Черну–Вейлю с математической кривизной $F = i\mathcal F$:
   $c(E) = \det\bigl(1 + \tfrac{i}{2\pi}F\bigr)$, то есть $c_1 = \frac{i}{2\pi}\operatorname{tr}F = -\frac{1}{2\pi}\operatorname{tr}\mathcal F$. Связность Берри
   $A_\text{Б} = i\langle s|\dd s\rangle$ равна $-\mathcal A$ для индуцированной связности на линии $s$, поэтому число Черна

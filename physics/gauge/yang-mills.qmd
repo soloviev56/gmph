@@ -1,0 +1,383 @@
+---
+title: "Поля Янга–Миллса"
+topic: yang-mills
+order: 2
+description: "Неабелева кривизна в компонентах F^a = ∂A^a − ∂A^a − g f_abc A^bA^c (нормировка добавлена в конвенции); лагранжиан −(1/2g²)tr ℱ² = −¼F^aF^a, уравнения Янга–Миллса D_μF^{μν} = 0 (вывод в SymPy для SU(2)) и тождество Бьянки; самодействие: кубические и четвертичные вершины, цветовой заряд самого поля в законе Гаусса; абелевы решения; механика Янга–Миллса — однородные поля, потенциал ½g²x²y² и хаос (сечение Пуанкаре, показатель Ляпунова, рисунок); евклидовы уравнения, самодуальность и инстантон БПЗТ: действие 8π²/g² = 8π²|c₂|/g², туннельный множитель; асимптотическая свобода и конфайнмент — словами"
+---
+
+[Калибровочный принцип](/physics/gauge/gauge-principle.qmd) для группы $\mathrm{U}(1)$ дал
+электродинамику — линейную теорию: электромагнитные волны проходят
+друг сквозь друга, фотон не несёт заряда. Если в основе лежит
+неабелева группа ($\mathrm{SU}(2)$ слабого взаимодействия, $\mathrm{SU}(3)$ сильного), связность —
+матрица, её кривизна содержит коммутатор, и теория становится
+нелинейной. Калибровочные поля сами несут заряд и взаимодействуют друг с
+другом. Это **поля Янга–Миллса** (1954). Геометрически — та же
+[кривизна связности в расслоении](/math/bundles/bundle-curvature.qmd), только
+теперь она сама подчиняется динамическому уравнению.
+
+Обозначения — из [конвенций](/conventions.qmd) (раздел «Калибровочные поля»):
+$D_\mu = \partial_\mu + i\mathcal A_\mu$, $\mathcal A_\mu = gA^a_\mu T_a$, $\operatorname{tr}T_aT_b = \frac12\delta_{ab}$, $[T_a, T_b] = if_{abc}T_c$; $\hbar = c = 1$.
+Нормировку лагранжиана мы добавили в конвенции вместе с этой статьёй:
+для неабелевых полей принято писать его в рационализованных единицах.
+Все вычисления — для $\mathrm{SU}(2)$: $T_a = \sigma_a/2$, $f_{abc} = \varepsilon_{abc}$.
+
+## Кривизна в компонентах
+
+Матричная кривизна $\mathcal F_{\mu\nu} = \partial_\mu\mathcal A_\nu - \partial_\nu\mathcal A_\mu + i[\mathcal A_\mu, \mathcal A_\nu]$ раскладывается по
+генераторам, $\mathcal F_{\mu\nu} = gF^a_{\mu\nu}T_a$, и коммутатор $i[T_b, T_c] = -f_{bca}T_a$ даёт
+$$
+F^a_{\mu\nu} = \partial_\mu A^a_\nu - \partial_\nu A^a_\mu - g f_{abc}A^b_\mu A^c_\nu .
+$$
+Первые два слагаемых — «максвелловские», третье — квадратичное по
+полям. Проверим разложение в четырёх измерениях для произвольных
+функций $A^a_\mu(x)$:
+
+```{python}
+import numpy as np
+import sympy as sp
+import matplotlib.pyplot as plt
+from sympy import LeviCivita as eps
+from gmph.fields import euler_lagrange
+
+X = sp.symbols("x0:4", real=True)
+eta = sp.diag(1, -1, -1, -1)
+g = sp.Symbol("g", positive=True)
+T = [sp.Matrix([[0, 1], [1, 0]]) / 2, sp.Matrix([[0, -sp.I], [sp.I, 0]]) / 2, sp.Matrix([[1, 0], [0, -1]]) / 2]
+A = [[sp.Function(f"A{a + 1}_{m}")(*X) for m in range(4)] for a in range(3)]     # A[a][μ] = A^a_μ
+
+def F(a, m, n, A=A):
+    """Компонента F^a_{μν} (индексы μ, ν нижние)."""
+    return (A[a][n].diff(X[m]) - A[a][m].diff(X[n])
+            - g * sum(eps(a, b, c) * A[b][m] * A[c][n] for b in range(3) for c in range(3)))
+
+def F_up(a, m, n, A=A):
+    return eta[m, m] * eta[n, n] * F(a, m, n, A)
+
+A_mat = [g * sum((A[a][m] * T[a] for a in range(3)), sp.zeros(2)) for m in range(4)]
+def F_mat(m, n):
+    return A_mat[n].diff(X[m]) - A_mat[m].diff(X[n]) + sp.I * (A_mat[m] * A_mat[n] - A_mat[n] * A_mat[m])
+
+print("ℱ_μν = g F^a_μν T_a:", all(sp.expand(F_mat(m, n) - g * sum((F(a, m, n) * T[a] for a in range(3)), sp.zeros(2)))
+                                 == sp.zeros(2) for m in range(4) for n in range(m + 1, 4)))
+```
+
+## Лагранжиан и уравнения поля
+
+Калибровочно-инвариантный лагранжиан низшего порядка — след квадрата
+кривизны (сама $\mathcal F$ преобразуется сопряжением, $\mathcal F\to U\mathcal FU^{-1}$, и инвариантен только след):
+
+::: {#def-yang-mills}
+**Действие Янга–Миллса** для калибровочной группы $G$:
+$$
+S = \int\mathcal L\,\dd^4x, \qquad \mathcal L = -\frac{1}{2g^2}\operatorname{tr}\mathcal F_{\mu\nu}\mathcal F^{\mu\nu} = -\frac14F^a_{\mu\nu}F^{a\,\mu\nu} .
+$$
+На языке форм $\mathcal L\,\mathrm{vol} = -\frac{1}{g^2}\operatorname{tr}(\mathcal F\wedge\hodge\mathcal F)$. **Уравнения Янга–Миллса** — уравнения
+Эйлера–Лагранжа этого действия.
+:::
+
+Варьирование по $A^a_\nu$ даёт
+$$
+D_\mu F^{a\,\mu\nu} \equiv \partial_\mu F^{a\,\mu\nu} - g\,\varepsilon_{abc}A^b_\mu F^{c\,\mu\nu} = 0,
+$$
+то есть $D_\mu\mathcal F^{\mu\nu} = \partial_\mu\mathcal F^{\mu\nu} + i[\mathcal A_\mu, \mathcal F^{\mu\nu}] = 0$, или $D\hodge\mathcal F = 0$ на языке форм. Вторая пара —
+**тождество Бьянки** $D_\lambda\mathcal F_{\mu\nu} + D_\mu\mathcal F_{\nu\lambda} + D_\nu\mathcal F_{\lambda\mu} = 0$ ($D\mathcal F = 0$) — выполняется для
+любой связности, как $\dd F = 0$ в электродинамике. Выведем уравнения
+функцией `euler_lagrange` (двенадцать полей $A^a_\mu$) и сравним:
+
+```{python}
+L = -sp.Rational(1, 4) * sum(F(a, m, n) * F_up(a, m, n) for a in range(3) for m in range(4) for n in range(4))
+L_trace = -1 / (2 * g**2) * sum(eta[m, m] * eta[n, n] * (F_mat(m, n) * F_mat(m, n)).trace()
+                                for m in range(4) for n in range(4))
+print("−tr ℱ²/2g² = −¼F^aF^a:", sp.expand(L - L_trace) == 0)
+
+fields = [A[a][n] for a in range(3) for n in range(4)]
+eqs = euler_lagrange(L, fields, X)                    # ∂_μ ∂ℒ/∂(∂_μA^a_ν) − ∂ℒ/∂A^a_ν
+
+def D_F(a, n):
+    """D_μ F^{aμν}."""
+    return sum(F_up(a, m, n).diff(X[m]) - g * sum(eps(a, b, c) * A[b][m] * F_up(c, m, n)
+                                                  for b in range(3) for c in range(3)) for m in range(4))
+
+print("уравнения Эйлера–Лагранжа = −D_μF^{aμν}:",
+      all(sp.expand(eqs[4 * a + n] + D_F(a, n)) == 0 for a in range(3) for n in range(4)))
+
+def D_lower(a, l, m, n):
+    """D_λ F^a_{μν} в присоединённом представлении."""
+    return F(a, m, n).diff(X[l]) - g * sum(eps(a, b, c) * A[b][l] * F(c, m, n) for b in range(3) for c in range(3))
+
+bianchi = [sp.expand(D_lower(a, 0, 1, 2) + D_lower(a, 1, 2, 0) + D_lower(a, 2, 0, 1)) for a in range(3)]
+print("тождество Бьянки (λμν = 012):", bianchi == [0, 0, 0])
+```
+
+## Самодействие
+
+Подставим $F^a$ в лагранжиан. Получатся три группы слагаемых:
+$$
+\mathcal L = -\tfrac14\bigl(\partial_\mu A^a_\nu - \partial_\nu A^a_\mu\bigr)^2 + g\,\varepsilon_{abc}\,(\partial_\mu A^a_\nu)A^{b\,\mu}A^{c\,\nu} - \tfrac{g^2}{4}\,\varepsilon_{abc}\varepsilon_{ade}A^b_\mu A^c_\nu A^{d\,\mu}A^{e\,\nu} .
+$$
+Первая — три копии свободного максвелловского поля, вторая и третья —
+**вершины** взаимодействия полей друг с другом (трёх- и
+четырёхглюонная в КХД). Проверим это разложение по степеням $g$:
+
+```{python}
+dA = lambda a, m, n: A[a][n].diff(X[m]) - A[a][m].diff(X[n])
+up = lambda m: eta[m, m]
+free = -sp.Rational(1, 4) * sum(up(m) * up(n) * dA(a, m, n)**2 for a in range(3) for m in range(4) for n in range(4))
+cubic = g * sum(eps(a, b, c) * A[a][n].diff(X[m]) * up(m) * up(n) * A[b][m] * A[c][n]
+                for a in range(3) for b in range(3) for c in range(3) for m in range(4) for n in range(4))
+quartic = -g**2 / 4 * sum(eps(a, b, c) * eps(a, d, f) * up(m) * up(n) * A[b][m] * A[c][n] * A[d][m] * A[f][n]
+                          for a in range(3) for b in range(3) for c in range(3) for d in range(3) for f in range(3)
+                          for m in range(4) for n in range(4) if eps(a, b, c) * eps(a, d, f) != 0)
+print("ℒ = свободная + кубическая + четвертичная части:", sp.expand(L - free - cubic - quartic) == 0)
+print("число слагаемых: свободная", len(sp.expand(free).args), ", кубическая", len(sp.expand(cubic).args),
+      ", четвертичная", len(sp.expand(quartic).args))
+```
+
+**Цветовой заряд поля.** Уравнение $D_\mu F^{a\,\mu0} = 0$ с источником $j^{a\,0}$ (закон
+Гаусса) удобно переписать, перенеся нелинейную часть вправо:
+$$
+\partial_iF^{a\,i0} = j^{a\,0} + g\,\varepsilon_{abc}A^b_\mu F^{c\,\mu0} .
+$$
+Само поле входит в правую часть как плотность заряда. В отличие от
+фотона, «глюон» заряжен: силовые линии цветового поля притягиваются
+друг к другу. Именно это делает поведение сильного взаимодействия
+качественно иным (ниже — о конфайнменте).
+
+**Абелевы решения.** Если все поля направлены в одну сторону
+изотопического пространства, $A^a_\mu = n^a a_\mu(x)$ с постоянным $\mathbf n$, коммутаторы
+обращаются в нуль, и уравнения Янга–Миллса сводятся к уравнениям
+Максвелла для $a_\mu$. Неабелевость проявляется, только когда поля в
+разных точках «смотрят» в разные стороны группы.
+
+## Механика Янга–Миллса и хаос
+
+Самая простая система, где видна нелинейность, — однородные поля,
+зависящие только от времени. В калибровке $A^a_0 = 0$ возьмём
+$A^1_1 = x(t)$, $A^2_2 = y(t)$, остальные компоненты нулевые. Тогда
+«электрические» поля $F^a_{0i} = \partial_0A^a_i$, а «магнитное» поле рождается
+только коммутатором: $F^3_{12} = -g\,xy$. Лагранжиан превращается в
+лагранжиан частицы на плоскости:
+
+```{python}
+t = sp.Symbol("t", real=True)
+xt, yt = sp.Function("x")(t), sp.Function("y")(t)
+ansatz = {A[a][m]: 0 for a in range(3) for m in range(4)}
+ansatz.update({A[0][1]: xt.subs(t, X[0]), A[1][2]: yt.subs(t, X[0])})
+def on_ansatz(expr):
+    return sp.simplify(expr.subs(ansatz).doit().subs(X[0], t))
+
+L_mech = on_ansatz(L)
+print("ℒ =", L_mech)
+print("ℒ − [½(ẋ² + ẏ²) − ½g²x²y²] =",
+      sp.simplify(L_mech - ((xt.diff(t)**2 + yt.diff(t)**2) / 2 - g**2 * xt**2 * yt**2 / 2)))
+others = {on_ansatz(D_F(a, n)) for a in range(3) for n in range(4)} - {0}
+print("ненулевые уравнения Янга–Миллса на анзаце:", others)
+```
+
+Остальные уравнения (включая закон Гаусса) выполняются тождественно, а
+два ненулевых — это уравнения движения частицы с потенциалом
+$V = \frac12g^2x^2y^2$. Потенциал однороден четвёртой степени, поэтому все энергии
+эквивалентны: замена $x\to\lambda x$, $t\to t/\lambda$ переводит $E$ в $\lambda^4E$. Энергетические
+«каналы» вдоль осей сужаются как $|xy| = \sqrt{2E}/g$, и частица, заходя в них,
+отражается под непредсказуемыми углами. Абелева теория (здесь — без
+$F^3_{12}$) дала бы свободное движение. Построим сечение Пуанкаре: точки
+$(y, p_y)$ при прохождении $x = 0$ с $p_x > 0$, $g = 1$, $E = \frac12$:
+
+```{python}
+from scipy.integrate import solve_ivp
+
+def rhs(t, s):
+    x, y, px, py = s
+    return [px, py, -x * y**2, -x**2 * y]
+
+def crossing(t, s):
+    return s[0]
+crossing.direction = 1                                   # x = 0 при p_x > 0
+
+def energy(s):
+    x, y, px, py = s
+    return (px**2 + py**2) / 2 + x**2 * y**2 / 2
+
+E0, t_max = 0.5, 400.0
+rng = np.random.default_rng(3)
+sections, drift, reach = [], 0.0, 0.0
+for k in range(12):
+    y0, py0 = rng.uniform(-3, 3), rng.uniform(-0.95, 0.95)
+    s0 = [0.0, y0, np.sqrt(2 * E0 - py0**2), py0]          # на сечении x = 0: E = (p_x² + p_y²)/2
+    sol = solve_ivp(rhs, (0, t_max), s0, method="DOP853", rtol=1e-10, atol=1e-12, events=crossing)
+    sections.append(sol.y_events[0][:, [1, 3]])
+    drift = max(drift, abs(energy(sol.y[:, -1]) - E0))
+    reach = max(reach, np.abs(sol.y[:2]).max())
+print(f"{len(sections)} траекторий, {sum(len(s) for s in sections)} точек сечения; max |E − E₀| = {drift:.0e};"
+      f" наибольшее удаление по каналу {reach:.0f}")
+
+def rhs_tangent(t, s):
+    """Уравнения движения и уравнения в вариациях (касательный вектор δ)."""
+    x, y, px, py, dx, dy, dpx, dpy = s
+    return [px, py, -x * y**2, -x**2 * y,
+            dpx, dpy, -(y**2 * dx + 2 * x * y * dy), -(2 * x * y * dx + x**2 * dy)]
+
+def lyapunov(s0, t_total=1000.0, dt=5.0):
+    """Наибольший показатель Ляпунова: рост касательного вектора с перенормировкой."""
+    s = np.r_[s0, 0.0, 1.0, 0.0, 0.0]
+    log_growth = 0.0
+    for _ in range(int(t_total / dt)):
+        s = solve_ivp(rhs_tangent, (0, dt), s, method="DOP853", rtol=1e-10, atol=1e-12).y[:, -1]
+        norm = np.linalg.norm(s[4:])
+        log_growth += np.log(norm)
+        s[4:] /= norm
+    return log_growth / t_total
+
+for y0, py0 in ((1.0, 0.3), (-2.0, 0.6), (0.5, -0.8)):
+    lam = lyapunov([0.0, y0, np.sqrt(2 * E0 - py0**2), py0])
+    print(f"начало (y, p_y) = ({y0:+.1f}, {py0:+.1f}):  λ ≈ {lam:.3f} за t = 1000")
+```
+
+```{python}
+#| label: fig-ym-chaos
+#| fig-cap: 'Механика Янга–Миллса: однородное поле SU(2) с A¹₁ = x(t), A²₂ = y(t) движется в потенциале ½x²y² (g = 1, E = ½). Слева — одна траектория за время t ≤ 300: она заходит в узкие каналы вдоль осей и выходит из них хаотически; серые линии — граница |xy| = 1 области, доступной при этой энергии. Справа — сечение Пуанкаре x = 0, p_x > 0 для 12 траекторий за t ≤ 400 (цвет — номер траектории, показана часть |y| ≤ 8): точки рассеяны по всей полосе |p_y| ≤ 1 без замкнутых инвариантных кривых; гладкие дуги — следы долгих заходов в канал вдоль оси y, где быстрые колебания x почти регулярны.'
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4.3))
+s0 = [0.0, 1.0, np.sqrt(2 * E0 - 0.3**2), 0.3]
+orbit = solve_ivp(rhs, (0, 300), s0, method="DOP853", rtol=1e-10, atol=1e-12, dense_output=True)
+tt = np.linspace(0, 300, 30000)
+ax1.plot(*orbit.sol(tt)[:2], lw=0.4, color="tab:blue")
+u = np.linspace(1 / 6.5, 6.5, 300)
+for sx in (1, -1):
+    for sy in (1, -1):
+        ax1.plot(sx * u, sy / u, color="0.6", lw=1)
+ax1.set(xlim=(-6, 6), ylim=(-6, 6), aspect="equal", xlabel="x = A¹₁", ylabel="y = A²₂", title="траектория")
+colors = plt.cm.tab20(np.linspace(0, 1, len(sections)))
+for sec, col in zip(sections, colors):
+    ax2.plot(sec[:, 0], sec[:, 1], ".", ms=1.5, color=col)
+ax2.set(xlabel="y", ylabel="p_y", title="сечение Пуанкаре x = 0", xlim=(-8, 8), ylim=(-1.05, 1.05))
+plt.tight_layout()
+plt.show()
+```
+
+Классическая механика Янга–Миллса хаотична (Матинян, Саввиди, Тер-Арутюнян-Саввиди, 1981):
+показатель Ляпунова положителен. Оценки за конечное время для разных
+начальных условий разбросаны ($0{,}24$–$0{,}30$ при $E = \frac12$): траектория надолго уходит в каналы,
+где движение почти регулярно, и усреднение сходится медленно. Из-за
+однородности потенциала показатель при любой энергии получается
+масштабированием: время сжимается в $\lambda$ раз при росте энергии в $\lambda^4$ раз, поэтому
+$\lambda_\text{Л}\propto E^{1/4}$. Однородные поля с переменной ориентацией — лишь
+модель, но она показывает главное: нелинейность, порождённая
+коммутатором, качественно меняет динамику по сравнению с
+электродинамикой.
+
+## Инстантон
+
+В евклидовом пространстве ($t\to-i\tau$, метрика $\delta_{\mu\nu}$) действие становится
+положительным: $S_E = \frac14\int F^a_{\mu\nu}F^a_{\mu\nu}\,\dd^4x$. Из неравенства
+$\int(F - \hodge F)^2\ge0$ и $\hodge\hodge = 1$ на 2-формах в $\R^4$ следует оценка
+$$
+S_E \ge \frac14\Bigl|\int F^a_{\mu\nu}(\hodge F)^a_{\mu\nu}\,\dd^4x\Bigr| = \frac{8\pi^2}{g^2}\,|k|,
+$$
+где $k$ — целое **топологическое число**, второй класс Черна $\int c_2$ (статья о
+[характеристических классах](/math/bundles/chern-classes.qmd)); множитель $1/g^2$
+появляется потому, что решения масштабируются как $A\propto1/g$. Равенство — на **самодуальных** полях
+$F = \hodge F$: они минимизируют действие в своём топологическом секторе и
+автоматически решают уравнения Янга–Миллса (уравнение $D\hodge F = DF = 0$
+выполнено по тождеству Бьянки). Решение с $k = 1$ — **инстантон
+Белавина–Полякова–Шварца–Тюпкина** (1975):
+$$
+A^a_\mu = -\frac{2}{g}\,\frac{\eta_{a\mu\nu}x_\nu}{x^2 + \rho^2},
+$$
+где $\eta_{a\mu\nu}$ — символы т’Хоофта ($\eta_{aij} = \varepsilon_{aij}$, $\eta_{ai4} = \delta_{ai}$, $\eta_{a4i} = -\delta_{ai}$), $\rho$ —
+произвольный размер. Знак минус связан с нашим знаком в $F^a$: с плюсом
+получилось бы антисамодуальное поле. Проверим самодуальность и
+вычислим действие ($g = 1$):
+
+```{python}
+xe = sp.symbols("x1:5", real=True)
+rho, r = sp.symbols("rho r", positive=True)
+
+def thooft(a, m, n):
+    if m < 3 and n < 3:
+        return eps(a, m, n)
+    if n == 3 and m < 3:
+        return int(a == m)
+    if m == 3 and n < 3:
+        return -int(a == n)
+    return 0
+
+x_sq = sum(v**2 for v in xe)
+A_inst = [[-2 * sum(thooft(a, m, n) * xe[n] for n in range(4)) / (x_sq + rho**2) for m in range(4)] for a in range(3)]
+F_inst = {(a, m, n): sp.simplify(A_inst[a][n].diff(xe[m]) - A_inst[a][m].diff(xe[n])
+                                 - sum(eps(a, b, c) * A_inst[b][m] * A_inst[c][n] for b in range(3) for c in range(3)))
+          for a in range(3) for m in range(4) for n in range(4)}
+dual = lambda a, m, n: sum(eps(m, n, k, l) * F_inst[(a, k, l)] for k in range(4) for l in range(4)) / 2
+print("F = ⋆F:", all(sp.simplify(F_inst[(a, m, n)] - dual(a, m, n)) == 0 for a in range(3) for m in range(4) for n in range(4)))
+density = sp.simplify(sum(v**2 for v in F_inst.values()) / 4)
+radial = sp.factor(density.subs({xe[0]: r, xe[1]: 0, xe[2]: 0, xe[3]: 0}))
+print("плотность действия ¼F^aF^a =", radial, " (зависит только от |x| = r)")
+S_inst = sp.integrate(radial * 2 * sp.pi**2 * r**3, (r, 0, sp.oo))     # площадь S³ радиуса r — 2π²r³
+print("S_E =", S_inst, " = 8π²:", sp.simplify(S_inst - 8 * sp.pi**2) == 0)
+```
+
+Действие не зависит от размера $\rho$ — следствие масштабной инвариантности
+классических уравнений Янга–Миллса в четырёх измерениях. Физически
+инстантон — туннелирование между классическими вакуумами,
+различающимися числом намотки (большие калибровочные преобразования из
+статьи о [калибровочных преобразованиях](/math/bundles/gauge-transformations.qmd)), с амплитудой
+$\sim e^{-S_E} = e^{-8\pi^2/g^2}$. В слабой связи это ничтожно мало (упражнение 5), но
+неустранимо по теории возмущений.
+
+## Квантовая теория: что меняется
+
+Квантование полей Янга–Миллса — предмет курса квантовой теории поля;
+отметим два главных результата, оба следствия самодействия.
+
+- **Асимптотическая свобода.** Эффективная константа связи $g(\mu)$
+  уменьшается с ростом энергии $\mu$ (Гросс, Вильчек, Политцер, 1973): заряженные
+  глюоны «антиэкранируют» цветовой заряд. Для $\mathrm{SU}(N)$ с $n_f$ ароматами
+  кварков $\mu\,\dd g/\dd\mu = -\frac{g^3}{16\pi^2}\bigl(\frac{11}{3}N - \frac23n_f\bigr)$; при $N = 3$ коэффициент положителен,
+  пока $n_f\le16$. В электродинамике знак противоположный.
+- **Конфайнмент.** При малых энергиях связь сильная, и цветовые
+  силовые линии собираются в трубку: энергия растёт линейно с
+  расстоянием, и свободные кварки не наблюдаются. Строгого
+  доказательства нет; решёточные расчёты (действие Вильсона из статьи о
+  [калибровочном принципе](/physics/gauge/gauge-principle.qmd)) его подтверждают.
+
+Классические безмассовые поля Янга–Миллса в природе не видны: сильное
+взаимодействие короткодействующее из-за конфайнмента, слабое — потому
+что $W$ и $Z$ массивны. Как совместить массу с калибровочной инвариантностью,
+объясняет тема «Спонтанное нарушение симметрии».
+
+## Итоги
+
+- $\mathcal A = gA^aT_a$; $F^a_{\mu\nu} = \partial_\mu A^a_\nu - \partial_\nu A^a_\mu - gf_{abc}A^b_\mu A^c_\nu$; кривизна ковариантна, $\mathcal F\to U\mathcal FU^{-1}$.
+- $\mathcal L = -\frac{1}{2g^2}\operatorname{tr}\mathcal F^2 = -\frac14F^aF^a$; уравнения $D_\mu\mathcal F^{\mu\nu} = 0$ ($D\hodge\mathcal F = 0$) и тождество
+  Бьянки $D\mathcal F = 0$ — нелинейное обобщение уравнений Максвелла.
+- Лагранжиан содержит кубические и четвертичные вершины; поле несёт
+  цветовой заряд; абелевы конфигурации подчиняются уравнениям Максвелла.
+- Однородные поля дают механику с потенциалом $\frac12g^2x^2y^2$ — хаотическую.
+- В евклидовом пространстве $S_E\ge8\pi^2|k|/g^2$; самодуальный инстантон БПЗТ насыщает
+  оценку при $k = 1$.
+
+## Упражнения
+
+1. Выведите $F^a_{\mu\nu}$ для $\mathrm{SU}(2)$ из $\mathcal F_{\mu\nu}$, используя $[\sigma_a, \sigma_b] = 2i\varepsilon_{abc}\sigma_c$.
+2. Покажите, что для $A^a_\mu = n^aa_\mu(x)$ с постоянным единичным $\mathbf n$ уравнения
+   Янга–Миллса сводятся к $\partial_\mu f^{\mu\nu} = 0$, $f_{\mu\nu} = \partial_\mu a_\nu - \partial_\nu a_\mu$.
+3. Запишите закон Гаусса $D_iE^{a}_i = 0$ ($E^a_i = F^a_{0i}$ в калибровке $A^a_0 = 0$) для механики Янга–Миллса
+   с анзацем $A^1_1 = x$, $A^2_2 = y$ и убедитесь, что он выполнен. Что изменится, если
+   добавить $A^1_2 = z(t)$?
+4. Как меняется период движения в потенциале $\frac12x^2y^2$ при росте энергии в 16 раз
+   (для подобной траектории)?
+5. Оцените туннельный множитель $e^{-8\pi^2/g^2}$ для $\alpha = g^2/4\pi = 0{,}1$ и $\alpha = 1/137$.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $i[\mathcal A_\mu, \mathcal A_\nu] = \frac{ig^2}{4}A^b_\mu A^c_\nu[\sigma_b, \sigma_c] = -\frac{g^2}{2}\varepsilon_{bca}A^b_\mu A^c_\nu\sigma_a = g\bigl(-g\varepsilon_{abc}A^b_\mu A^c_\nu\bigr)T_a$ — это и
+   есть нелинейная часть $F^a$.
+2. $\varepsilon_{abc}n^bn^c = 0$, поэтому $F^a_{\mu\nu} = n^af_{\mu\nu}$, а член $\varepsilon_{abc}A^b_\mu F^{c\,\mu\nu} = \varepsilon_{abc}n^bn^c\,a_\mu f^{\mu\nu} = 0$. Остаётся
+   $n^a\partial_\mu f^{\mu\nu} = 0$.
+3. $D_iE^a_i = \partial_iE^a_i - g\varepsilon_{abc}A^b_iE^c_i$, поля однородны, $\partial_i = 0$. Для $a = 3$: $-g(A^1_iE^2_i - A^2_iE^1_i) = -g(x\cdot0 - y\cdot0) = 0$
+   (у $A^1_i$ и $E^2_i$ нет общих ненулевых $i$); для $a = 1, 2$ ненулевых слагаемых нет. С
+   $A^1_2 = z$ закон Гаусса для $a = 3$ даёт $-g(z\dot y - y\dot z) = 0$: «момент» $z\dot y - y\dot z$ (он сохраняется) должен
+   быть равен нулю — это связь на начальные условия.
+4. $E\to\lambda^4E$ при $t\to t/\lambda$: $\lambda = 16^{1/4} = 2$, период уменьшается вдвое.
+5. $8\pi^2/g^2 = 2\pi/\alpha$: при $\alpha = 0{,}1$ множитель $e^{-62{,}8}\approx 5\cdot10^{-28}$; при $\alpha = 1/137$ —
+   $e^{-861}\approx 10^{-374}$.
+:::
