@@ -133,6 +133,18 @@ subtitle: "Обозначения и соглашения о знаках, ед�
   $\dot{\mathbf S} = \gamma\,\mathbf S\times\mathbf B$ (при $\mathbf B = B\mathbf e_z$:
   $\dot\varphi = -\gamma B$).
 
+## Контактная геометрия
+
+- Стандартная контактная форма на $\R^{2n+1}$ с координатами $(q^1, \dots, q^n, p_1, \dots, p_n, S)$:
+  $$\alpha = \dd S - p_i\,\dd q^i, \qquad \dd\alpha = \dd q^i\wedge\dd p_i = -\omega ,$$
+  поле Риба $R = \partial_S$ ($\iprod{R}\alpha = 1$, $\iprod{R}\dd\alpha = 0$).
+- Контактное гамильтоново поле $X_H$ функции $H(q, p, S)$ задаётся условиями
+  $$\iprod{X_H}\alpha = -H, \qquad \iprod{X_H}\dd\alpha = \dd H - R(H)\,\alpha ,$$
+  что даёт
+  $$\dot q^i = \pd{H}{p_i}, \qquad \dot p_i = -\pd{H}{q^i} - p_i\pd{H}{S}, \qquad \dot S = p_i\pd{H}{p_i} - H ,$$
+  и $\Lie{X_H}\alpha = -R(H)\,\alpha$. Если $H$ не зависит от $S$, проекция на $(q, p)$ — обычные уравнения
+  Гамильтона раздела «Гамильтонова механика», а $\dot S = p\dot q - H$ — лагранжиан, то есть $S$ — действие.
+
 ## Комплексные пространства
 
 - Эрмитово скалярное произведение антилинейно по **первому** аргументу и

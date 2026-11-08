@@ -544,3 +544,19 @@ def test_yang_mills_normalization():
           for a in range(3)]
     assert sp.expand(F - g * sum((Fa[a] * sigma[a] / 2 for a in range(3)), sp.zeros(2))) == sp.zeros(2)
     assert sp.expand((F * F).trace() / (2 * g**2) - sum(f**2 for f in Fa) / 4) == 0
+
+
+def test_contact_hamiltonian_signs():
+    """α = dS − p dq, R = ∂_S; ι_Xα = −H, ι_X dα = dH − R(H)α ⇒ q̇ = H_p, ṗ = −H_q − pH_S, Ṡ = pH_p − H."""
+    from gmph.exterior import add, d, interior, lie, scale
+    q, p, S = sp.symbols("q p S", real=True)
+    C = (q, p, S)
+    H = sp.Function("H")(q, p, S)
+    alpha = {(3,): 1, (1,): -p}
+    dalpha = d(alpha, C)
+    assert dalpha == {(1, 2): 1}                                   # dq∧dp
+    assert interior([0, 0, 1], alpha) == {(): 1} and interior([0, 0, 1], dalpha) == {}
+    X = [H.diff(p), -H.diff(q) - p * H.diff(S), p * H.diff(p) - H]
+    assert sp.simplify(interior(X, alpha)[()] + H) == 0
+    assert add(interior(X, dalpha), scale(-1, d({(): H}, C)), scale(H.diff(S), alpha)) == {}
+    assert add(lie(X, alpha, C), scale(H.diff(S), alpha)) == {}
