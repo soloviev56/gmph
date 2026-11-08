@@ -1,0 +1,332 @@
+---
+title: "Монополь Дирака"
+topic: dirac-monopole
+order: 12
+description: "Поле магнитного заряда 𝓑 = g sinθ dθ∧dφ: замкнута, но не точна (поток 4πg через сферу); глобального потенциала нет — два потенциала 𝒜_N = g(1 − cosθ)dφ и 𝒜_S = −g(1 + cosθ)dφ со струнами Дирака, их разность 2g dφ — калибровочное преобразование; однозначность функции перехода даёт условие Дирака eg/ħc = n/2 — квантование заряда; невидимость струны (голономия вдоль широты в двух калибровках, рисунок); монополь как расслоение с первым классом Черна −n; классическое движение заряда: сохраняющийся момент J = r×mv − (eg/c)r̂, движение по конусу (численно, рисунок); квантовый момент импульса: [J_x, J_y] = iJ_z только с вкладом поля, r̂·J = −q, j ≥ |q| — полуцелый спин из бесспиновых частиц"
+---
+
+Уравнения Максвелла несимметричны: у электрического поля есть
+источники, у магнитного — нет, $\dd\mathcal B = 0$. Если бы существовал
+**магнитный заряд**, электродинамика стала бы симметричнее, но возникла
+бы трудность: вокруг монополя форма $\mathcal B$ замкнута, но поток её через
+сферу не равен нулю, и векторного потенциала, заданного всюду, нет. А
+без потенциала нельзя записать уравнение Шрёдингера. Дирак (1931) нашёл
+выход: потенциал задаётся двумя картами, а условие согласования на их
+пересечении требует, чтобы произведение электрического и магнитного
+зарядов было квантовано,
+$$
+\frac{eg}{\hbar c} = \frac n2, \qquad n\in\mathbb Z .
+$$
+Существование одного монополя во Вселенной объяснило бы, почему все
+электрические заряды кратны одному.
+
+Нужны [калибровочная инвариантность в электродинамике](/physics/electrodynamics/gauge-invariance-em.qmd)
+и [характеристические классы](/math/bundles/chern-classes.qmd). Обозначения — по
+[конвенциям](/conventions.qmd): гауссовы единицы, $\mathcal B = \mathbf B\cdot\dd\mathbf S$, $\mathcal B = \dd\mathcal A$,
+$D = \dd + \frac{ie}{\hbar c}\mathcal A$, калибровочное преобразование $\mathcal A\to\mathcal A + \dd f$, $\psi\to e^{ief/\hbar c}\psi$. Магнитный
+заряд обозначим $g$ (в этой статье — не метрика и не константа связи).
+
+## Поле монополя: замкнутая, но не точная форма
+
+::: {#def-monopole}
+**Монополь Дирака** с магнитным зарядом $g$ — статическое магнитное поле
+$\mathbf B = g\,\mathbf r/r^3$ в $\R^3\setminus\{0\}$. В сферических координатах его 2-форма потока
+$$
+\mathcal B = g\sin\theta\,\dd\theta\wedge\dd\varphi, \qquad \oint_{S^2}\mathcal B = 4\pi g .
+$$
+:::
+
+Форма замкнута ($\dd\mathcal B = 0$ вне начала координат), но поток через сферу не
+нуль, поэтому $\mathcal B$ не точна: если бы $\mathcal B = \dd\mathcal A$ с гладкой на всей сфере $\mathcal A$,
+то по [теореме Стокса](/math/forms/stokes.qmd) $\oint_{S^2}\dd\mathcal A = 0$ (у сферы нет края). Это та же
+ситуация, что с формой $\dd\varphi$ на плоскости без точки, только на
+размерность выше: $H^2(\R^3\setminus\{0\}) = \R$, и класс $\mathcal B$ в нём — $4\pi g$.
+
+Потенциал можно задать **локально**. Два стандартных выбора:
+$$
+\mathcal A_N = g\,(1 - \cos\theta)\,\dd\varphi, \qquad \mathcal A_S = -g\,(1 + \cos\theta)\,\dd\varphi .
+$$
+Форма $\dd\varphi$ сама особая на оси $z$, а коэффициент $1 - \cos\theta$ обращается в нуль на
+северной полуоси $\theta = 0$: $\mathcal A_N$ гладкая всюду, кроме южной полуоси $\theta = \pi$. Там
+её «длина» $|\mathbf A_N| = g(1 - \cos\theta)/(r\sin\theta)$ неограниченно растёт — это **струна Дирака**.
+У $\mathcal A_S$ струна — северная полуось. Проверим, что обе дают поле монополя,
+а их разность — градиент:
+
+```{python}
+import numpy as np
+import sympy as sp
+import matplotlib.pyplot as plt
+from gmph.exterior import d, add, scale
+
+r, th, ph = sp.symbols("r theta phi", positive=True)
+g = sp.Symbol("g", real=True)
+sph = (r, th, ph)
+B_form = {(2, 3): g * sp.sin(th)}                         # индексы форм: 1 — r, 2 — θ, 3 — φ
+A_N, A_S = {(3,): g * (1 - sp.cos(th))}, {(3,): -g * (1 + sp.cos(th))}
+print("d𝒜_N = 𝓑:", add(d(A_N, sph), scale(-1, B_form)) == {}, "  d𝒜_S = 𝓑:", add(d(A_S, sph), scale(-1, B_form)) == {})
+print("𝒜_N − 𝒜_S =", add(A_N, scale(-1, A_S)), " (то есть 2g dφ)")
+print("поток через сферу:", sp.integrate(sp.integrate(B_form[(2, 3)], (th, 0, sp.pi)), (ph, 0, 2 * sp.pi)))
+
+x, y, z = sp.symbols("x y z", real=True)
+R = sp.sqrt(x**2 + y**2 + z**2)
+A_N_cart = [-g * y / (R * (R + z)), g * x / (R * (R + z)), sp.Integer(0)]      # 𝒜_N в декартовых координатах
+curl = [A_N_cart[2].diff(y) - A_N_cart[1].diff(z), A_N_cart[0].diff(z) - A_N_cart[2].diff(x),
+        A_N_cart[1].diff(x) - A_N_cart[0].diff(y)]
+print("rot A_N − g r/r³ =", [sp.simplify(c - g * v / R**3) for c, v in zip(curl, (x, y, z))],
+      "; знаменатель R + z обращается в нуль при x = y = 0, z < 0 — струна")
+```
+
+## Условие квантования
+
+В области, где определены обе карты (всё, кроме оси $z$), потенциалы
+отличаются на $\mathcal A_N - \mathcal A_S = 2g\,\dd\varphi = \dd f$ с $f = 2g\varphi$. Это калибровочное
+преобразование, и волновые функции в двух картах связаны функцией
+перехода:
+$$
+\psi_N = e^{\,ief/\hbar c}\,\psi_S = e^{\,2ieg\varphi/\hbar c}\,\psi_S .
+$$
+Функция $f = 2g\varphi$ неоднозначна, но это не беда: важно лишь, чтобы
+множитель $e^{2ieg\varphi/\hbar c}$ был однозначен на окружности $\varphi\in[0, 2\pi)$. Это требует
+$2eg/\hbar c\in\mathbb Z$:
+
+::: {#thm-dirac-quantization}
+## Условие Дирака
+Квантовая механика заряда $e$ в поле монополя $g$ непротиворечива,
+только если
+$$
+q \equiv \frac{eg}{\hbar c} = \frac n2, \qquad n\in\mathbb Z .
+$$
+:::
+
+Если в природе есть хотя бы один монополь с зарядом $g$, то все
+электрические заряды кратны $\hbar c/2g$. В единицах элементарного заряда
+наименьший магнитный заряд $g_D = \hbar c/2e = e/2\alpha \approx 68{,}5\,e$ — монополь
+взаимодействует очень сильно (упражнение 3).
+
+**Невидимость струны.** Другой взгляд на то же условие. В одной карте
+$\mathcal A_N$ струна вдоль южной полуоси выглядит как бесконечно тонкий
+соленоид, несущий поток $-4\pi g$ (он «приносит» в начало координат поток,
+который монополь излучает во все стороны). Заряд, обходящий соленоид,
+приобретает фазу Ааронова–Бома. Струна ненаблюдаема, только если эта
+фаза кратна $2\pi$: $\frac{e}{\hbar c}\,4\pi g = 2\pi n$ — то же условие. Посчитаем голономию
+$\exp\bigl(-\frac{ie}{\hbar c}\oint\mathcal A\bigr)$ вдоль окружности широты $\theta$ в двух картах:
+
+```{python}
+theta0, qs = sp.Symbol("theta_0"), sp.Symbol("q")
+loop_N = sp.integrate(A_N[(3,)].subs(th, theta0), (ph, 0, 2 * sp.pi))      # ∮𝒜 по широте θ₀
+loop_S = sp.integrate(A_S[(3,)].subs(th, theta0), (ph, 0, 2 * sp.pi))
+cap = sp.integrate(sp.integrate(B_form[(2, 3)], (th, 0, theta0)), (ph, 0, 2 * sp.pi))
+print("∮𝒜_N =", sp.factor(loop_N), "= поток через северную шапку:", sp.simplify(loop_N - cap) == 0)
+print("∮𝒜_N − ∮𝒜_S =", sp.simplify(loop_N - loop_S))
+ratio = sp.simplify(sp.exp(-sp.I * qs / g * loop_N) / sp.exp(-sp.I * qs / g * loop_S))   # q/g = e/ħc
+print("отношение голономий в двух картах:", ratio, "→ 1 при q = n/2:",
+      [sp.simplify(ratio.subs(qs, sp.Rational(n, 2))) for n in range(-2, 4)])
+```
+
+```{python}
+#| label: fig-monopole-holonomy
+#| fig-cap: 'Фаза голономии arg exp(−i(e/ħc)∮𝒜) вдоль окружности широты θ в двух картах (сплошная — 𝒜_N, штриховая — 𝒜_S). Слева q = eg/ħc = 1/2: кривые различаются на 4πq = 2π, то есть голономии совпадают, и струна не видна. Справа q = 0,3: голономии различаются на 4πq = 1,2π, и карты описывают разную физику.'
+theta_grid = np.linspace(0.01, np.pi - 0.01, 400)
+fig, axes = plt.subplots(1, 2, figsize=(9.5, 3.5), sharey=True)
+for ax, qv in zip(axes, (0.5, 0.3)):
+    phase_N = np.angle(np.exp(-1j * qv * 2 * np.pi * (1 - np.cos(theta_grid))))
+    phase_S = np.angle(np.exp(1j * qv * 2 * np.pi * (1 + np.cos(theta_grid))))
+    ax.plot(theta_grid, phase_N, ".", ms=2.5, color="tab:blue", label="карта N")
+    ax.plot(theta_grid, phase_S, ".", ms=1, color="tab:red", label="карта S")
+    ax.set(xlabel="θ", title=f"q = {qv}", xticks=[0, np.pi / 2, np.pi], xticklabels=["0", "π/2", "π"],
+           yticks=[-np.pi, 0, np.pi], yticklabels=["−π", "0", "π"])
+axes[0].set_ylabel("arg голономии")
+axes[0].legend(fontsize=8, markerscale=4, loc="lower left")
+plt.tight_layout()
+plt.show()
+```
+
+## Монополь как расслоение
+
+Геометрически заряд в поле монополя — сечение комплексного линейного
+расслоения над сферой (над $\R^3\setminus\{0\}$, что гомотопически то же). Карты —
+северная и южная полусферы (с перекрытием по экватору), функция
+перехода $e^{2iq\varphi} = e^{in\varphi}$ — отображение экватора в $\mathrm{U}(1)$ с числом намотки $n$. Связность
+$\frac{e}{\hbar c}\mathcal A$ имеет кривизну $\frac{e}{\hbar c}\mathcal B$, и по формуле из [конвенций](/conventions.qmd) первый
+класс Черна
+$$
+\int_{S^2}c_1 = -\frac{1}{2\pi}\int_{S^2}\frac{e}{\hbar c}\mathcal B = -\frac{e}{\hbar c}\,2g = -n .
+$$
+Расслоение тривиально только при $n = 0$. Монополь с $n = 1$ (то есть $q = \frac12$) — то
+же расслоение, что тавтологическое над сферой Блоха, у которого $\int c_1 = -1$:
+связность Берри спина ½ в магнитном поле — поле монополя, сидящего в
+точке вырождения $\mathbf B = 0$, только в пространстве параметров. Условие Дирака —
+это утверждение, что класс Черна целый: кривизна связности на
+настоящем расслоении не может давать произвольный поток.
+
+## Классическое движение
+
+Уравнение движения заряда $m\ddot{\mathbf r} = \frac ec\,\dot{\mathbf r}\times\mathbf B$ с $\mathbf B = g\mathbf r/r^3$. Обычный момент $\mathbf r\times m\mathbf v$
+не сохраняется — сила не центральная. Сохраняется
+$$
+\mathbf J = \mathbf r\times m\mathbf v - \frac{eg}{c}\,\hat{\mathbf r},
+$$
+где второе слагаемое — момент импульса электромагнитного поля
+системы «заряд + монополь» (упражнение 4). Отсюда $\mathbf J\cdot\hat{\mathbf r} = -eg/c$: угол между $\mathbf r$
+и постоянным вектором $\mathbf J$ постоянен, и заряд движется по поверхности
+конуса с осью $-\mathbf J$ и полууглом $\cos\vartheta = eg/(c|\mathbf J|)$ (Пуанкаре, 1896). Проверим численно
+($m = 1$, $eg/c = 0{,}8$):
+
+```{python}
+from scipy.integrate import solve_ivp
+
+kappa = 0.8                                            # eg/c при m = 1
+
+def rhs(t, s):
+    rv, v = s[:3], s[3:]
+    return np.r_[v, kappa * np.cross(v, rv) / np.linalg.norm(rv)**3]
+
+def J_vec(s):
+    rv, v = s[:3], s[3:]
+    return np.cross(rv, v) - kappa * rv / np.linalg.norm(rv)
+
+s0 = np.r_[2.0, 0.0, 0.0, -0.6, 0.4, 0.0]                  # состояние в середине пролёта
+back = solve_ivp(rhs, (0, -12), s0, method="DOP853", rtol=1e-11, atol=1e-12)
+sol = solve_ivp(rhs, (0, 24), back.y[:, -1], method="DOP853", rtol=1e-11, atol=1e-12, dense_output=True)
+ts = np.linspace(0, 24, 3000)
+traj = sol.sol(ts)
+J_all = np.array([J_vec(traj[:, k]) for k in range(len(ts))])
+L_all = np.cross(traj[:3].T, traj[3:].T)
+J0 = J_all[0]
+cos_cone = [np.dot(traj[:3, k], -J0) / (np.linalg.norm(traj[:3, k]) * np.linalg.norm(J0)) for k in range(len(ts))]
+print(f"J = {np.round(J0, 4) + 0.0}, |J| = {np.linalg.norm(J0):.4f};  max |J(t) − J(0)| = {np.abs(J_all - J0).max():.0e}")
+print(f"r×mv меняется: |L_z| от {np.abs(L_all[:, 2]).min():.3f} до {np.abs(L_all[:, 2]).max():.3f}, L_x от {L_all[:, 0].min():+.3f} до {L_all[:, 0].max():+.3f}")
+print(f"cos угла между r и −J: от {min(cos_cone):.6f} до {max(cos_cone):.6f};  eg/(c|J|) = {kappa / np.linalg.norm(J0):.6f}")
+r_min = np.linalg.norm(traj[:3], axis=0).min()
+v0 = np.linalg.norm(s0[3:])
+print(f"расстояние в начале и в конце пролёта: {np.linalg.norm(traj[:3, 0]):.2f} и {np.linalg.norm(traj[:3, -1]):.2f}")
+print(f"наименьшее расстояние {r_min:.4f};  из энергии и |J|: √(|J|² − κ²)/v = {np.sqrt(np.linalg.norm(J0)**2 - kappa**2) / v0:.4f}")
+```
+
+Скорость постоянна (магнитная сила работы не совершает), а развёртка
+конуса превращает траекторию в прямую: заряд движется по геодезической
+конуса. Наименьшее расстояние до монополя $r_\text{min} = |\mathbf r\times m\mathbf v|/mv = \sqrt{J^2 - (eg/c)^2}/mv$.
+
+```{python}
+#| label: fig-monopole-cone
+#| fig-cap: 'Траектория заряда в поле монополя (eg/c = 0,8, m = 1, отрезок времени 24). Заряд прилетает, огибает монополь (чёрная точка) и улетает, оставаясь на поверхности конуса (сетка), ось которого направлена против сохраняющегося вектора J (стрелка).'
+from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+
+fig = plt.figure(figsize=(6, 5.5))
+ax = fig.add_subplot(projection="3d")
+axis = -J0 / np.linalg.norm(J0)
+e1 = np.cross(axis, [0, 0, 1.0]); e1 /= np.linalg.norm(e1)
+e2 = np.cross(axis, e1)
+half = np.arccos(kappa / np.linalg.norm(J0))
+s_len, s_ang = np.meshgrid(np.linspace(0, 9, 10), np.linspace(0, 2 * np.pi, 40))
+cone = [s_len * (np.cos(half) * axis[i] + np.sin(half) * (np.cos(s_ang) * e1[i] + np.sin(s_ang) * e2[i])) for i in range(3)]
+ax.plot_wireframe(*cone, color="0.75", lw=0.5)
+ax.plot(*traj[:3], color="tab:red", lw=2)
+ax.scatter([0], [0], [0], color="k", s=30)
+ax.quiver(0, 0, 0, *(-5 * axis), color="tab:blue", lw=2)
+ax.text(*(-5.6 * axis), "J", color="tab:blue")
+ax.set(xlabel="x", ylabel="y", zlabel="z", xlim=(-9, 9), ylim=(-9, 9), zlim=(-9, 9))
+ax.set_box_aspect((1, 1, 1))
+ax.view_init(elev=25, azim=-75)
+plt.show()
+```
+
+## Квантовый момент импульса
+
+В квантовой механике тот же вектор, с $\boldsymbol\pi = \mathbf p - \frac ec\mathbf A$ вместо $m\mathbf v$,
+$$
+\mathbf J = \mathbf r\times\boldsymbol\pi - \hbar q\,\hat{\mathbf r}, \qquad q = \frac{eg}{\hbar c},
+$$
+— генератор вращений: $[J_x, J_y] = i\hbar J_z$ и циклически. Без слагаемого $-\hbar q\hat{\mathbf r}$
+коммутаторы «кинетического» момента $\mathbf r\times\boldsymbol\pi$ не замыкаются, потому что $[\pi_i, \pi_j] = i\hbar\frac ec\varepsilon_{ijk}B_k$
+(кривизна!). Проверим на пробной функции в точках, в карте $\mathcal A_N$ ($\hbar = 1$):
+
+```{python}
+q = sp.Symbol("q", real=True)
+a_N = [qc.subs(g, q) for qc in A_N_cart]               # (e/ħc)A_N при ħ = 1: g → q
+coords = (x, y, z)
+f_test = sp.exp(x - 2 * y) * (x + 3 * z**2 + y * z)
+points = [{x: sp.Rational(1, 3), y: sp.Rational(-2, 5), z: sp.Rational(1, 7), q: sp.Rational(3, 2)},
+          {x: sp.Rational(2, 3), y: sp.Rational(1, 5), z: sp.Rational(-1, 2), q: sp.Rational(-1, 2)}]
+
+def pi_op(i, h):
+    return -sp.I * h.diff(coords[i]) - a_N[i] * h
+
+def J_op(i, h, field_term=True):
+    j, k = (i + 1) % 3, (i + 2) % 3
+    out = coords[j] * pi_op(k, h) - coords[k] * pi_op(j, h)
+    return out - q * coords[i] / R * h if field_term else out
+
+def worst(expr):
+    return max(abs(complex(sp.N(expr.subs(p), 30))) for p in points)
+
+for field_term in (True, False):
+    res = max(worst(J_op(i, J_op((i + 1) % 3, f_test, field_term), field_term)
+                    - J_op((i + 1) % 3, J_op(i, f_test, field_term), field_term)
+                    - sp.I * J_op((i + 2) % 3, f_test, field_term)) for i in range(3))
+    print(f"{'J = r×π − q r̂' if field_term else 'только r×π   '}: max |[J_i, J_j] − iJ_k| = {res:.1e}")
+radial = sum(coords[i] / R * J_op(i, f_test) for i in range(3))
+print(f"r̂·J + q: max |(r̂·J + q)f| = {worst(radial + q * f_test):.1e}")
+```
+
+Проекция момента на направление $\hat{\mathbf r}$ равна $-\hbar q$ при любом состоянии. Значит,
+в разложении по собственным состояниям $\mathbf J^2 = \hbar^2j(j+1)$ возможны только
+$j\ge|q|$, причём $j - |q|$ целое: $j = |q|, |q| + 1, \dots$ (это «монопольные гармоники» Ву и
+Янга). При $q = \frac12$ бесспиновая частица в поле монополя имеет
+**полуцелый** момент импульса. Целочисленность $2j$ — ещё один вывод
+условия Дирака: представления $\mathrm{SU}(2)$ существуют только при $2q\in\mathbb Z$.
+
+## Монополи в природе
+
+Свободные монополи не наблюдались; эксперименты ограничивают их
+поток очень малыми значениями. Но теоретически они ожидаются: в
+теориях великого объединения с компактной группой $\mathrm{U}(1)$ внутри
+неабелевой появляются гладкие монополи т’Хоофта–Полякова (1974) с
+массой порядка масштаба объединения, и условие Дирака выполняется
+автоматически. В конденсированных средах «эмерджентные» монополи
+наблюдаются: в спиновом льду и в пространстве параметров (связность
+Берри, вейлевские точки в полуметаллах — точки вырождения зон, несущие
+«заряд» = числу Черна).
+
+## Итоги
+
+- Поле монополя $\mathcal B = g\sin\theta\,\dd\theta\wedge\dd\varphi$ замкнуто, но не точно: поток $4\pi g$ через сферу.
+- Потенциалы $\mathcal A_N = g(1 - \cos\theta)\dd\varphi$ и $\mathcal A_S = -g(1 + \cos\theta)\dd\varphi$ определены каждый вне своей струны;
+  на пересечении $\mathcal A_N - \mathcal A_S = \dd(2g\varphi)$.
+- Однозначность функции перехода $e^{2ieg\varphi/\hbar c}$ (или невидимость струны) — условие Дирака
+  $eg/\hbar c = n/2$; заряды квантованы.
+- Монополь — линейное расслоение над $S^2$ с $\int c_1 = -n$.
+- Классически сохраняется $\mathbf J = \mathbf r\times m\mathbf v - \frac{eg}{c}\hat{\mathbf r}$, заряд движется по конусу; квантово
+  $\mathbf J$ порождает $\mathrm{su}(2)$ только с полевым слагаемым, $\hat{\mathbf r}\cdot\mathbf J = -\hbar q$, $j\ge|q|$.
+
+## Упражнения
+
+1. Найдите потенциал монополя в карте, струна которой идёт вдоль
+   положительной полуоси $x$. (Подсказка: поверните $\mathcal A_N$.)
+2. Покажите, что $\mathcal A_N$ и $\mathcal A_S$ — частные случаи $\mathcal A_\lambda = g(\lambda - \cos\theta)\,\dd\varphi$. Для каких $\lambda$
+   потенциал регулярен хотя бы на одной полуоси? Как выглядит струна при $\lambda = 0$?
+3. Минимальный магнитный заряд $g_D = \hbar c/2e$. Во сколько раз сила взаимодействия
+   двух монополей $g_D$ больше силы взаимодействия двух электронов на том
+   же расстоянии?
+4. Покажите, что момент импульса электромагнитного поля точечного заряда
+   $e$ в точке $\mathbf r$ и монополя $g$ в начале координат
+   $\mathbf L_\text{поле} = \frac{1}{4\pi c}\int\mathbf r'\times(\mathbf E\times\mathbf B)\,\dd^3r'$ равен $-\frac{eg}{c}\hat{\mathbf r}$ (не зависит от расстояния!). Проверьте
+   численно для $e = g = c = 1$, $\mathbf r = (0, 0, 1)$.
+5. Квантовый заряд с $q = 1$ в поле монополя. Каковы возможные значения $j$ и
+   сколько состояний с наименьшим $j$?
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. Поле монополя сферически симметрично, поэтому годится повёрнутый $\mathbf A_S$ (у него струна на
+   северной полуоси): ось $z$ переходит в ось $x$, и $\mathbf A = g\,\dfrac{(0,\ z,\ -y)}{r(r - x)}$. Знаменатель обращается в нуль при
+   $r = x$, то есть $y = z = 0$, $x > 0$. Ротор равен $g\mathbf r/r^3$ (проверено в точках; с противоположным знаком
+   числителя получился бы монополь $-g$).
+2. $\dd\mathcal A_\lambda = \mathcal B$ при любом $\lambda$. Регулярность при $\theta = 0$ требует $\lambda = 1$, при $\theta = \pi$ — $\lambda = -1$. При
+   $\lambda = 0$ струна — вся ось $z$, в каждую сторону поток $-2\pi g$ (симметричная струна Швингера).
+3. $(g_D/e)^2 = (1/2\alpha)^2 = (137{,}036/2)^2\approx 4{,}7\cdot10^3$.
+4. $\mathbf E\times\mathbf B$ с $\mathbf B = g\mathbf r'/r'^3$ и полем заряда; интеграл сводится к $-\frac{eg}{c}\hat{\mathbf r}$ (Томсон, 1904).
+   Численно (интегрирование в сферических координатах с центром в монополе до $r' = 1000$; хвост убывает как $1/r'$)
+   $L_z \approx -0{,}999$, $L_x = L_y = 0$ по симметрии.
+5. $j = 1, 2, 3, \dots$; при $j = 1$ три состояния ($m = -1, 0, 1$) — у частицы без спина
+   нет состояния с $j = 0$.
+:::
