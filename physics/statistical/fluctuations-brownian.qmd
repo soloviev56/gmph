@@ -1,0 +1,367 @@
+---
+title: "Флуктуации и броуновское движение"
+topic: fluctuations-brownian
+order: 8
+description: "Термодинамические флуктуации: вероятность ∝ e^{ΔS}, гауссова форма и ⟨ΔV²⟩ = −T(∂V/∂p)_T (идеальный газ — пуассоновская статистика числа частиц); уравнение Ланжевена m v̇ = −γv + ξ, условие Γ = γT как требование равнораспределения, соотношение Эйнштейна D = T/γ; моделирование: автокорреляция скорости и переход от баллистического режима к диффузионному (формула Орнштейна–Фюрта, рисунок); уравнение Фоккера–Планка и уравнение Смолуховского, стационарные решения Максвелла и Больцмана (SymPy); свободная энергия убывает — эволюция в двухъямном потенциале (рисунок); формула Крамерса для скорости перехода через барьер против точного времени первого достижения; флуктуационно-диссипационная теорема S(ω) = (2T/ω) Im χ(ω) и шум Джонсона–Найквиста"
+---
+
+Равновесная термодинамика имеет дело со средними, но макроскопические
+величины флуктуируют: энергия тела в термостате, число молекул в объёме,
+положение взвешенной в жидкости пыльцы. Эти флуктуации малы (порядка
+$1/\sqrt N$ от среднего), но наблюдаемы, и они несут информацию, которой нет в
+средних: из броуновского движения Перрен определил число Авогадро. А
+главное, флуктуации и диссипация — две стороны одного процесса:
+жидкость, тормозящая частицу, её же и толкает, и сила трения однозначно
+определяет силу случайных толчков. Это содержание
+**флуктуационно-диссипационной теоремы**.
+
+Используются [каноническое распределение](/physics/statistical/canonical-ensemble.qmd)
+и [теория вероятностей](/math/analysis/probability.qmd). Температура измеряется в
+энергетических единицах ($k = 1$), кроме числовых оценок. Преобразование Фурье по
+времени — по [конвенциям](/conventions.qmd): $\tilde f(\omega) = \int f(t)e^{i\omega t}\dd t$, $\partial_t\to-i\omega$.
+
+## Термодинамические флуктуации
+
+Вероятность найти подсистему в неравновесном состоянии со значением
+параметра $x$ пропорциональна числу микросостояний, то есть $e^{S(x)}$
+(Эйнштейн, 1910). Вблизи максимума энтропии $S(x)\approx S_0 - \frac12\beta(x - x_0)^2$, и
+распределение гауссово с $\langle\Delta x^2\rangle = 1/\beta$. Для подсистемы в термостате с
+температурой $T$ и давлением $p$ роль $S$ играет $-(\Delta U - T\Delta S + p\Delta V)/T$ — минимальная работа,
+делённая на $T$. Отсюда, например, флуктуации объёма при постоянной
+температуре:
+$$
+\langle\Delta V^2\rangle = -T\pd{V}{p}\bigg|_T .
+$$
+Для идеального газа $pV = NT$ это даёт $\langle\Delta V^2\rangle/V^2 = 1/N$, а в пересчёте на
+число частиц в фиксированном объёме — $\langle\Delta N^2\rangle = \langle N\rangle$, пуассоновскую
+статистику. Проверим обе вещи — формулу через вторую производную
+минимальной работы и прямой подсчёт для частиц, независимо
+разбросанных по большому сосуду:
+
+```{python}
+import numpy as np
+import sympy as sp
+import matplotlib.pyplot as plt
+
+V, V0, N, T_ = sp.symbols("V V_0 N T", positive=True)
+p_gas = N * T_ / V
+F_gas = -N * T_ * sp.log(V)                              # F(V) при постоянной T (с точностью до функции T)
+p0 = p_gas.subs(V, V0)
+R_min = F_gas - F_gas.subs(V, V0) + p0 * (V - V0)         # минимальная работа ΔF + p₀ΔV
+curv = sp.diff(R_min, V, 2).subs(V, V0)
+print("⟨ΔV²⟩ = T / R''(V₀) =", sp.simplify(T_ / curv), " = −T (∂V/∂p)_T:",
+      sp.simplify(T_ / curv + T_ / sp.diff(p_gas, V).subs(V, V0)) == 0)
+
+rng = np.random.default_rng(0)
+N_total, fraction, samples = 100_000, 0.01, 20_000
+counts = rng.binomial(N_total, fraction, size=samples)     # частиц в малом объёме из N_total
+print(f"⟨N⟩ = {counts.mean():.1f},  ⟨ΔN²⟩ = {counts.var():.1f}  (биномиально N_полн·q(1 − q) = {N_total * fraction * (1 - fraction):.0f};"
+      f" при малой доле q это пуассоновское ⟨ΔN²⟩ = ⟨N⟩)")
+```
+
+## Уравнение Ланжевена
+
+Частица массы $m$ в жидкости испытывает силу трения $-\gamma v$ (для шарика
+радиуса $r$ в жидкости с вязкостью $\eta$ $\gamma = 6\pi\eta r$) и случайные удары молекул. Ланжевен
+(1908) записал это как уравнение со случайной силой:
+
+::: {#def-langevin}
+**Уравнение Ланжевена**
+$$
+m\dot v = -\gamma v + \xi(t), \qquad \langle\xi(t)\rangle = 0, \qquad \langle\xi(t)\,\xi(t')\rangle = 2\Gamma\,\delta(t - t') ,
+$$
+$\xi(t)$ — гауссов белый шум интенсивности $\Gamma$.
+:::
+
+Время корреляции толчков ($\sim10^{-13}$ с) намного меньше времени релаксации
+скорости $\tau = m/\gamma$, отсюда белый шум. Решение:
+$v(t) = v_0e^{-t/\tau} + \frac1m\int_0^te^{-(t - s)/\tau}\xi(s)\,\dd s$, и при $t\gg\tau$
+$$
+\langle v^2\rangle = \frac{2\Gamma}{m^2}\int_0^\infty e^{-2s/\tau}\dd s = \frac{\Gamma}{m\gamma} .
+$$
+Но в равновесии по [каноническому распределению](/physics/statistical/canonical-ensemble.qmd)
+$\langle v^2\rangle = T/m$. Значит,
+$$
+\Gamma = \gamma T :
+$$
+интенсивность шума определяется трением и температурой. Это простейшая
+форма флуктуационно-диссипационной теоремы. Смещение за большое время
+— сумма почти независимых шагов, $\langle\Delta x^2\rangle = 2Dt$ с
+$D = \int_0^\infty\langle v(t)v(0)\rangle\dd t = \frac Tm\tau$:
+$$
+D = \frac{T}{\gamma} \qquad\text{(соотношение Эйнштейна)} .
+$$
+Полный ответ для всех времён (Орнштейн, Фюрт) —
+$\langle\Delta x^2\rangle = 2D\bigl[t - \tau(1 - e^{-t/\tau})\bigr]$: при $t\ll\tau$ движение баллистическое, $\langle\Delta x^2\rangle\approx\frac Tmt^2$.
+Проверим аналитику символьно и моделированием: скорость обновляется
+точно (процесс Орнштейна–Уленбека), координата — по скорости:
+
+```{python}
+t, s, tau, m, T = sp.symbols("t s tau m T", positive=True)
+vacf = T / m * sp.exp(-s / tau)                          # ⟨v(s)v(0)⟩ в равновесии, s ≥ 0
+msd = 2 * sp.integrate((t - s) * vacf, (s, 0, t))           # ⟨Δx²⟩ = ∫∫⟨v(s₁)v(s₂)⟩ = 2∫(t − s)C(s)ds
+D = T * tau / m
+print("2∫(t − s)⟨v(s)v(0)⟩ds − 2D[t − τ(1 − e^{−t/τ})] =",
+      sp.simplify(msd - 2 * D * (t - tau * (1 - sp.exp(-t / tau)))))
+
+def langevin(n_particles, dt, n_steps, m=1.0, gamma=1.0, T=1.0, seed=1):
+    """Ансамбль частиц: точный шаг Орнштейна–Уленбека для v, x по трапеции. Возвращает t, ⟨Δx²⟩, ⟨v(t)v(0)⟩."""
+    rng = np.random.default_rng(seed)
+    decay = np.exp(-gamma * dt / m)
+    kick = np.sqrt(T / m * (1 - decay**2))
+    v = rng.normal(0, np.sqrt(T / m), n_particles)        # равновесное начальное распределение
+    v0, x = v.copy(), np.zeros(n_particles)
+    out_t, out_msd, out_vacf = [], [], []
+    record = set(np.unique(np.logspace(0, np.log10(n_steps), 60).astype(int)))
+    for k in range(1, n_steps + 1):
+        v_new = v * decay + kick * rng.normal(size=n_particles)
+        x += 0.5 * (v + v_new) * dt
+        v = v_new
+        if k in record:
+            out_t.append(k * dt); out_msd.append((x**2).mean()); out_vacf.append((v * v0).mean())
+    return np.array(out_t), np.array(out_msd), np.array(out_vacf)
+
+ts, msd_sim, vacf_sim = langevin(20000, 0.01, 10000)
+msd_theory = 2 * (ts - (1 - np.exp(-ts)))
+print(f"⟨Δx²⟩ при t = 0,1: {msd_sim[np.argmin(abs(ts - 0.1))]:.4f}  (теория {2 * (0.1 - 1 + np.exp(-0.1)):.4f});"
+      f"  при t = 100: {msd_sim[-1]:.1f}  (теория {msd_theory[-1]:.1f}, 2Dt = {2 * ts[-1]:.0f})")
+```
+
+```{python}
+#| label: fig-langevin
+#| fig-cap: 'Моделирование уравнения Ланжевена (20 000 частиц, m = γ = T = 1, шаг 0,01). Слева — средний квадрат смещения (точки) и формула Орнштейна–Фюрта (линия): при t ≪ τ = 1 он растёт как t² (баллистический режим), при t ≫ τ — как 2Dt с D = T/γ (пунктиры — обе асимптоты). Справа — автокорреляция скорости ⟨v(t)v(0)⟩ и экспонента (T/m)e^{−t/τ}; при t ≳ 5 экспонента уходит ниже статистического шума ансамбля (≈ 0,007, серая полоса).'
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
+ax1.loglog(ts, msd_sim, "o", ms=3, label="моделирование")
+ax1.loglog(ts, msd_theory, "k", lw=1, label="Орнштейн–Фюрт")
+ax1.loglog(ts, ts**2, "--", color="tab:red", lw=1, label="(T/m) t²")
+ax1.loglog(ts, 2 * ts, "--", color="tab:green", lw=1, label="2Dt")
+ax1.set(xlabel="t / τ", ylabel="⟨Δx²⟩", ylim=(1e-5, 400))
+ax1.legend(fontsize=8)
+noise = 1 / np.sqrt(20000)
+ax2.axhspan(-noise, noise, color="0.9")
+ax2.plot(ts, vacf_sim, "o", ms=3)
+ax2.plot(ts, np.exp(-ts), "k", lw=1)
+ax2.set(xscale="log", xlabel="t / τ", ylabel="⟨v(t)v(0)⟩", xlim=(0.01, 100))
+plt.tight_layout()
+plt.show()
+```
+
+## Уравнение Фоккера–Планка
+
+Вместо отдельных траекторий можно следить за плотностью вероятности. Для
+уравнения Ланжевена в потенциале $U(x)$ плотность в фазовом
+пространстве $P(x, v, t)$ подчиняется **уравнению Фоккера–Планка**
+(Крамерса)
+$$
+\pd{P}{t} = -v\pd{P}{x} + \frac{U'(x)}{m}\pd{P}{v} + \frac{\gamma}{m}\pd{}{v}\Bigl(vP + \frac Tm\pd{P}{v}\Bigr) .
+$$
+Первые два слагаемых — гамильтонов поток (уравнение Лиувилля), третье
+— трение и диффузия по скоростям. При сильном трении ($\tau\to0$) скорость
+мгновенно максвелловская, и для $P(x, t)$ остаётся **уравнение Смолуховского**
+$$
+\pd{P}{t} = \pd{}{x}\Bigl[\frac{U'(x)}{\gamma}P + D\pd{P}{x}\Bigr], \qquad D = \frac T\gamma .
+$$
+Проверим, что стационарное решение первого — распределение Гиббса
+$e^{-(mv^2/2 + U)/T}$, второго — $e^{-U/T}$, и что именно условие $\Gamma = \gamma T$ (через $D = T/\gamma$) делает
+их таковыми:
+
+```{python}
+x, v, gam = sp.symbols("x v gamma", positive=True)
+Ufun = sp.Function("U")(x)
+Gamma = sp.Symbol("Gamma", positive=True)
+
+def kramers_rhs(P, Gam):
+    """Правая часть уравнения Крамерса с произвольной интенсивностью шума Γ."""
+    return (-v * P.diff(x) + Ufun.diff(x) / m * P.diff(v)
+            + gam / m * (v * P).diff(v) + Gam / m**2 * P.diff(v, 2))
+
+gibbs = sp.exp(-(m * v**2 / 2 + Ufun) / T)
+print("Крамерс, Γ = γT: ∂P/∂t на распределении Гиббса =", sp.simplify(kramers_rhs(gibbs, gam * T)))
+print("Крамерс, произвольное Γ:", sp.factor(sp.simplify(kramers_rhs(gibbs, Gamma) / gibbs)))
+smol = sp.diff(Ufun.diff(x) / gam * sp.exp(-Ufun / T) + T / gam * sp.exp(-Ufun / T).diff(x), x)
+print("Смолуховский: ∂P/∂t на e^{−U/T} =", sp.simplify(smol))
+```
+
+**Свободная энергия убывает.** Уравнение Смолуховского — градиентный
+поток: функционал
+$$
+\mathcal F[P] = \int\bigl(U P + T P\ln P\bigr)\dd x
+$$
+(энергия минус $T\times$энтропия Гиббса) монотонно убывает и минимален на
+распределении Больцмана, $\frac{\dd\mathcal F}{\dd t} = -\frac1\gamma\int P\,\bigl(\partial_x\frac{\delta\mathcal F}{\delta P}\bigr)^2\dd x\le0$ (Джордан, Киндерлерер,
+Отто показали, что это градиентный поток в метрике Вассерштейна). Решим
+уравнение в двухъямном потенциале $U = U_0(x^2 - 1)^2$, начав с частиц, сидящих
+в левой яме. Дискретизация — конечные объёмы со скоростями перескоков
+$k_{i\to i\pm1} = \frac{D}{h^2}e^{-(U_{i\pm1} - U_i)/2T}$: они удовлетворяют детальному равновесию, и распределение
+Больцмана на сетке стационарно точно. Решение — экспонента матрицы:
+
+```{python}
+from scipy.linalg import expm
+
+def smoluchowski_generator(U_grid, h, T=1.0, gamma=1.0):
+    """Матрица L уравнения dP/dt = L P на сетке (P — вероятности ячеек)."""
+    n, D = len(U_grid), T / gamma
+    L = np.zeros((n, n))
+    for i in range(n - 1):
+        k_up = D / h**2 * np.exp(-(U_grid[i + 1] - U_grid[i]) / (2 * T))
+        k_down = D / h**2 * np.exp(-(U_grid[i] - U_grid[i + 1]) / (2 * T))
+        L[i + 1, i] += k_up; L[i, i] -= k_up
+        L[i, i + 1] += k_down; L[i + 1, i + 1] -= k_down
+    return L
+
+U0 = 3.0
+xs = np.linspace(-2.0, 2.0, 401)
+h = xs[1] - xs[0]
+U_grid = U0 * (xs**2 - 1)**2
+L = smoluchowski_generator(U_grid, h)
+P0 = np.exp(-(xs + 1)**2 / (2 * 0.05**2)); P0 /= P0.sum()
+boltz = np.exp(-U_grid); boltz /= boltz.sum()
+print(f"‖L·P_Больцман‖ = {np.abs(L @ boltz).max():.0e}")
+
+def free_energy(P, T=1.0):
+    Pd = P / h                                           # плотность
+    mask = Pd > 1e-300
+    return np.sum(U_grid * P) + T * np.sum(P[mask] * np.log(Pd[mask]))
+
+times = np.concatenate([[0], np.logspace(-3, 3, 60)])
+step = {tt: expm(L * tt) @ P0 for tt in times}
+F_t = np.array([free_energy(step[tt]) for tt in times])
+right_t = np.array([step[tt][xs > 0].sum() for tt in times])
+print(f"F(0) = {F_t[0]:.4f} → F(10³) = {F_t[-1]:.4f};  F_Больцман = {free_energy(boltz):.4f};"
+      f"  наибольший рост за шаг {np.diff(F_t).max():.0e} (округление expm)")
+print(f"доля в правой яме при t = 10³: {right_t[-1]:.4f}")
+```
+
+```{python}
+#| label: fig-smoluchowski
+#| fig-cap: 'Уравнение Смолуховского в двухъямном потенциале U = 3(x² − 1)² (T = γ = 1). Слева — плотность P(x, t) в моменты t = 0,01; 0,1; 1; 10; 100 (от тёмного к светлому) и распределение Больцмана (пунктир); серым — потенциал в масштабе. Сначала пакет быстро расплывается внутри левой ямы, затем медленно перетекает через барьер. Справа — свободная энергия 𝓕(t) (убывает до значения −T ln Z, пунктир) и доля частиц в правой яме, выходящая на ½ за время порядка обратной скорости Крамерса.'
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10.5, 4))
+for tt, col in zip((0.01, 0.1, 1, 10, 100), plt.cm.viridis(np.linspace(0, 0.85, 5))):
+    ax1.plot(xs, expm(L * tt) @ P0 / h, color=col, label=f"t = {tt:g}")
+ax1.plot(xs, boltz / h, "k--", lw=1, label="Больцман")
+ax1.plot(xs, U_grid / U0 * 0.4, color="0.75", lw=1)
+ax1.set(xlabel="x", ylabel="P(x, t)", ylim=(0, 2.5))
+ax1.legend(fontsize=7)
+ax2.semilogx(times[1:], F_t[1:], color="tab:blue", label="F(t)")
+ax2.axhline(free_energy(boltz), color="tab:blue", ls="--", lw=1)
+ax2.set(xlabel="t", ylabel="свободная энергия F(t)")
+ax3 = ax2.twinx()
+ax3.semilogx(times[1:], right_t[1:], color="tab:red", label="доля справа")
+ax3.set_ylabel("доля в правой яме", color="tab:red")
+ax3.set_ylim(0, 0.55)
+plt.tight_layout()
+plt.show()
+```
+
+## Формула Крамерса
+
+Переход через барьер высотой $\Delta U\gg T$ — редкое событие. Крамерс (1940)
+нашёл его скорость в режиме сильного трения:
+$$
+k = \frac{\omega_a\omega_b}{2\pi\gamma}\,e^{-\Delta U/T}, \qquad \omega_a^2 = U''(x_a),\quad \omega_b^2 = |U''(x_b)| ,
+$$
+$x_a$ — дно ямы, $x_b$ — вершина барьера ($m = 1$). Аррениусовский множитель
+$e^{-\Delta U/T}$ задаёт главную зависимость от температуры, а предэкспонента —
+кривизны потенциала. Для одномерной диффузии среднее время
+первого достижения точки $x_f$ из $x_a$ известно точно:
+$$
+\bar t = \frac1D\int_{x_a}^{x_f}\dd y\,e^{U(y)/T}\int_{-\infty}^{y}e^{-U(z)/T}\dd z .
+$$
+Время до дна правой ямы — это обратная скорость перехода: до вершины частица
+добирается в среднем за $1/2k$, но с вершины с вероятностью ½ скатывается обратно.
+Сравним $1/\bar t$ с формулой Крамерса при растущем барьере:
+
+```{python}
+from scipy.integrate import quad
+
+def mfpt(U0, T=1.0, gamma=1.0):
+    """Точное среднее время перехода из x = −1 в x = +1 для U = U0(x² − 1)²."""
+    U = lambda z: U0 * (z**2 - 1)**2
+    inner = lambda y: quad(lambda z: np.exp(-(U(z) - U0) / T), -4, y, limit=200)[0]   # сдвиг на U0 против переполнения
+    outer = quad(lambda y: np.exp((U(y) - U0) / T) * inner(y), -1, 1, limit=200, points=[0])[0]
+    return outer * gamma / T
+
+for U0_val in (2, 4, 6, 8, 10):
+    omega_a, omega_b = np.sqrt(8 * U0_val), np.sqrt(4 * U0_val)        # U''(±1) = 8U0, |U''(0)| = 4U0
+    k_kramers = omega_a * omega_b / (2 * np.pi) * np.exp(-U0_val)
+    k_exact = 1 / mfpt(U0_val)
+    print(f"ΔU/T = {U0_val:2d}:  1/t̄ = {k_exact:.3e},  k_Крамерс = {k_kramers:.3e},  отношение {k_exact / k_kramers:.3f}")
+```
+
+Отношение стремится к единице при росте барьера: формула Крамерса —
+асимптотика по $T/\Delta U$, и поправки к ней порядка $T/\Delta U$.
+
+## Флуктуационно-диссипационная теорема
+
+Соотношение $\Gamma = \gamma T$ — частный случай общей теоремы (Каллен, Велтон,
+1951). Пусть на систему действует слабая сила $F(t)$, сопряжённая
+координате $x$. Линейный отклик описывается восприимчивостью:
+$\tilde x(\omega) = \chi(\omega)\tilde F(\omega)$. Спектральная плотность равновесных флуктуаций
+$S_x(\omega) = \int\langle x(t)x(0)\rangle e^{i\omega t}\dd t$ выражается через мнимую (диссипативную) часть $\chi$:
+$$
+S_x(\omega) = \frac{2T}{\omega}\operatorname{Im}\chi(\omega)
+$$
+(классический предел; в квантовом случае $T\to\frac{\hbar\omega}{2}\coth\frac{\hbar\omega}{2T}$). Проверим для
+броуновского осциллятора $m\ddot x + \gamma\dot x + kx = F + \xi$: отклик $\chi = 1/(k - m\omega^2 - i\gamma\omega)$, а
+спектр флуктуаций, вызванных шумом $\xi$, $S_x = |\chi|^2\cdot2\Gamma$:
+
+```{python}
+w, k_spring = sp.symbols("omega k", positive=True)
+chi = 1 / (k_spring - m * w**2 - sp.I * gam * w)
+S_x = sp.Abs(chi)**2 * 2 * Gamma
+fdt = 2 * T / w * sp.im(chi)
+print("S_x − (2T/ω) Im χ =", sp.factor(sp.simplify(S_x - fdt)))
+S_num = sp.lambdify(w, (2 * gam * T / ((k_spring - m * w**2)**2 + gam**2 * w**2)).subs({gam: 0.3, T: 1.5, m: 1, k_spring: 2}))
+x2 = quad(S_num, -np.inf, np.inf, points=None, limit=400)[0] / (2 * np.pi)
+print(f"⟨x²⟩ = ∫S dω/2π при Γ = γT (γ = 0,3, T = 1,5, m = 1, k = 2): {x2:.6f};  T/k = {1.5 / 2}")
+```
+
+Разность обращается в нуль ровно при $\Gamma = \gamma T$, а интеграл спектра даёт
+равнораспределение $\langle x^2\rangle = T/k$. В электрической цепи то же самое — **шум
+Джонсона–Найквиста** (1928): резистор $R$ при температуре $T$ — источник
+случайного напряжения со спектральной плотностью (на положительных
+частотах) $4k_BTR$, и в полосе $\Delta f$
+$$
+\langle V^2\rangle = 4k_BTR\,\Delta f .
+$$
+
+```{python}
+k_B = 1.380649e-23
+for R_ohm, T_K, band in ((1e3, 300, 1e4), (1e6, 300, 1e4), (50, 4.2, 1e9)):
+    print(f"R = {R_ohm:8.0f} Ом, T = {T_K:5.1f} К, Δf = {band:.0e} Гц:  V_rms = {np.sqrt(4 * k_B * T_K * R_ohm * band) * 1e6:.3f} мкВ")
+```
+
+## Итоги
+
+- Вероятность флуктуации $\propto e^{\Delta S}$; гауссовы флуктуации, $\langle\Delta V^2\rangle = -T(\partial V/\partial p)_T$, для идеального
+  газа $\langle\Delta N^2\rangle = \langle N\rangle$.
+- Ланжевен: $m\dot v = -\gamma v + \xi$, $\langle\xi\xi\rangle = 2\Gamma\delta$; равнораспределение требует $\Gamma = \gamma T$; $D = T/\gamma$;
+  $\langle\Delta x^2\rangle = 2D[t - \tau(1 - e^{-t/\tau})]$.
+- Фоккер–Планк (Крамерс) и Смолуховский; стационарные решения — Гиббс и Больцман;
+  свободная энергия $\int(UP + TP\ln P)$ убывает.
+- Формула Крамерса $k = \frac{\omega_a\omega_b}{2\pi\gamma}e^{-\Delta U/T}$ — асимптотика при $\Delta U\gg T$.
+- ФДТ: $S_x(\omega) = \frac{2T}{\omega}\operatorname{Im}\chi(\omega)$; шум Джонсона–Найквиста $4k_BTR\Delta f$.
+
+## Упражнения
+
+1. Найдите $\langle\Delta T^2\rangle$ для тела с теплоёмкостью $C_V$ в термостате (флуктуации
+   температуры при фиксированном объёме) из $\langle\Delta E^2\rangle = T^2C_V$.
+2. Шарик радиуса $r = 1$ мкм в воде ($\eta = 10^{-3}$ Па·с, $T = 300$ К, плотность $10^3$ кг/м³).
+   Найдите $D$, время $\tau = m/\gamma$ и среднеквадратичное смещение за 1 с.
+3. Решите уравнение Смолуховского для $U = kx^2/2$ с начальным условием $\delta(x - x_0)$:
+   как зависят от времени среднее и дисперсия?
+4. Покажите, что для уравнения Смолуховского
+   $\frac{\dd\mathcal F}{\dd t} = -\frac1\gamma\int P\,(\partial_x\mu)^2\dd x$, где $\mu = U + T\ln P$.
+5. Какое напряжение шума даёт резистор 1 МОм при комнатной температуре в полосе
+   звуковых частот (20 кГц)?
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $E - \bar E\approx C_V\Delta T$, поэтому $\langle\Delta T^2\rangle = T^2/C_V$ (в единицах $k = 1$; в обычных $k_BT^2/C_V$).
+2. $\gamma = 6\pi\eta r = 1{,}88\cdot10^{-8}$ кг/с, $D = k_BT/\gamma\approx2{,}2\cdot10^{-13}$ м²/с, $m = 4{,}19\cdot10^{-15}$ кг,
+   $\tau\approx2{,}2\cdot10^{-7}$ с; $\sqrt{2D\cdot1\,\text{с}}\approx0{,}66$ мкм.
+3. Процесс Орнштейна–Уленбека: $\langle x\rangle = x_0e^{-kt/\gamma}$, $\langle\Delta x^2\rangle = \frac Tk\bigl(1 - e^{-2kt/\gamma}\bigr)$; при $t\to\infty$ — Больцман $T/k$.
+4. $\partial_tP = \partial_x\bigl(\frac{P}{\gamma}\partial_x\mu\bigr)$, $\frac{\dd\mathcal F}{\dd t} = \int\mu\,\partial_tP\,\dd x$ (вклад $T\int\partial_tP = 0$), интегрирование по частям даёт
+   $-\frac1\gamma\int P(\partial_x\mu)^2\dd x\le0$; равенство — только при $\mu = \mathrm{const}$, то есть $P\propto e^{-U/T}$.
+5. $\sqrt{4\cdot1{,}38\cdot10^{-23}\cdot300\cdot10^6\cdot2\cdot10^4}\approx18$ мкВ.
+:::
