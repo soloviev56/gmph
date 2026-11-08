@@ -1,0 +1,353 @@
+---
+title: "Группа SU(3)"
+topic: su3
+order: 16
+description: "Алгебра su(3): матрицы Гелл-Манна, структурные константы f_abc и симметричные d_abc (расчёт), оператор Казимира; подалгебра Картана T₃, T₈, веса фундаментального представления (кварки u, d, s) и сопряжённого; корни — шестиугольник, простые корни и операторы сдвига; старший вес (p, q), размерность (p + 1)(q + 1)(p + q + 2)/2 и Казимир (p² + q² + pq + 3p + 3q)/3; разложение тензорных произведений по собственным значениям Казимира: 3⊗3̄ = 8⊕1, 3⊗3 = 6⊕3̄, 3⊗3⊗3 = 10⊕8⊕8⊕1; весовые диаграммы и кварковая модель — октет барионов, декуплет и предсказание Ω⁻ (рисунок), формула Гелл-Манна–Нисиджимы, равные интервалы масс декуплета; цветовая SU(3) и синглет ε_ijk q^iq^jq^k"
+---
+
+Группа $\mathrm{SU}(2)$ описывает спин и изоспин: протон и нейтрон — два
+состояния одной частицы. В 1950-х годах было открыто много
+«странных» адронов, и они группировались в семейства по 8 и 10 частиц.
+Гелл-Ман и Нееман (1961) поняли, что это неприводимые представления
+группы $\mathrm{SU}(3)$, а Гелл-Ман и Цвейг (1964) — что все они строятся из трёх
+кварков $u, d, s$, образующих фундаментальное представление. Позже
+оказалось, что $\mathrm{SU}(3)$ входит в физику дважды: как приближённая
+«ароматная» симметрия лёгких кварков и как точная калибровочная группа
+«цвета» в квантовой хромодинамике.
+
+Эта статья — о том, как устроены представления $\mathrm{SU}(3)$. Метод тот же,
+что для [представлений SU(2)](/math/lie/su2-reps.qmd), но вместо одного числа $m$
+состояние нумеруется **вектором весов** — парой собственных значений двух
+коммутирующих генераторов. Используются [представления групп и алгебр
+Ли](/math/lie/lie-representations.qmd). Генераторы — эрмитовы, как в разделе
+«Калибровочные поля» [конвенций](/conventions.qmd): $[T_a, T_b] = if_{abc}T_c$, $\operatorname{tr}T_aT_b = \frac12\delta_{ab}$.
+
+## Алгебра su(3)
+
+Группа $\mathrm{SU}(3)$ — унитарные $3\times3$ матрицы с единичным определителем; её
+алгебра — антиэрмитовы бесследовые матрицы, вещественная размерность $9 - 1 = 8$.
+Эрмитов базис физиков — **матрицы Гелл-Манна** $\lambda_a$, $T_a = \lambda_a/2$. Первые три —
+матрицы Паули в левом верхнем углу: подалгебра $\mathrm{su}(2)$ изоспина.
+
+```{python}
+import numpy as np
+import sympy as sp
+import matplotlib.pyplot as plt
+from itertools import product
+
+def gell_mann():
+    """Восемь матриц Гелл-Манна λ₁…λ₈."""
+    lam = [sp.zeros(3) for _ in range(8)]
+    for k, (i, j) in enumerate([(0, 1), (0, 2), (1, 2)]):
+        sym, asym = [0, 3, 5][k], [1, 4, 6][k]
+        lam[sym][i, j] = lam[sym][j, i] = 1
+        lam[asym][i, j], lam[asym][j, i] = -sp.I, sp.I
+    lam[2][0, 0], lam[2][1, 1] = 1, -1
+    lam[7] = sp.diag(1, 1, -2) / sp.sqrt(3)
+    return lam
+
+T = [l / 2 for l in gell_mann()]
+print("эрмитовы и бесследовые:", all(t == t.H and t.trace() == 0 for t in T))
+print("tr T_aT_b = δ_ab/2:", all((T[a] * T[b]).trace() == sp.Rational(int(a == b), 2) for a in range(8) for b in range(8)))
+
+f = {}
+d_sym = {}
+for a, b, c in product(range(8), repeat=3):
+    fv = sp.nsimplify(sp.simplify(-2 * sp.I * ((T[a] * T[b] - T[b] * T[a]) * T[c]).trace()))   # f_abc = −2i tr([T_a,T_b]T_c)
+    dv = sp.nsimplify(sp.simplify(2 * ((T[a] * T[b] + T[b] * T[a]) * T[c]).trace()))           # d_abc = 2 tr({T_a,T_b}T_c)
+    if fv != 0:
+        f[(a, b, c)] = fv
+    if dv != 0:
+        d_sym[(a, b, c)] = dv
+print("ненулевые f_abc (a < b < c):", {tuple(i + 1 for i in k): v for k, v in f.items() if k[0] < k[1] < k[2]})
+print("[T_a, T_b] = i f_abc T_c:", all(sp.simplify(T[a] * T[b] - T[b] * T[a] - sp.I * sum((f.get((a, b, c), 0) * T[c]
+                                    for c in range(8)), sp.zeros(3))) == sp.zeros(3) for a in range(8) for b in range(8)))
+casimir = sp.simplify(sum((t * t for t in T), sp.zeros(3)))
+print("Казимир Σ T_a² в фундаментальном представлении:", casimir)
+```
+
+В отличие от $\mathrm{su}(2)$, где $\{\sigma_a, \sigma_b\} = 2\delta_{ab}$, у $\mathrm{su}(3)$ антикоммутатор генераторов
+содержит новую величину — полностью симметричные константы $d_{abc}$
+(например $d_{118} = 1/\sqrt3$). Из них строится второй, кубический оператор Казимира;
+квадратичный $C_2 = \sum_aT_a^2$ в фундаментальном представлении равен $\frac43$.
+
+## Веса и корни
+
+Максимальное число коммутирующих генераторов (ранг) равно двум:
+$H_1 = T_3$ и $H_2 = T_8$ — **подалгебра Картана**. Они диагональны, и базисные
+векторы $\mathbb C^3$ — их общие собственные векторы. Пара собственных значений
+$\mu = (\mu_1, \mu_2)$ — **вес** состояния.
+
+::: {#def-weights-roots}
+**Вес** представления $\rho$ — вектор $\mu\in\R^2$, для которого есть ненулевой $v$ с
+$\rho(H_i)v = \mu_iv$. **Корень** — ненулевой вес присоединённого представления:
+$[H_i, E_\alpha] = \alpha_iE_\alpha$ для некоторой комплексной комбинации $E_\alpha$ генераторов.
+:::
+
+Операторы $E_\alpha$ — аналоги $J_\pm$: если $v$ имеет вес $\mu$, то $E_\alpha v$ имеет вес $\mu + \alpha$. Найдём
+веса фундаментального представления (кварки) и корни:
+
+```{python}
+H = [T[2], T[7]]
+quark_names = ["u", "d", "s"]
+weights_3 = [(H[0][k, k], H[1][k, k]) for k in range(3)]
+for name, w in zip(quark_names, weights_3):
+    Y = 2 * w[1] / sp.sqrt(3)                      # гиперзаряд Y = (2/√3) T₈
+    print(f"{name}: вес (T₃, T₈) = ({w[0]}, {sp.nsimplify(w[1])}),  Y = {sp.nsimplify(Y)},  Q = T₃ + Y/2 = {sp.nsimplify(w[0] + Y / 2)}")
+
+# корни: собственные значения ad(H₁), ad(H₂) на матричных единицах E_ij (i ≠ j)
+roots = {}
+for i, j in product(range(3), repeat=2):
+    if i != j:
+        E = sp.zeros(3); E[i, j] = 1
+        alpha = tuple(sp.nsimplify(sp.simplify((h * E - E * h)[i, j])) for h in H)
+        assert all(sp.simplify(h * E - E * h - a * E) == sp.zeros(3) for h, a in zip(H, alpha))
+        roots[(i, j)] = alpha
+print("корни E_ij:", {f"E_{quark_names[i]}{quark_names[j]}": r for (i, j), r in roots.items()})
+print("длины корней:", {sp.sqrt(r[0]**2 + r[1]**2) for r in roots.values()})
+```
+
+Матричная единица $E_{ij}$ переводит кварк $j$ в кварк $i$, и её корень — разность
+весов кварков $i$ и $j$. Шесть корней длины 1 образуют правильный
+шестиугольник, плюс два нулевых веса присоединённого представления
+($H_1$, $H_2$). Корни $E_{ud}$ ($\alpha = (1, 0)$) и $E_{ds}$ ($\alpha = (-\frac12, \frac{\sqrt3}{2})$) — **простые**: все
+положительные корни — их неотрицательные целые комбинации. Каждая пара
+$\pm\alpha$ с $[E_\alpha, E_{-\alpha}]$ образует подалгебру $\mathrm{su}(2)$: изоспин ($u\leftrightarrow d$), $U$-спин ($d\leftrightarrow s$), $V$-спин ($u\leftrightarrow s$).
+
+**Сопряжённое представление** $\bar 3$ (антикварки) — генераторы $-T_a^*$, веса
+противоположны весам $3$. В отличие от $\mathrm{SU}(2)$, у которой $\bar2\cong2$, представления
+$3$ и $\bar3$ не эквивалентны: треугольник весов, отражённый относительно
+начала, не совпадает с исходным.
+
+## Неприводимые представления
+
+Как у $\mathrm{SU}(2)$, неприводимое представление определяется **старшим весом** —
+весом, который не повышается ни одним $E_\alpha$ с положительным корнем.
+Старший вес — целая неотрицательная комбинация $p\,\omega_1 + q\,\omega_2$ двух **фундаментальных
+весов** (старших весов $3$ и $\bar3$); пару $(p, q)$ называют метками Дынкина:
+$3 = (1, 0)$, $\bar3 = (0, 1)$, присоединённое $8 = (1, 1)$. Размерность и квадратичный
+Казимир даются формулами
+$$
+\dim(p, q) = \frac{(p + 1)(q + 1)(p + q + 2)}{2}, \qquad C_2(p, q) = \frac{p^2 + q^2 + pq + 3p + 3q}{3} .
+$$
+Обе формулы проверим, строя представления как подпространства тензорных
+произведений. Генератор в произведении — $T_a\otimes1 + 1\otimes T_a$, а неприводимые
+слагаемые различаются значениями Казимира:
+
+```{python}
+T_num = [np.array(t, dtype=complex) for t in T]
+T_bar = [-t.conj() for t in T_num]                     # сопряжённое представление 3̄
+
+def tensor(*reps):
+    """Генераторы тензорного произведения представлений (списки из 8 матриц)."""
+    dims = [r[0].shape[0] for r in reps]
+    out = []
+    for a in range(8):
+        total = np.zeros((np.prod(dims),) * 2, dtype=complex)
+        for k, r in enumerate(reps):
+            factors = [np.eye(n) for n in dims]
+            factors[k] = r[a]
+            term = factors[0]
+            for fac in factors[1:]:
+                term = np.kron(term, fac)
+            total += term
+        out.append(total)
+    return out
+
+def decompose(gens):
+    """Собственные значения Казимира с кратностями — разложение на неприводимые."""
+    C = sum(g @ g for g in gens)
+    vals = np.round(np.linalg.eigvalsh(C), 8)
+    return dict(zip(*np.unique(vals, return_counts=True)))
+
+dim_pq = lambda p, q: (p + 1) * (q + 1) * (p + q + 2) // 2
+cas_pq = lambda p, q: sp.Rational(p**2 + q**2 + p * q + 3 * p + 3 * q, 3)
+print("таблица (p, q): размерность, Казимир:",
+      {(p, q): (dim_pq(p, q), cas_pq(p, q)) for p, q in [(0, 0), (1, 0), (0, 1), (1, 1), (2, 0), (3, 0), (2, 2)]})
+for name, reps in [("3 ⊗ 3̄", (T_num, T_bar)), ("3 ⊗ 3", (T_num, T_num)), ("3 ⊗ 3 ⊗ 3", (T_num, T_num, T_num))]:
+    parts = decompose(tensor(*reps))
+    print(f"{name}: Казимир → размерность подпространства:", {sp.Rational(int(round(3 * c)), 3): int(n) for c, n in parts.items()})
+```
+
+Читаем: $3\otimes\bar3$ — Казимир $3$ на восьмимерном подпространстве и $0$ на одномерном:
+$3\otimes\bar3 = 8\oplus1$. $3\otimes3$: Казимир $\frac{10}{3}$ (это $(2, 0)$, размерность 6) и $\frac43$ (это $\bar3$):
+$3\otimes3 = 6\oplus\bar3$. Три кварка: Казимир $6$ на десятимерном
+подпространстве — $(3, 0)$, Казимир $3$ на шестнадцатимерном — **два** октета, и
+синглет: $3\otimes3\otimes3 = 10\oplus8\oplus8\oplus1$. Одинаковый Казимир у двух октетов — не
+совпадение: это эквивалентные представления.
+
+## Весовые диаграммы и кварковая модель
+
+Веса неприводимого слагаемого — совместные собственные значения $T_3$ и $T_8$
+на соответствующем собственном подпространстве Казимира (они
+коммутируют с Казимиром). Физики используют вместо $T_8$ **гиперзаряд**
+$Y = \frac{2}{\sqrt3}T_8$; электрический заряд — по формуле Гелл-Манна–Нисиджимы $Q = T_3 + Y/2$.
+
+```{python}
+def weights(gens, casimir_value):
+    """Веса (T₃, T₈) на собственном подпространстве Казимира с данным значением."""
+    C = sum(g @ g for g in gens)
+    vals, vecs = np.linalg.eigh(C)
+    basis = vecs[:, np.abs(vals - casimir_value) < 1e-6]
+    h1, h2 = (basis.conj().T @ gens[k] @ basis for k in (2, 7))
+    mix = h1 + np.pi * h2                                # общие собственные векторы коммутирующих H₁, H₂
+    _, w = np.linalg.eig(mix)
+    w = basis @ w
+    out = []
+    for k in range(w.shape[1]):
+        v = w[:, k] / np.linalg.norm(w[:, k])
+        out.append((round((v.conj() @ gens[2] @ v).real, 6), round((v.conj() @ gens[7] @ v).real, 6)))
+    return sorted(out, key=lambda t: (-t[1], t[0]))
+
+w8 = weights(tensor(T_num, T_bar), 3.0)
+w10 = weights(tensor(T_num, T_num, T_num), 6.0)
+for name, ws in (("октет", w8), ("декуплет", w10)):
+    tY = [(t3 + 0.0, round(2 * t8 / np.sqrt(3), 6) + 0.0) for t3, t8 in ws]
+    print(f"{name}: (T₃, Y) =", ", ".join(f"({float(a):+.1f}, {float(b):+.0f})" for a, b in tY))
+    print(f"        заряды Q = T₃ + Y/2:", sorted({float(round(a + b / 2, 6)) + 0.0 for a, b in tY}))
+```
+
+В октете вес $(0, 0)$ встречается дважды — это $\Sigma^0$ и $\Lambda$ (или $\pi^0$ и $\eta$ у мезонов из
+$q\bar q$); у $\mathrm{SU}(2)$ все веса неприводимого представления простые, у $\mathrm{SU}(3)$ —
+уже нет. Декуплет — треугольник с простыми весами. В 1962 году девять
+его членов были известны: четыре $\Delta$, три $\Sigma^*$, два $\Xi^*$. Гелл-Ман предсказал
+десятую частицу в вершине — $\Omega^-$ с $Y = -2$, странностью $-3$ и зарядом $-1$, — и
+её массу. Нарушение симметрии массой $s$-кварка в первом порядке
+линейно по $Y$ (формула Гелл-Манна–Окубо), так что в декуплете
+массы соседних строк отстоят на равные интервалы:
+
+```{python}
+decuplet_mass = {"Δ (Y = 1)": 1232, "Σ* (Y = 0)": 1385, "Ξ* (Y = −1)": 1533}     # МэВ, средние по зарядам
+m = list(decuplet_mass.values())
+steps = np.diff(m)
+predicted = m[-1] + steps.mean()
+print("интервалы, МэВ:", steps.tolist(), f"→ предсказание m(Ω⁻) ≈ {predicted:.0f} МэВ; измерено 1672 МэВ "
+      f"(расхождение {abs(predicted - 1672) / 1672 * 100:.1f} %)")
+```
+
+$\Omega^-$ нашли в 1964 году в Брукхейвене с массой $1672$ МэВ.
+
+```{python}
+#| label: fig-su3-weights
+#| fig-cap: 'Весовые диаграммы SU(3) в осях (T₃, T₈), найденные численно из тензорных произведений: кварки 3 и антикварки 3̄ (треугольники), октет из 3⊗3̄ (шестиугольник с двукратным центром — два кружка) и декуплет из 3⊗3⊗3 (треугольник). Подписи — частицы барионного октета и декуплета; шесть серых стрелок в октете — корни.'
+fig, axes = plt.subplots(1, 3, figsize=(12, 4.2))
+ax = axes[0]
+w3 = [(float(a), float(b)) for a, b in weights_3]
+for ws, col, mark, lab in ((w3, "tab:blue", "o", "3"), ([(-a, -b) for a, b in w3], "tab:red", "s", r"$\bar 3$")):
+    xs, ys = zip(*ws)
+    ax.fill(xs, ys, color=col, alpha=0.08)
+    ax.plot(xs, ys, mark, color=col, ms=8, label=lab)
+for (a, b), nm in zip(w3, quark_names):
+    ax.annotate(nm, (a, b), xytext=(7, 4), textcoords="offset points", color="tab:blue")
+    ax.annotate(f"{nm}̄", (-a, -b), xytext=(7, -12), textcoords="offset points", color="tab:red")
+ax.legend(loc="lower right", fontsize=8)
+ax.set_title(r"3 и $\bar 3$")
+
+octet_names = {(-0.5, 1): "n", (0.5, 1): "p", (-1, 0): "Σ⁻", (1, 0): "Σ⁺", (-0.5, -1): "Ξ⁻", (0.5, -1): "Ξ⁰"}
+ax = axes[1]
+xs, ys = zip(*w8)
+ax.plot(xs, ys, "o", color="tab:green", ms=9)
+ax.plot([0], [0], "o", ms=16, mfc="none", color="tab:green")
+for r in roots.values():
+    ax.annotate("", xy=(float(r[0]), float(r[1])), xytext=(0, 0), arrowprops=dict(arrowstyle="->", color="0.6"))
+for (t3, t8) in set(w8):
+    key = (t3, round(2 * t8 / np.sqrt(3)))
+    if key in octet_names:
+        ax.annotate(octet_names[key], (t3, t8), xytext=(8, 4), textcoords="offset points")
+ax.annotate("Σ⁰, Λ", (0, 0), xytext=(10, -14), textcoords="offset points")
+ax.set_title("8: барионы J = ½")
+
+decuplet_names = {1: ["Δ⁻", "Δ⁰", "Δ⁺", "Δ⁺⁺"], 0: ["Σ*⁻", "Σ*⁰", "Σ*⁺"], -1: ["Ξ*⁻", "Ξ*⁰"], -2: ["Ω⁻"]}
+ax = axes[2]
+xs, ys = zip(*w10)
+ax.plot(xs, ys, "o", color="tab:purple", ms=9)
+for Y, names in decuplet_names.items():
+    row = sorted(t3 for t3, t8 in w10 if round(2 * t8 / np.sqrt(3)) == Y)
+    for t3, nm in zip(row, names):
+        ax.annotate(nm, (t3, Y * np.sqrt(3) / 2), xytext=(-8, 9), textcoords="offset points", fontsize=9)
+ax.set_title("10: барионы J = 3/2")
+for ax in axes:
+    ax.axhline(0, color="0.85", lw=0.8, zorder=0)
+    ax.axvline(0, color="0.85", lw=0.8, zorder=0)
+    ax.set(aspect="equal", xlabel="T₃")
+    ax.set_xlim(-1.9, 1.9)
+    ax.set_ylim(-2.0, 1.3)
+axes[0].set_ylabel("T₈ = (√3/2) Y")
+plt.tight_layout()
+plt.show()
+```
+
+## Цвет
+
+Ароматная $\mathrm{SU}(3)$ — приближённая симметрия (массы кварков $u, d, s$
+различны). Точная симметрия — **цветовая**: каждый кварк существует в
+трёх «цветах», преобразующихся по представлению $3$, и $\mathrm{SU}(3)$ цвета —
+калибровочная группа КХД (статья о [полях Янга–Миллса](/physics/gauge/yang-mills.qmd), с
+восемью глюонами по числу генераторов). Наблюдаемые адроны — цветовые
+синглеты. Синглет в $3\otimes3\otimes3$ — полностью антисимметричный тензор
+$\varepsilon_{ijk}q^iq^jq^k$: он инвариантен, потому что $\varepsilon_{ijk}U_{ia}U_{jb}U_{kc} = (\det U)\,\varepsilon_{abc}$, а $\det U = 1$.
+Синглет в $3\otimes\bar3$ — $\delta_{ij}q^i\bar q^j$ (мезоны). Проверим инвариантность $\varepsilon$ и то,
+что синглет произведения трёх кварков — именно он:
+
+```{python}
+from scipy.linalg import expm
+from scipy.stats import unitary_group
+
+rng = np.random.default_rng(0)
+U = unitary_group.rvs(3, random_state=rng)
+U = U / np.linalg.det(U)**(1 / 3)                      # det U = 1
+levi = np.zeros((3, 3, 3))
+for (i, j, k), s in {(0, 1, 2): 1, (1, 2, 0): 1, (2, 0, 1): 1, (0, 2, 1): -1, (2, 1, 0): -1, (1, 0, 2): -1}.items():
+    levi[i, j, k] = s
+rotated = np.einsum("ijk,ia,jb,kc->abc", levi, U, U, U)
+print(f"det U = {np.linalg.det(U).real:.6f} {np.linalg.det(U).imag:+.0e}i;  max |ε' − ε| = {np.abs(rotated - levi).max():.0e}")
+G3 = tensor(T_num, T_num, T_num)
+C3 = sum(g @ g for g in G3)
+vals, vecs = np.linalg.eigh(C3)
+singlet = vecs[:, np.abs(vals) < 1e-8][:, 0]
+eps_vec = levi.reshape(27) / np.sqrt(6)
+print(f"|⟨синглет | ε/√6⟩| = {abs(np.vdot(eps_vec, singlet)):.6f}")
+```
+
+Отсюда объяснение загадки декуплета: состояние $\Delta^{++} = uuu$ со спином
+$\frac32$ симметрично по аромату и по спину, и по принципу Паули его волновая
+функция должна быть антисимметрична ещё по чему-то. Это и есть цвет: множитель
+$\varepsilon_{ijk}$ делает полную функцию антисимметричной.
+
+## Итоги
+
+- $\mathrm{su}(3)$: восемь генераторов $T_a = \lambda_a/2$, константы $f_{abc}$ и симметричные $d_{abc}$, $C_2 = \frac43$ на $3$.
+- Ранг 2: веса — точки на плоскости $(T_3, T_8)$; корни — шесть векторов шестиугольника,
+  каждая пара $\pm\alpha$ даёт подалгебру $\mathrm{su}(2)$ (изоспин, $U$-, $V$-спин).
+- Неприводимые представления — старшие веса $(p, q)$; $\dim = \frac{(p+1)(q+1)(p+q+2)}{2}$, $C_2 = \frac{p^2+q^2+pq+3p+3q}{3}$;
+  $3\not\cong\bar3$.
+- $3\otimes\bar3 = 8\oplus1$, $3\otimes3 = 6\oplus\bar3$, $3\otimes3\otimes3 = 10\oplus8\oplus8\oplus1$ — найдено по собственным значениям Казимира.
+- Кварковая модель: $Q = T_3 + Y/2$; октеты и декуплеты адронов; равные интервалы в декуплете
+  предсказали $\Omega^-$. Цветовая $\mathrm{SU}(3)$: адроны — синглеты $\varepsilon_{ijk}q^iq^jq^k$, $\delta_{ij}q^i\bar q^j$.
+
+## Упражнения
+
+1. Проверьте, что $\lambda_1, \lambda_2, \lambda_3$ порождают подалгебру $\mathrm{su}(2)$, и найдите, какие
+   матрицы Гелл-Манна порождают подалгебру $V$-спина ($u\leftrightarrow s$).
+2. Найдите размерности представлений $(2, 1)$ и $(4, 0)$ и значения $C_2$ на них.
+3. Разложите $8\otimes8$ по собственным значениям Казимира. (Ответ:
+   $8\otimes8 = 27\oplus10\oplus\overline{10}\oplus8\oplus8\oplus1$; проверьте суммой размерностей.)
+4. Найдите заряды и гиперзаряды мезонного октета $q\bar q$: какие кварковые
+   комбинации стоят в вершинах шестиугольника?
+5. Почему $\mathrm{SU}(3)$ не имеет комплексно-сопряжённо-эквивалентного $3$ и $\bar3$,
+   а $\mathrm{SU}(2)$ — имеет? Найдите матрицу $S$, для которой $S\sigma_aS^{-1} = -\sigma_a^*$.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $[T_1, T_2] = iT_3$ и циклически — $f_{123} = 1$. $V$-спин действует на $u$ и $s$: $T_4$, $T_5$ и
+   $\frac12T_3 + \frac{\sqrt3}{2}T_8 = \mathrm{diag}(\frac12, 0, -\frac12)$; $[T_4, T_5] = \frac i2T_3 + \frac{i\sqrt3}{2}T_8$.
+2. $\dim(2, 1) = 3\cdot2\cdot5/2 = 15$, $C_2 = (4 + 1 + 2 + 6 + 3)/3 = \frac{16}{3}$; $\dim(4, 0) = 5\cdot1\cdot6/2 = 15$, $C_2 = (16 + 12)/3 = \frac{28}{3}$ —
+   две разные 15-мерные неприводимые.
+3. Казимир на 64-мерном произведении: $8$ (размерность 27), $6$ (размерность 20 — это $10$ и $\overline{10}$),
+   $3$ (16 — два октета), $0$ (1). $27 + 10 + 10 + 8 + 8 + 1 = 64$.
+4. Вершины: $u\bar s$ ($K^+$: $Q = 1$, $Y = 1$), $d\bar s$ ($K^0$: $0, 1$), $u\bar d$ ($\pi^+$: $1, 0$), $d\bar u$ ($\pi^-$: $-1, 0$),
+   $s\bar u$ ($K^-$: $-1, -1$), $s\bar d$ ($\bar K^0$: $0, -1$); в центре $\pi^0$ и $\eta$.
+5. Веса $\bar3$ — веса $3$ с обратным знаком, а треугольник не симметричен относительно
+   начала координат, поэтому эквивалентности нет. У $\mathrm{SU}(2)$ веса $\pm\frac12$
+   симметричны: $S = i\sigma_2$ даёт $S\sigma_aS^{-1} = -\sigma_a^*$.
+:::
