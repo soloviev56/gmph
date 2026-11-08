@@ -1,0 +1,316 @@
+---
+title: "Тензорные операторы и теорема Вигнера–Эккарта"
+topic: wigner-eckart
+order: 17
+description: "Операторы как представление группы вращений: U T U† = Σ D T; неприводимые тензорные операторы T^(k)_q и их определение через коммутаторы с J_z, J_± (проверка для r, J, квадрупольного оператора); сферические компоненты вектора; произведение тензорных операторов и правило сложения рангов; теорема Вигнера–Эккарта ⟨j'm'|T^k_q|jm⟩ = ⟨jm kq|j'm'⟩⟨j'‖T^k‖j⟩ — численная проверка для угловых матричных элементов r̂_q (интегралы Гаунта); правила отбора Δl = ±1, |Δm| ≤ 1 для дипольных переходов (рисунок); теорема о проекции для векторных операторов и множитель Ланде; правило сумм для интенсивностей зеемановских компонент"
+---
+
+Матричных элементов у оператора бесконечно много: для дипольного
+перехода между уровнями атома с моментами $j$ и $j'$ это
+$3(2j + 1)(2j' + 1)$ чисел $\langle j'm'|x_q|jm\rangle$. Но если оператор «правильно»
+поворачивается — как вектор, тензор второго ранга и т. д., — то почти вся
+эта таблица фиксирована симметрией: от динамики зависит **одно** число на
+пару уровней, а остальное — коэффициенты Клебша–Гордана. Это и есть
+теорема Вигнера–Эккарта. Из неё следуют правила отбора, соотношения
+интенсивностей спектральных линий и множитель Ланде.
+
+Используются [представления SU(2)](/math/lie/su2-reps.qmd): спин-матрицы $\hat J_k$ из
+`gmph.lie.spin_matrices` ($\hbar = 1$), базис $|j, m\rangle$, коэффициенты Клебша–Гордана
+$\langle j_1m_1\,j_2m_2|JM\rangle$ в соглашениях Кондона–Шортли (`sympy.physics.quantum.cg.CG`).
+
+## Операторы как представление
+
+Поворот $R$ действует на состояния унитарным оператором $U(R)$, а на
+операторы — сопряжением $A\mapsto U A U^\dagger$. Это тоже представление группы
+вращений, только в пространстве операторов. Инфинитезимально, при
+$U = 1 - i\varepsilon\,\mathbf n\cdot\hat{\mathbf J}$, оператор меняется на $-i\varepsilon[\mathbf n\cdot\hat{\mathbf J}, A]$: роль генератора играет
+коммутатор $[\hat J_k, \cdot\,]$. Разложим пространство операторов на неприводимые
+части — как функции на сфере раскладываются по $Y_{lm}$.
+
+::: {#def-tensor-operator}
+**Неприводимый тензорный оператор ранга $k$** — набор $2k + 1$ операторов
+$T^{(k)}_q$, $q = -k, \dots, k$, преобразующихся при поворотах как базис $|k, q\rangle$:
+$$
+U(R)\,T^{(k)}_q\,U(R)^\dagger = \sum_{q'}D^{k}_{q'q}(R)\,T^{(k)}_{q'} .
+$$
+Эквивалентно (условие Рака) —
+$$
+[\hat J_z, T^{(k)}_q] = q\,T^{(k)}_q, \qquad [\hat J_\pm, T^{(k)}_q] = \sqrt{(k\mp q)(k\pm q + 1)}\;T^{(k)}_{q\pm1} .
+$$
+:::
+
+Коммутатор с $\hat J_\pm$ действует на индекс $q$ так же, как $\hat J_\pm$ на $|k, q\rangle$. Скаляр
+($k = 0$) — оператор, коммутирующий с $\hat{\mathbf J}$ (например, гамильтониан
+изолированного атома). Вектор ($k = 1$) — в **сферических компонентах**
+$$
+V_{\pm1} = \mp\frac{V_x \pm iV_y}{\sqrt2}, \qquad V_0 = V_z
+$$
+(знак $\mp$ — фаза Кондона–Шортли; $r_q = \sqrt{4\pi/3}\,r\,Y_{1q}$). Проверим условие Рака для
+трёх примеров: самого $\hat{\mathbf J}$ в представлении $j = \frac32$, координаты $\mathbf r$ (оператор
+умножения) с орбитальным моментом $\hat{\mathbf L} = -i\,\mathbf r\times\nabla$ и квадрупольного
+оператора $Q_0 = 3z^2 - r^2$ с его «партнёрами» $Q_{\pm1} = \mp\sqrt6\,z(x\pm iy)$, $Q_{\pm2} = \sqrt{3/2}\,(x\pm iy)^2$:
+
+```{python}
+import numpy as np
+import sympy as sp
+import matplotlib.pyplot as plt
+from sympy.physics.quantum.cg import CG
+from gmph.lie import spin_matrices
+
+def spherical(V):
+    """Сферические компоненты (V₊₁, V₀, V₋₁) вектора (V_x, V_y, V_z)."""
+    return {1: -(V[0] + sp.I * V[1]) / sp.sqrt(2), 0: V[2], -1: (V[0] - sp.I * V[1]) / sp.sqrt(2)}
+
+def is_zero(e):
+    """Нуль — для числа, выражения или матрицы."""
+    return all(sp.simplify(v) == 0 for v in e) if isinstance(e, sp.MatrixBase) else sp.simplify(e) == 0
+
+def racah_ok(T, k, Jz, Jp, Jm, comm):
+    """Условие Рака для набора {q: T_q}; comm(A, B) — коммутатор [A, B]."""
+    ok = all(is_zero(comm(Jz, T[q]) - q * T[q]) for q in T)
+    for q in T:
+        for J, s in ((Jp, 1), (Jm, -1)):
+            target = sp.sqrt((k - s * q) * (k + s * q + 1)) * T[q + s] if abs(q + s) <= k else 0 * T[q]
+            ok &= is_zero(comm(J, T[q]) - target)
+    return ok
+
+# 1) J в представлении j = 3/2: операторы — матрицы
+Jx, Jy, Jz = spin_matrices(sp.Rational(3, 2))
+mat_comm = lambda A, B: A * B - B * A
+J_sph = {q: sp.Matrix(v) for q, v in spherical([Jx, Jy, Jz]).items()}
+print("J (j = 3/2) — вектор:", racah_ok(J_sph, 1, Jz, Jx + sp.I * Jy, Jx - sp.I * Jy, mat_comm))
+
+# 2), 3) операторы умножения на функции; L = −i r×∇ действует на пробную функцию
+x, y, z = sp.symbols("x y z", real=True)
+f = sp.Function("f")(x, y, z)
+def L_op(k):
+    return lambda h: -sp.I * {0: y * h.diff(z) - z * h.diff(y), 1: z * h.diff(x) - x * h.diff(z),
+                              2: x * h.diff(y) - y * h.diff(x)}[k]
+Lz, Lp, Lm = L_op(2), (lambda h: L_op(0)(h) + sp.I * L_op(1)(h)), (lambda h: L_op(0)(h) - sp.I * L_op(1)(h))
+op_comm = lambda L, g: sp.expand((L(g * f) - g * L(f)) / f)     # [L, g] как оператор умножения
+r_sph = spherical([x, y, z])
+print("r — вектор:", racah_ok(r_sph, 1, Lz, Lp, Lm, op_comm))
+Q = {0: 3 * z**2 - (x**2 + y**2 + z**2), 1: -sp.sqrt(6) * z * (x + sp.I * y), -1: sp.sqrt(6) * z * (x - sp.I * y),
+     2: sp.sqrt(sp.Rational(3, 2)) * (x + sp.I * y)**2, -2: sp.sqrt(sp.Rational(3, 2)) * (x - sp.I * y)**2}
+print("Q — тензор ранга 2:", racah_ok(Q, 2, Lz, Lp, Lm, op_comm))
+```
+
+Квадрупольные компоненты — это $r^2Y_{2q}$ с общим множителем $\sqrt{16\pi/5}$, как $r_q$ — это $rY_{1q}$
+с $\sqrt{4\pi/3}$: многочлены, преобразующиеся как $Y_{lm}$, и есть тензорные операторы
+умножения. Из двух тензорных операторов рангов $k_1$, $k_2$ можно собрать
+операторы рангов $|k_1 - k_2|, \dots, k_1 + k_2$ теми же коэффициентами Клебша–Гордана,
+что и состояния: $[T^{(k_1)}\otimes U^{(k_2)}]^{(K)}_Q = \sum\langle k_1q_1\,k_2q_2|KQ\rangle\,T_{q_1}U_{q_2}$. Например,
+$[\mathbf r\otimes\mathbf r]^{(2)}$ пропорционально $Q$, а $[\mathbf r\otimes\mathbf r]^{(0)} \propto r^2$ (упражнение 1).
+
+## Теорема Вигнера–Эккарта
+
+::: {#thm-wigner-eckart}
+## Вигнер, Эккарт
+Для неприводимого тензорного оператора $T^{(k)}$ и мультиплетов $|\alpha j m\rangle$, $|\alpha' j'm'\rangle$
+($\alpha$ — остальные квантовые числа)
+$$
+\langle\alpha'j'm'|T^{(k)}_q|\alpha jm\rangle = \langle jm\,kq|j'm'\rangle\;\langle\alpha'j'\|T^{(k)}\|\alpha j\rangle .
+$$
+**Приведённый матричный элемент** $\langle\alpha'j'\|T^{(k)}\|\alpha j\rangle$ не зависит от $m$, $m'$, $q$.
+:::
+
+(Встречается и другая нормировка приведённого элемента — с лишним
+множителем $1/\sqrt{2j' + 1}$; мы её не используем.)
+
+*Идея доказательства.* Векторы $T^{(k)}_q|\alpha jm\rangle$ преобразуются как произведение
+$|kq\rangle|jm\rangle$ — это следует из определения и $U|jm\rangle = \sum D^j|jm'\rangle$. Значит, их комбинации
+$\sum\langle jm\,kq|JM\rangle\,T_q|\alpha jm\rangle$ преобразуются как $|JM\rangle$. Скалярное произведение двух
+векторов, преобразующихся по неприводимым представлениям $J$ и $j'$, по
+лемме Шура равно нулю при $J\ne j'$ и не зависит от $M$ при $J = j'$. Обращая
+разложение Клебша–Гордана, получаем теорему. $\square$
+
+Проверим её для угловой части дипольного оператора: $\hat r_q = \sqrt{4\pi/3}\,Y_{1q}$
+между сферическими функциями. Матричные элементы — интегралы трёх
+сферических функций (интегралы Гаунта), считаем их SymPy. Для каждой
+пары $(l, l')$ делим все ненулевые элементы на коэффициенты Клебша–Гордана
+и смотрим, получается ли одно число:
+
+```{python}
+theta, phi = sp.symbols("theta phi", real=True)
+Y = lambda l, m: sp.Ynm(l, m, theta, phi).expand(func=True)
+
+def angular(l2, m2, q, l1, m1):
+    """⟨l₂m₂| r̂_q |l₁m₁⟩ = √(4π/3) ∫ Y*_{l₂m₂} Y_{1q} Y_{l₁m₁} dΩ."""
+    if m2 != q + m1:
+        return sp.Integer(0)                                    # интеграл по φ равен нулю
+    integrand = sp.conjugate(Y(l2, m2)) * Y(1, q) * Y(l1, m1) * sp.sin(theta)
+    integrand = sp.simplify(integrand.subs(phi, 0))             # от φ зависимость сократилась
+    return sp.nsimplify(sp.sqrt(4 * sp.pi / 3) * 2 * sp.pi * sp.integrate(integrand, (theta, 0, sp.pi)))
+
+for l1, l2 in [(0, 1), (1, 0), (1, 2), (2, 1), (2, 3)]:
+    ratios = set()
+    for m1 in range(-l1, l1 + 1):
+        for q in (-1, 0, 1):
+            m2 = m1 + q
+            if abs(m2) > l2:
+                continue
+            value, cg = angular(l2, m2, q, l1, m1), CG(l1, m1, 1, q, l2, m2).doit()
+            if cg != 0:
+                ratios.add(sp.nsimplify(sp.simplify(value / cg)))
+            else:
+                assert value == 0
+    print(f"l = {l1} → l' = {l2}: ⟨l'm'|r̂_q|lm⟩ / ⟨lm 1q|l'm'⟩ = {ratios}")
+```
+
+Все отношения для данной пары $(l, l')$ совпадают: таблица из $3(2l + 1)(2l' + 1)$
+интегралов свелась к одному числу $\langle l'\|\hat r\|l\rangle$. В общем виде
+$\langle l + 1\|\hat r\|l\rangle = \sqrt{(l + 1)/(2l + 3)}$ и $\langle l - 1\|\hat r\|l\rangle = -\sqrt{l/(2l - 1)}$ (упражнение 3).
+
+## Правила отбора
+
+Коэффициент Клебша–Гордана $\langle jm\,kq|j'm'\rangle$ равен нулю, если не выполнены условия
+$$
+m' = m + q, \qquad |j - k|\le j'\le j + k .
+$$
+Для дипольного перехода ($k = 1$): $\Delta m = 0, \pm1$ и $\Delta j = 0, \pm1$, причём $0\to0$ запрещён.
+Для орбитального момента добавляется чётность: $\hat{\mathbf r}$ нечётен, $Y_{lm}$ имеет
+чётность $(-1)^l$, поэтому $\Delta l = 0$ тоже запрещён — остаётся $\Delta l = \pm1$ (правило
+Лапорта). Посмотрим на всю таблицу матричных элементов $\hat r_0$ и $\hat r_{+1}$ для
+$l, l'\le3$:
+
+```{python}
+#| label: fig-dipole-selection
+#| fig-cap: 'Модули угловых матричных элементов ⟨l′m′|r̂_q|lm⟩ для q = 0 (слева) и q = +1 (справа), l, l′ ≤ 3 (16 состояний, внутри блока m убывает). Ненулевые элементы только в блоках l′ = l ± 1 (правило Лапорта) и на одной «диагонали» m′ = m + q в каждом блоке; внутри блока величины пропорциональны коэффициентам Клебша–Гордана.'
+states = [(l, m) for l in range(4) for m in range(l, -l - 1, -1)]
+fig, axes = plt.subplots(1, 2, figsize=(10, 4.6))
+for ax, q in zip(axes, (0, 1)):
+    M = np.array([[float(abs(angular(l2, m2, q, l1, m1))) if abs(l2 - l1) == 1 else 0.0
+                   for (l1, m1) in states] for (l2, m2) in states])
+    im = ax.imshow(M, cmap="Greys", vmin=0, vmax=0.8)
+    edges = np.cumsum([2 * l + 1 for l in range(4)])[:-1] - 0.5
+    for e in edges:
+        ax.axhline(e, color="tab:blue", lw=0.8)
+        ax.axvline(e, color="tab:blue", lw=0.8)
+    centers = [0, 2, 6, 12]
+    ax.set_xticks(centers, [str(l) for l in range(4)])
+    ax.set_yticks(centers, [str(l) for l in range(4)])
+    ax.set(xlabel="l", ylabel="l′", title="|⟨l′m′| r̂₊₁ |lm⟩|" if q else "|⟨l′m′| r̂₀ |lm⟩|")
+fig.colorbar(im, ax=axes, shrink=0.8)
+plt.show()
+print("при l′ = l все элементы равны нулю (чётность):",
+      all(angular(l, m2, q, l, m1) == 0 for l in range(3) for m1 in range(-l, l + 1)
+          for q in (-1, 0, 1) for m2 in [m1 + q] if abs(m2) <= l))
+```
+
+Правила отбора — чисто геометрический факт: они верны для любого
+атома, любой радиальной функции, и нарушаются только из-за отличия
+реального оператора перехода от дипольного (квадрупольные, магнитные
+переходы с $k = 2$ или аксиальным вектором слабее на порядки).
+
+## Векторные операторы: теорема о проекции
+
+Для векторного оператора $\mathbf V$ внутри одного мультиплета $j$ (при $j' = j$) приведённые
+элементы $\mathbf V$ и $\hat{\mathbf J}$ пропорциональны, а коэффициент находится из скаляра $\hat{\mathbf J}\cdot\mathbf V$:
+$$
+\langle jm'|\mathbf V|jm\rangle = \frac{\langle\hat{\mathbf J}\cdot\mathbf V\rangle_j}{j(j + 1)}\;\langle jm'|\hat{\mathbf J}|jm\rangle .
+$$
+Внутри мультиплета вектор «прецессирует» вокруг $\hat{\mathbf J}$, и выживает только его
+проекция на $\hat{\mathbf J}$. Главное применение — **множитель Ланде**. Магнитный момент
+электрона $\boldsymbol\mu = -\mu_B(\hat{\mathbf L} + 2\hat{\mathbf S})$ не параллелен $\hat{\mathbf J} = \hat{\mathbf L} + \hat{\mathbf S}$, но в слабом поле работает
+только его проекция: $\langle\hat L_z + 2\hat S_z\rangle = g_Jm$ с
+$$
+g_J = 1 + \frac{\langle\hat{\mathbf S}\cdot\hat{\mathbf J}\rangle}{j(j + 1)} = 1 + \frac{j(j + 1) + s(s + 1) - l(l + 1)}{2j(j + 1)} .
+$$
+Проверим, построив состояния $|l s; jm\rangle$ из произведения $l\otimes s$ коэффициентами
+Клебша–Гордана и вычислив полные матрицы $\hat L_z + 2\hat S_z$ внутри мультиплета:
+
+```{python}
+def kron(A, B):
+    return sp.kronecker_product(A, B)
+
+def multiplet(l, s, j):
+    """Столбцы — векторы |l s; j m⟩, m = j…−j, в базисе |l m_l⟩|s m_s⟩ (m по убыванию)."""
+    ml_list = [l - a for a in range(int(2 * l + 1))]
+    ms_list = [s - a for a in range(int(2 * s + 1))]
+    cols = []
+    for m in [j - a for a in range(int(2 * j + 1))]:
+        cols.append(sp.Matrix([CG(l, ml, s, ms, j, m).doit() for ml in ml_list for ms in ms_list]))
+    return sp.Matrix.hstack(*cols)
+
+def lande(l, s, j):
+    return 1 + (j * (j + 1) + s * (s + 1) - l * (l + 1)) / (2 * j * (j + 1))
+
+for l, s, j in [(1, sp.Rational(1, 2), sp.Rational(3, 2)), (1, sp.Rational(1, 2), sp.Rational(1, 2)),
+                (2, sp.Rational(1, 2), sp.Rational(5, 2)), (2, 1, 1), (3, sp.Rational(3, 2), sp.Rational(3, 2))]:
+    Lx, Ly, Lz_m = spin_matrices(l)
+    Sx, Sy, Sz = spin_matrices(s)
+    Il, Is = sp.eye(int(2 * l + 1)), sp.eye(int(2 * s + 1))
+    B = multiplet(l, s, j)
+    mu = [kron(La, Is) + 2 * kron(Il, Sa) for La, Sa in ((Lx, Sx), (Ly, Sy), (Lz_m, Sz))]   # L + 2S
+    Jm = spin_matrices(j)
+    g = sp.nsimplify(lande(l, s, j))
+    ok = all(sp.simplify(B.H * mu[k] * B - g * Jm[k]) == sp.zeros(int(2 * j + 1)) for k in range(3))
+    print(f"l = {l}, s = {s}, j = {j}: внутри мультиплета L + 2S = g_J·J с g_J = {g}: {ok}")
+```
+
+Совпадают не только диагональные элементы $\hat L_z + 2\hat S_z$, но все компоненты: внутри
+мультиплета оператор $\hat{\mathbf L} + 2\hat{\mathbf S}$ — ровно $g_J\hat{\mathbf J}$. Последний пример ($l = 3$,
+$s = \frac32$, $j = \frac32$) даёт $g_J = \frac25$ — множитель Ланде может быть и меньше единицы, и
+даже нулевым (упражнение 4).
+
+## Интенсивности линий
+
+Вероятность дипольного перехода $|jm\rangle\to|j'm'\rangle$ пропорциональна $|\langle j'm'|r_q|jm\rangle|^2$, то
+есть $|\langle jm\,1q|j'm'\rangle|^2\cdot|\langle j'\|r\|j\rangle|^2$. Отношения интенсивностей зеемановских компонент
+даются квадратами коэффициентов Клебша–Гордана и не зависят от
+атома. Отсюда **правило сумм**: полная вероятность распада с данного
+подуровня $m$ на все $m'$ и $q$ не зависит от $m$ — иначе время жизни
+подуровней было бы разным, а изолированный атом их не различает:
+$$
+\sum_{m', q}|\langle jm\,1q|j'm'\rangle|^2 = \frac{2j' + 1}{2j + 1} .
+$$
+
+```{python}
+def total_rate(j, j2, m):
+    return sum(CG(j, m, 1, q, j2, m + q).doit()**2 for q in (-1, 0, 1) if abs(m + q) <= j2)
+
+for j, j2 in [(sp.Rational(3, 2), sp.Rational(1, 2)), (1, 2), (2, 1), (1, 1)]:
+    rates = {m: sp.nsimplify(total_rate(j, j2, m)) for m in [j - a for a in range(int(2 * j + 1))]}
+    print(f"j = {j} → j' = {j2}: Σ|CG|² по m', q = {set(rates.values())}, (2j'+1)/(2j+1) = {sp.Rational(2 * j2 + 1, 2 * j + 1)}")
+```
+
+## Итоги
+
+- Операторы преобразуются при поворотах сопряжением; неприводимый тензорный оператор
+  ранга $k$ — набор $T_q^{(k)}$, преобразующийся как $|k, q\rangle$; критерий — коммутаторы Рака с $\hat J_z$, $\hat J_\pm$.
+- Примеры: $\hat{\mathbf J}$, $\mathbf r$ в сферических компонентах ($k = 1$), квадрупольный $r^2Y_{2q}$ ($k = 2$); произведения
+  тензоров раскладываются коэффициентами Клебша–Гордана.
+- Теорема Вигнера–Эккарта: $\langle j'm'|T^{(k)}_q|jm\rangle = \langle jm\,kq|j'm'\rangle\,\langle j'\|T^{(k)}\|j\rangle$ — зависимость от $m, m', q$
+  чисто геометрическая.
+- Правила отбора $\Delta m = q$, $|j - k|\le j'\le j + k$; для диполя $\Delta l = \pm1$ (с чётностью).
+- Теорема о проекции: внутри мультиплета $\mathbf V\propto\hat{\mathbf J}$; $\hat{\mathbf L} + 2\hat{\mathbf S} = g_J\hat{\mathbf J}$ с формулой Ланде.
+- Отношения интенсивностей — квадраты коэффициентов Клебша–Гордана; правило сумм.
+
+## Упражнения
+
+1. Покажите, что $[\mathbf r\otimes\mathbf r]^{(0)}_0 = -r^2/\sqrt3$ и $[\mathbf r\otimes\mathbf r]^{(2)}_0 = (3z^2 - r^2)/\sqrt6$, а $[\mathbf r\otimes\mathbf r]^{(1)} = 0$.
+2. Какие из переходов разрешены в дипольном приближении: $3d\to2p$, $3d\to2s$,
+   $2s\to1s$, $3p\to1s$? Какие запрещены и каким правилом?
+3. Найдите $\langle l + 1\|\hat r\|l\rangle$ из одного матричного элемента $\langle l + 1, 0|\cos\theta|l, 0\rangle$ и сравните с
+   выводом ячейки для $l = 0, 1, 2$.
+4. Найдите $g_J$ для терма $^4D_{1/2}$ ($l = 2$, $s = \frac32$, $j = \frac12$). Что это значит для
+   эффекта Зеемана?
+5. Найдите отношение интенсивностей $\sigma$- и $\pi$-компонент ($q = \pm1$ и $q = 0$) при
+   переходе $j = 1\to j' = 0$ с подуровней $m = 1, 0, -1$, если все подуровни заселены
+   одинаково.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $\langle1q_1\,1q_2|00\rangle = (-1)^{1-q_1}/\sqrt3$ при $q_2 = -q_1$: $\frac{1}{\sqrt3}(r_{+1}r_{-1} - r_0r_0 + r_{-1}r_{+1})$, и $r_{+1}r_{-1} = -(x^2 + y^2)/2$ —
+   получается $-r^2/\sqrt3$. Для $K = 2$, $Q = 0$: $\frac{1}{\sqrt6}(r_{+1}r_{-1} + 2r_0^2 + r_{-1}r_{+1}) = (2z^2 - x^2 - y^2)/\sqrt6$.
+   При $K = 1$ коэффициенты антисимметричны, а компоненты коммутируют: $\mathbf r\times\mathbf r = 0$.
+2. $3d\to2p$ ($\Delta l = -1$) разрешён; $3d\to2s$ ($\Delta l = -2$) запрещён — $|l - l'|\le1$; $2s\to1s$ ($\Delta l = 0$)
+   запрещён чётностью (метастабильный $2s$ водорода); $3p\to1s$ разрешён.
+3. $\cos\theta = \hat r_0$, $\langle l + 1, 0|\cos\theta|l, 0\rangle = \frac{l + 1}{\sqrt{(2l + 1)(2l + 3)}}$, а $\langle l0\,10|l + 1, 0\rangle = \sqrt{\frac{l + 1}{2l + 1}}$.
+   Отношение $\sqrt{(l + 1)/(2l + 3)}$: $1/\sqrt3$, $\sqrt{2/5}$, $\sqrt{3/7}$ — как в ячейке.
+4. $g_J = 1 + \bigl(\frac34 + \frac{15}{4} - 6\bigr)/\frac32 = 0$: в слабом поле уровень не расщепляется
+   (в первом порядке); магнитный момент «прецессирует» так, что его проекция на $\hat{\mathbf J}$ равна нулю.
+5. Для $j' = 0$ переход с подуровня $m$ идёт только с $q = -m$, и $|\langle1m\,1,{-m}|00\rangle|^2 = \frac13$ для каждого $m$.
+   $\pi$-компонента — с $m = 0$, $\sigma$ — с $m = \pm1$: отношение $\sigma:\pi = 2:1$ (суммарно по обеим
+   $\sigma$-компонентам).
+:::
