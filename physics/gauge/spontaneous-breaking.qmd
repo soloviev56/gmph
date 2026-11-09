@@ -1,0 +1,375 @@
+---
+title: "Спонтанное нарушение симметрии"
+topic: spontaneous-breaking
+order: 3
+description: "Вырожденный вакуум: потенциал «мексиканская шляпа», многообразие вакуумов — орбита G/H (рисунок); теорема Голдстоуна: число безмассовых мод равно dim G − dim H (гессиан O(N)-модели в SymPy, N − 1 нулей и m_h² = 2λv²); голдстоуновская и хиггсовская ветви в решёточном моделировании комплексного поля 1+1: спектр колебаний ω = k и ω = √(k² + m_h²) (рисунок); кинк — доменная стенка при нарушении ℤ₂, его энергия (2√2/3)√λ v³ = m_h³/3λ (SymPy); механизм Хиггса в абелевой модели: унитарная калибровка, голдстоуновская фаза «съедается», масса векторного поля m_A = ev, уравнение Прока и подсчёт степеней свободы 2 + 2 = 1 + 3; эффект Мейсснера и лондоновская глубина проникновения ≈ 53 нм; электрослабая модель: дублет Хиггса, матрица масс W¹, W², W³, B (SymPy), m_W = gv/2, m_Z = √(g² + g′²)v/2, фотон безмассов; из m_W, m_Z, v — g, sin²θ_W ≈ 0,223, α(m_Z) ≈ 1/132, λ ≈ 0,13; калибровочная симметрия не нарушается (теорема Элитцура)"
+---
+
+Уравнения теории могут обладать симметрией, которой нет у её
+основного состояния. Ферромагнетик описывается изотропным
+гамильтонианом, но ниже точки Кюри намагниченность выбирает
+направление. Карандаш, поставленный на острие, симметричен относительно
+поворотов, но падает в какую-то одну сторону. Это **спонтанное нарушение
+симметрии**: симметрия не исчезает, а переставляет состояния с наименьшей
+энергией, и физическая система вынуждена выбрать одно из них.
+
+В теории поля у этого явления два знаменитых следствия. Если нарушена
+глобальная непрерывная симметрия, появляются безмассовые частицы —
+**голдстоуновские бозоны**. Если симметрия калибровочная, голдстоуновские
+бозоны исчезают, а калибровочные поля приобретают массу — **механизм
+Хиггса**. Так получают массу переносчики слабого взаимодействия $W^\pm$ и $Z$, хотя
+[калибровочный принцип](/physics/gauge/gauge-principle.qmd) запрещает массовый член $A_\mu A^\mu$.
+
+Используются [скалярное поле](/physics/fields/klein-gordon.qmd) и
+[поля Янга–Миллса](/physics/gauge/yang-mills.qmd); дискретный вариант того же явления — модель
+Изинга в статье [«Фазовые переходы»](/physics/statistical/phase-transitions.qmd). Как и для полей
+Янга–Миллса, единицы рационализованные, $\hbar = c = 1$ ([конвенции](/conventions.qmd), раздел «Калибровочные
+поля»): лагранжиан векторного поля $-\frac14F_{\mu\nu}F^{\mu\nu}$, ковариантная производная $D_\mu = \partial_\mu + ieA_\mu$.
+
+## Вырожденный вакуум
+
+Возьмём $N$ вещественных скалярных полей $\boldsymbol\varphi = (\varphi_1, \dots, \varphi_N)$ с лагранжианом
+$$
+\mathcal L = \frac12\partial_\mu\boldsymbol\varphi\cdot\partial^\mu\boldsymbol\varphi - V(\boldsymbol\varphi), \qquad
+V = \frac\lambda4\bigl(\boldsymbol\varphi\cdot\boldsymbol\varphi - v^2\bigr)^2 .
+$$
+Он инвариантен относительно вращений $\boldsymbol\varphi\to R\boldsymbol\varphi$, $R\in\mathrm O(N)$. Если бы перед $\varphi^2$ стоял
+знак «+», это был бы набор полей Клейна–Гордона с единственным
+минимумом $\boldsymbol\varphi = 0$. Здесь массовый член «неправильного» знака, и $\boldsymbol\varphi = 0$ —
+максимум. Минимумы образуют сферу $|\boldsymbol\varphi| = v$:
+
+::: {#def-vacuum-manifold}
+**Многообразие вакуумов** — множество минимумов потенциала $V$. Если
+группа симметрии $G$ действует на нём транзитивно, а $H\subset G$ — стабилизатор
+одной точки (остаточная симметрия выбранного вакуума), то многообразие
+вакуумов — однородное пространство $G/H$. Симметрия **спонтанно нарушена**,
+если $H\ne G$: основное состояние не инвариантно относительно всей группы.
+:::
+
+Для $\mathrm O(N)$-модели $G/H = \mathrm O(N)/\mathrm O(N - 1) = S^{N-1}$. При $N = 2$ (одно комплексное поле
+$\phi = (\varphi_1 + i\varphi_2)/\sqrt2$, симметрия $\mathrm U(1)$) потенциал — «мексиканская шляпа», а вакуумы
+— окружность на дне её желобка:
+
+```{python}
+#| label: fig-mexican-hat
+#| fig-cap: 'Потенциал V = λ(|φ|² − v²/2)² комплексного поля φ = (φ₁ + iφ₂)/√2 (λ = 1, v = 1, единицы произвольные; четверть поверхности вырезана). Вакуумы образуют окружность |φ| = v/√2 на дне желобка (красная линия); симметричная точка φ = 0 — локальный максимум. Колебания вдоль желобка ничего не стоят (голдстоуновская мода), поперёк — требуют энергии (хиггсовская мода).'
+import numpy as np
+import sympy as sp
+import matplotlib.pyplot as plt
+from gmph.fields import euler_lagrange
+
+r = np.linspace(0, 1.4, 60)
+th = np.linspace(0, 1.5 * np.pi, 90)                       # вырезана четверть, чтобы видеть профиль
+Rg, Tg = np.meshgrid(r, th)
+P1, P2 = Rg * np.cos(Tg), Rg * np.sin(Tg)                # φ₁, φ₂
+Vg = 0.25 * (Rg**2 - 1)**2
+fig = plt.figure(figsize=(7, 4.8))
+ax = fig.add_subplot(projection="3d")
+ax.plot_surface(P1, P2, Vg, facecolors=plt.cm.viridis(Vg / Vg.max()), rstride=1, cstride=1,
+                linewidth=0, antialiased=False, shade=False, alpha=0.95)
+ring = np.linspace(0, 2 * np.pi, 200)
+ax.plot(np.cos(ring), np.sin(ring), 0 * ring + 0.003, color="red", lw=2.5, zorder=10)
+ax.set(xlabel="φ₁", ylabel="φ₂", zlabel="V")
+ax.view_init(elev=38, azim=-35)
+fig.subplots_adjust(left=0, right=0.9, bottom=0.05, top=1)
+plt.show()
+```
+
+Выберем вакуум $\boldsymbol\varphi_0 = (0, \dots, 0, v)$ и разложим потенциал около него до второго
+порядка: собственные значения гессиана $\partial^2V/\partial\varphi_a\partial\varphi_b$ — квадраты масс
+малых колебаний.
+
+```{python}
+N = 4
+phi = sp.symbols(f"phi1:{N + 1}", real=True)
+lam, v = sp.symbols("lambda v", positive=True)
+r2 = sum(p**2 for p in phi)
+V = lam / 4 * (r2 - v**2)**2
+vac = {p: 0 for p in phi[:-1]}
+vac[phi[-1]] = v
+hessian = sp.hessian(V, phi).subs(vac)
+print("гессиан в вакууме:", hessian.tolist())
+print("квадраты масс:", hessian.eigenvals())
+gradient_at_vac = [sp.diff(V, p).subs(vac) for p in phi]
+print("∂V = 0 в вакууме:", gradient_at_vac == [0] * N)
+```
+
+$N - 1$ направлений вдоль сферы вакуумов безмассовы, одно радиальное
+имеет массу $m_h^2 = 2\lambda v^2$.
+
+## Теорема Голдстоуна
+
+::: {#thm-goldstone}
+## Голдстоун, 1961
+Если непрерывная глобальная симметрия $G$ лагранжиана спонтанно нарушена
+до подгруппы $H$, то в спектре малых колебаний около вакуума есть
+$\dim G - \dim H$ безмассовых мод — **голдстоуновских бозонов**, по одной на каждый
+нарушенный генератор.
+:::
+
+Классическое доказательство — одна строка. Инвариантность $V(e^{\epsilon T}\boldsymbol\varphi) = V(\boldsymbol\varphi)$
+для генератора $T$ даёт $\partial_aV\,(T\boldsymbol\varphi)_a = 0$ при всех $\boldsymbol\varphi$. Продифференцируем по $\varphi_b$ и
+подставим вакуум, где $\partial V = 0$:
+$$
+\frac{\partial^2V}{\partial\varphi_a\partial\varphi_b}\Big|_{\varphi_0}(T\boldsymbol\varphi_0)_a = 0 .
+$$
+Каждый вектор $T\boldsymbol\varphi_0$ — касательный к орбите вакуума — собственный вектор
+гессиана с нулевой массой. Ненулевыми они будут для $T\notin\mathfrak h$, и их
+$\dim G - \dim H = \dim(G/H)$. Для $\mathrm O(N)$: $\frac{N(N - 1)}{2} - \frac{(N - 1)(N - 2)}{2} = N - 1$, как и получилось.
+
+Безмассовость означает, что длинноволновые колебания вдоль желобка
+стоят сколь угодно мало энергии: однородный поворот вакуума — переход к
+другому, столь же хорошему вакууму. Проверим это динамически:
+промоделируем комплексное поле $\phi$ в одномерном пространстве на решётке
+(уравнение $\ddot\phi = \partial_x^2\phi - 2\lambda(|\phi|^2 - v^2/2)\phi$, схема «чехарда»), возбудим слабый шум около вакуума
+и найдём спектр колебаний модуля $h = \sqrt2|\phi| - v$ и фазы $\theta = v\arg\phi$ двумерным
+преобразованием Фурье по $x$ и $t$:
+
+```{python}
+def lattice_run(n_sites=256, a=0.5, dt=0.1, steps=8192, lam_=0.5, v_=1.0, seed=0):
+    """Комплексное поле на кольце из n_sites узлов; возвращает ряды h(t, x) и θ(t, x)."""
+    rng = np.random.default_rng(seed)
+    f = v_ / np.sqrt(2) + 0.01 * (rng.normal(size=n_sites) + 1j * rng.normal(size=n_sites))
+    p = np.zeros(n_sites, complex)
+    def force(f):
+        lap = (np.roll(f, 1) + np.roll(f, -1) - 2 * f) / a**2
+        return lap - 2 * lam_ * (np.abs(f)**2 - v_**2 / 2) * f
+    h_t, th_t = np.empty((steps, n_sites)), np.empty((steps, n_sites))
+    acc = force(f)
+    for s in range(steps):
+        p += 0.5 * dt * acc
+        f += dt * p
+        acc = force(f)
+        p += 0.5 * dt * acc
+        h_t[s], th_t[s] = np.sqrt(2) * np.abs(f) - v_, v_ * np.angle(f)
+    return h_t, th_t
+
+a_lat, dt_lat, steps = 0.5, 0.1, 8192
+h_t, th_t = lattice_run(a=a_lat, dt=dt_lat, steps=steps)
+m_h = np.sqrt(2 * 0.5) * 1.0
+window = np.hanning(steps)[:, None]
+spectra = {name: np.abs(np.fft.fft2(data * window))**2 for name, data in (("h", h_t), ("θ", th_t))}
+omega = 2 * np.pi * np.fft.fftfreq(steps, dt_lat)
+k = 2 * np.pi * np.fft.fftfreq(h_t.shape[1], a_lat)
+lattice_omega = lambda kk, m: np.sqrt((2 / a_lat * np.sin(kk * a_lat / 2))**2 + m**2)
+for j in (1, 5, 20, 40):
+    pos = omega > 0
+    w_h = omega[pos][np.argmax(spectra["h"][pos, j])]
+    w_t = omega[pos][np.argmax(spectra["θ"][pos, j])]
+    print(f"k = {k[j]:.3f}: пик ω для h = {w_h:.3f} (решётка √(k̃² + m_h²) = {lattice_omega(k[j], m_h):.3f}),"
+          f"  для θ = {w_t:.3f} (k̃ = {lattice_omega(k[j], 0):.3f})")
+print(f"разрешение по частоте 2π/T = {2 * np.pi / (steps * dt_lat):.4f}")
+```
+
+```{python}
+#| label: fig-goldstone-spectrum
+#| fig-cap: 'Спектр малых колебаний комплексного поля около вакуума (решётка из 256 узлов с шагом 0,5, λ = 0,5, v = 1, m_h = 1): логарифм мощности колебаний модуля h (слева) и фазы θ (справа) на плоскости (k, ω). Пунктир — дисперсия решётки ω² = (2 sin(ka/2)/a)² + m², с m = m_h для модуля и m = 0 для фазы: хиггсовская ветвь начинается со щели ω = m_h, голдстоуновская — из нуля. Слабые дополнительные линии (например, след голдстоуновской ветви в спектре модуля) — нелинейная связь мод.'
+order_k = np.argsort(k)
+order_w = np.argsort(omega)
+sel_w = (omega[order_w] >= 0) & (omega[order_w] <= 4.5)
+fig, axes = plt.subplots(1, 2, figsize=(10, 3.9), sharey=True)
+for ax, (name, m) in zip(axes, (("h", m_h), ("θ", 0.0))):
+    S = np.log10(spectra[name][order_w][sel_w][:, order_k] + 1e-12)
+    vmax = np.percentile(S, 99.9)
+    ax.pcolormesh(k[order_k], omega[order_w][sel_w], S, cmap="magma", vmin=vmax - 6, vmax=vmax, shading="auto")
+    kk = np.linspace(k.min(), k.max(), 400)
+    ax.plot(kk, lattice_omega(kk, m), "--", color="cyan", lw=1)
+    ax.set(xlabel="k", title=("модуль h" if name == "h" else "фаза θ"))
+axes[0].set_ylabel("ω")
+plt.tight_layout()
+plt.show()
+```
+
+Обе ветви совпадают с предсказанием в пределах частотного разрешения.
+Голдстоуновская мода безмассова: её частота стремится к нулю при $k\to0$.
+
+**Голдстоуновские бозоны вокруг нас.** В твёрдом теле нарушена
+трансляционная симметрия, и голдстоуновские моды — акустические фононы
+($\omega = c_sk$). В ферромагнетике нарушена $\mathrm{SO}(3)\to\mathrm{SO}(2)$ — это магноны (у них $\omega\propto k^2$, и
+вместо двух мод одна: нерелятивистский случай подсчитывается иначе). В
+сверхтекучем гелии нарушена $\mathrm U(1)$ фазы — это звук. Пионы — почти
+голдстоуновские бозоны приближённой киральной симметрии сильных
+взаимодействий, поэтому они в 7 раз легче протона.
+
+**Дискретная симметрия: кинк.** Если $N = 1$, группа $\mathbb Z_2$ ($\varphi\to-\varphi$) дискретна,
+вакуумов два, $\pm v$, и голдстоуновских мод нет. Зато есть **доменная стенка** —
+статическое решение, переходящее из одного вакуума в другой:
+
+```{python}
+x = sp.Symbol("x", real=True)
+m = sp.sqrt(2 * lam) * v                                     # масса малых колебаний m_h
+kink = v * sp.tanh(m * x / 2)
+static_eq = sp.diff(kink, x, 2) - lam * kink * (kink**2 - v**2)   # φ'' = ∂V/∂φ
+print("φ = v th(m x/2) — решение φ'' = V'(φ):", sp.simplify(static_eq) == 0)
+energy_density = sp.simplify(sp.diff(kink, x)**2 / 2 + lam / 4 * (kink**2 - v**2)**2)
+E_kink = sp.simplify(sp.integrate(energy_density, (x, -sp.oo, sp.oo)))
+print("энергия кинка E =", E_kink, " = (2√2/3)√λ v³:", sp.simplify(E_kink - 2 * sp.sqrt(2) / 3 * sp.sqrt(lam) * v**3) == 0)
+print("E = m_h³/(3λ):", sp.simplify(E_kink - m**3 / (3 * lam)) == 0)
+```
+
+Энергия стенки $E = \frac{2\sqrt2}{3}\sqrt\lambda\,v^3 = \frac{m_h^3}{3\lambda}$ конечна (на единицу площади в трёх измерениях),
+а толщина порядка $1/m_h$. Устойчивость стенки топологическая: она
+отличается от вакуума значениями поля на бесконечности, и никакая
+конечная деформация её не уничтожит. Это аналог доменных стенок в
+ферромагнетике Изинга.
+
+## Механизм Хиггса
+
+Сделаем $\mathrm U(1)$-симметрию комплексного поля локальной (**абелева модель Хиггса**):
+$$
+\mathcal L = \overline{D_\mu\phi}\,D^\mu\phi - \lambda\Bigl(|\phi|^2 - \frac{v^2}{2}\Bigr)^2 - \frac14F_{\mu\nu}F^{\mu\nu}, \qquad D_\mu = \partial_\mu + ieA_\mu .
+$$
+Запишем поле в полярных координатах, $\phi = \frac{1}{\sqrt2}(v + h)e^{i\theta}$. Фаза $\theta$ — та самая голдстоуновская
+мода. Но теперь фазу можно убрать калибровочным преобразованием
+$\phi\to e^{-i\theta}\phi$, $A_\mu\to A_\mu + \frac1e\partial_\mu\theta$ (раздел «Калибровочные поля» конвенций с $\alpha = -\theta$):
+она входит в лагранжиан только в комбинации $B_\mu = A_\mu + \frac1e\partial_\mu\theta$.
+
+```{python}
+X = sp.symbols("x0:4", real=True)
+eta = sp.diag(1, -1, -1, -1)
+e_ = sp.Symbol("e", positive=True)
+h = sp.Function("h", real=True)(*X)
+theta = sp.Function("theta", real=True)(*X)
+A = [sp.Function(f"A{m}", real=True)(*X) for m in range(4)]   # A_μ с нижним индексом
+ph = (v + h) * sp.exp(sp.I * theta) / sp.sqrt(2)
+ph_bar = (v + h) * sp.exp(-sp.I * theta) / sp.sqrt(2)          # сопряжённое поле (h, θ, A вещественны)
+D = [sp.diff(ph, X[mu]) + sp.I * e_ * A[mu] * ph for mu in range(4)]
+D_bar = [sp.diff(ph_bar, X[mu]) - sp.I * e_ * A[mu] * ph_bar for mu in range(4)]
+kinetic = sum(eta[mu, mu] * D_bar[mu] * D[mu] for mu in range(4))
+B = [A[mu] + sp.diff(theta, X[mu]) / e_ for mu in range(4)]
+unitary = sum(eta[mu, mu] * (sp.diff(h, X[mu])**2 / 2 + e_**2 * (v + h)**2 * B[mu]**2 / 2) for mu in range(4))
+print("|Dφ|² = ½(∂h)² + ½e²(v + h)² B_μB^μ:", sp.simplify(sp.expand(kinetic - unitary)) == 0)
+```
+
+В **унитарной калибровке** $\theta = 0$ остаются вещественное поле $h$ (хиггсовский бозон
+массы $m_h = \sqrt{2\lambda}\,v$) и векторное поле $B_\mu$ с массовым членом $\frac12e^2v^2B_\mu B^\mu$. Выведем
+его уравнения в квадратичном приближении функцией `euler_lagrange`:
+
+```{python}
+Bf = [sp.Function(f"B{m}")(*X) for m in range(4)]
+Fb = [[sp.diff(Bf[n], X[mu]) - sp.diff(Bf[mu], X[n]) for n in range(4)] for mu in range(4)]
+m_A = e_ * v
+L_proca = (-sp.Rational(1, 4) * sum(eta[mu, mu] * eta[n, n] * Fb[mu][n]**2 for mu in range(4) for n in range(4))
+           + m_A**2 / 2 * sum(eta[mu, mu] * Bf[mu]**2 for mu in range(4)))
+eqs = euler_lagrange(L_proca, Bf, X)                          # ∂_ν ∂ℒ/∂(∂_νB_μ) − ∂ℒ/∂B_μ
+proca = [-sum(sp.diff(eta[mu, mu] * eta[n, n] * Fb[n][mu], X[n]) for n in range(4)) - m_A**2 * eta[mu, mu] * Bf[mu]
+         for mu in range(4)]                                  # −∂_ν F^{νμ} − m² B^μ
+print("уравнения Эйлера–Лагранжа = −(∂_νF^{νμ} + m_A² B^μ):", all(sp.simplify(eqs[mu] - proca[mu]) == 0 for mu in range(4)))
+div_eq = sum(sp.diff(proca[mu], X[mu]) for mu in range(4))
+div_B = sum(sp.diff(eta[mu, mu] * Bf[mu], X[mu]) for mu in range(4))       # ∂_μB^μ
+print("∂_μ(−∂_νF^{νμ} − m_A²B^μ) = −m_A² ∂_μB^μ:", sp.simplify(div_eq + m_A**2 * div_B) == 0)
+```
+
+Это **уравнение Прока** $\partial_\nu F^{\nu\mu} + m_A^2B^\mu = 0$ для векторного поля массы $m_A = ev$. Его
+дивергенция даёт $\partial_\mu B^\mu = 0$ — одно условие, так что у массивного
+векторного поля три поляризации, а не две. Подсчёт степеней свободы
+сходится: до нарушения — комплексное поле (2) и безмассовый фотон (2),
+после — вещественное $h$ (1) и массивный вектор (3). Голдстоуновская мода не
+исчезла: её «съело» калибровочное поле, она стала продольной поляризацией.
+
+**Сверхпроводник.** Это тот же механизм в нерелятивистском варианте
+(теория Гинзбурга–Ландау, 1950): конденсат куперовских пар — заряженное
+скалярное поле с ненулевым средним. Масса фотона внутри сверхпроводника
+означает, что статическое магнитное поле убывает как $e^{-x/\lambda_L}$ — **эффект
+Мейсснера**. Глубина проникновения Лондонов в гауссовых единицах
+$\lambda_L = \sqrt{mc^2/4\pi n_se^2}$:
+
+```{python}
+m_e, c_cgs, e_cgs = 9.1093837e-28, 2.99792458e10, 4.80320471e-10      # г, см/с, ед. СГСЭ
+for n_s in (1e22, 1e23):                                    # см⁻³
+    lam_L = np.sqrt(m_e * c_cgs**2 / (4 * np.pi * n_s * e_cgs**2))
+    m_photon = 1.054571817e-27 * c_cgs / lam_L / 1.602176634e-12          # ħc/λ_L в эВ
+    print(f"n_s = {n_s:.0e} см⁻³: λ_L = {lam_L * 1e7:.1f} нм,  «масса фотона» ħ/(λ_L c) = {m_photon:.1f} эВ/c²")
+```
+
+## Электрослабая модель
+
+В Стандартной модели калибровочная группа $\mathrm{SU}(2)\times\mathrm U(1)_Y$, а поле Хиггса — дублет
+$\Phi$ с гиперзарядом $Y = \frac12$:
+$$
+D_\mu\Phi = \Bigl(\partial_\mu + igW^a_\mu\frac{\sigma_a}{2} + ig'\,\frac12B_\mu\Bigr)\Phi, \qquad
+\langle\Phi\rangle = \frac{1}{\sqrt2}\begin{pmatrix}0\\ v\end{pmatrix}.
+$$
+Вакуум не инвариантен относительно трёх из четырёх генераторов; остаётся
+комбинация $Q = T_3 + Y$ (на $\langle\Phi\rangle$ она равна нулю) — электрический заряд, $\mathrm U(1)_\text{эм}$.
+По теореме Голдстоуна три моды, и все три съедены. Квадраты масс векторных
+полей — собственные значения квадратичной формы $|D_\mu\langle\Phi\rangle|^2 = \frac12M^2_{ab}V^a_\mu V^{b\,\mu}$, $V = (W^1, W^2, W^3, B)$:
+
+```{python}
+g, gp = sp.symbols("g g'", positive=True)
+Wv = sp.symbols("W1 W2 W3 B", real=True)                     # постоянные значения полей
+sigma = [sp.Matrix([[0, 1], [1, 0]]), sp.Matrix([[0, -sp.I], [sp.I, 0]]), sp.Matrix([[1, 0], [0, -1]])]
+Phi0 = sp.Matrix([0, v / sp.sqrt(2)])
+conn = sum((g * Wv[a] * sigma[a] / 2 for a in range(3)), sp.zeros(2)) + gp * Wv[3] / 2 * sp.eye(2)
+DPhi = sp.I * conn * Phi0
+quad = sp.expand((DPhi.H * DPhi)[0])
+M2 = sp.hessian(quad, Wv)                                     # |DΦ|² = ½ Vᵀ M² V
+print("матрица масс M²:", M2.tolist())
+masses = M2.eigenvals()
+print("собственные значения:", {sp.factor(k): mult for k, mult in masses.items()})
+Q = sigma[2] / 2 + sp.eye(2) / 2
+print("Q⟨Φ⟩ =", list(Q * Phi0), " — заряд вакуума нулевой")
+```
+
+Два собственных значения $g^2v^2/4$ — заряженные $W^\pm = (W^1\mp iW^2)/\sqrt2$ с $m_W = gv/2$; одно
+$(g^2 + g'^2)v^2/4$ — $Z$-бозон, $Z = \cos\theta_WW^3 - \sin\theta_WB$, $m_Z = \sqrt{g^2 + g'^2}\,v/2$; одно нулевое — фотон
+$A = \sin\theta_WW^3 + \cos\theta_WB$. Угол Вайнберга $\operatorname{tg}\theta_W = g'/g$, и $m_W = m_Z\cos\theta_W$.
+Константа Ферми слабых распадов фиксирует $v = (\sqrt2G_F)^{-1/2}\approx246$ ГэВ. Из измеренных масс
+восстановим константы связи:
+
+```{python}
+v_ew, mW, mZ, mH = 246.22, 80.37, 91.19, 125.25                # ГэВ
+g_val = 2 * mW / v_ew
+cos_w = mW / mZ
+gp_val = g_val * np.sqrt(1 - cos_w**2) / cos_w
+e_val = g_val * gp_val / np.hypot(g_val, gp_val)              # e = g sin θ_W
+print(f"g = {g_val:.4f}, g' = {gp_val:.4f}, sin²θ_W = {1 - cos_w**2:.4f}")
+print(f"e = g sin θ_W = {e_val:.4f},  α = e²/4π = 1/{4 * np.pi / e_val**2:.1f}")
+print(f"λ = m_h²/(2v²) = {mH**2 / (2 * v_ew**2):.4f}")
+```
+
+Заряд электрона получился из масс $W$ и $Z$: $\alpha\approx1/132$, близко к значению
+$1/128$ на масштабе $m_Z$ (постоянная тонкой структуры растёт с энергией от $1/137$
+из-за поляризации вакуума; небольшое расхождение — следствие того,
+что соотношение $m_W = m_Z\cos\theta_W$ выполняется лишь в древесном приближении).
+
+**Что нарушено на самом деле.** Калибровочная симметрия — избыточность
+описания, а не преобразование физических состояний, и её нельзя
+нарушить спонтанно: среднее любой калибровочно-неинвариантной величины
+равно нулю (теорема Элитцура, 1975). «Вакуумное среднее $\langle\Phi\rangle$» имеет смысл
+только после фиксации калибровки. Калибровочно-инвариантное
+содержание механизма Хиггса — спектр: массивные векторные частицы и
+скалярный бозон, без безмассовых голдстоуновских мод. Нарушена
+**глобальная** часть симметрии, а в электрослабой теории в итоге остаётся
+точной $\mathrm U(1)_\text{эм}$.
+
+## Итоги
+
+- Симметрия лагранжиана, не являющаяся симметрией основного состояния, спонтанно нарушена; многообразие вакуумов — однородное пространство $G/H$.
+- Теорема Голдстоуна: касательные к орбите вакуума — нулевые собственные векторы гессиана, безмассовых мод $\dim G - \dim H$; радиальная мода имеет массу $m_h^2 = 2\lambda v^2$.
+- Для дискретной симметрии голдстоуновских мод нет, зато есть топологически устойчивые доменные стенки (кинк $v\operatorname{th}(m_hx/2)$, $E = m_h^3/3\lambda$).
+- Механизм Хиггса: при калибровочной симметрии голдстоуновская фаза поглощается полем, $B_\mu = A_\mu + \partial_\mu\theta/e$, масса $m_A = ev$, уравнение Прока; степеней свободы $2 + 2 = 1 + 3$.
+- Электрослабая модель: $m_W = gv/2$, $m_Z = m_W/\cos\theta_W$, фотон безмассов; $v\approx246$ ГэВ, $\sin^2\theta_W\approx0{,}22$.
+
+## Упражнения
+
+1. Сколько голдстоуновских бозонов возникает при нарушении $\mathrm{SU}(3)\to\mathrm{SU}(2)$ (например,
+   триплетом с ненулевым средним)? А при $\mathrm{SU}(2)\times\mathrm{SU}(2)\to\mathrm{SU}(2)$ (киральная симметрия
+   с двумя ароматами кварков)?
+2. Найдите частоту колебаний голдстоуновской и хиггсовской мод на
+   решётке с шагом $a = 0{,}5$ при $k = \pi/a$ (граница зоны) для $m_h = 1$.
+3. Покажите, что энергия кинка равна $\int(\varphi')^2\dd x$ и что для статического решения
+   $\frac12(\varphi')^2 = V(\varphi)$ (равнораспределение).
+4. Найдите массу фотона в абелевой модели Хиггса, если поле $\phi$ имеет заряд $2e$
+   (куперовская пара).
+5. Выразите $m_Z/m_W$ через $\sin^2\theta_W$ и найдите его для $\sin^2\theta_W = 0{,}223$.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $\dim\mathrm{SU}(3) - \dim\mathrm{SU}(2) = 8 - 3 = 5$; $(3 + 3) - 3 = 3$ — три пиона.
+2. Решёточная дисперсия $\omega^2 = (2/a)^2\sin^2(ka/2) + m^2$: при $ka = \pi$ $\omega_\theta = 2/a = 4$, $\omega_h = \sqrt{16 + 1}\approx4{,}12$.
+3. Умножив $\varphi'' = V'(\varphi)$ на $\varphi'$, получим $\bigl(\frac12\varphi'^2 - V\bigr)' = 0$, а на бесконечности обе части равны
+   нулю, поэтому $\frac12\varphi'^2 = V$ и $E = \int\bigl(\frac12\varphi'^2 + V\bigr)\dd x = \int\varphi'^2\dd x$.
+4. $D_\mu = \partial_\mu + 2ieA_\mu$, поэтому $m_A = 2ev$.
+5. $m_Z/m_W = 1/\cos\theta_W = 1/\sqrt{1 - \sin^2\theta_W}\approx1{,}135$ (по массам $91{,}19/80{,}37 = 1{,}135$).
+:::
