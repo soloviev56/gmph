@@ -1,0 +1,418 @@
+---
+title: "Численные методы теории упругости"
+topic: elasticity-numerics
+order: 8
+description: "Метод конечных элементов для линейной упругости: слабая форма ∫σ(u):ε(v) = ∫f·v, элементы Лагранжа P1 и P2 (расширение модуля gmph.fem); ядро матрицы жёсткости — жёсткие движения, отсюда дискретные законы сохранения импульса и момента: явная схема «чехарда» для свободного тела сохраняет их до ошибок округления, энергия колеблется на 4·10⁻⁴; объёмное запирание: при ν → ½ решение P1 стремится к нулю (точное решение с div u = 0), подсчёт — связей больше, чем неизвестных, и единственное дискретно бездивергентное поле P1 — нулевое; смешанная постановка смещение–давление p = −λ div u, условие inf-sup: у пары P1–P0 паразитные моды давления и β_h ∝ h, у P2–P0 β_h ≈ 0,43; ошибки в зависимости от ν и h: P1 запирается, P2 теряет точность в 30 раз, P2–P0 не зависит от ν и сходится как h³ (рисунок); деформация бруска (рисунок); связь со смешанными элементами внешнего исчисления и комплексом упругости"
+---
+
+Резина, гели, мягкие биологические ткани и вода в пористых породах
+почти несжимаемы: их коэффициент Пуассона близок к $\frac12$, модуль всестороннего
+сжатия в тысячи раз больше модуля сдвига. Если такое тело рассчитать
+самым простым методом конечных элементов — кусочно-линейными
+смещениями на треугольниках, — оно окажется в десятки раз жёстче, чем
+на самом деле: сетка **запирается**. Причина та же, что у паразитных мод
+в электродинамике: пространства приближения плохо согласованы с
+дифференциальным оператором, здесь — с дивергенцией. Лечение тоже
+похожее: смешанные элементы, в которых смещение и давление
+приближаются согласованными пространствами.
+
+Статья опирается на [теорию упругости](/physics/continuum/elasticity.qmd) (закон Гука
+$\sigma = \lambda\operatorname{tr}\varepsilon\,I + 2\mu\varepsilon$, уравнение Ламе) и на
+[конечные элементы внешнего исчисления](/math/numerics/feec.qmd), откуда взяты треугольные
+сетки модуля `gmph.fem`. Для этой статьи модуль дополнен элементами
+Лагранжа второй степени и сборкой матриц упругости.
+
+## Слабая постановка и конечные элементы
+
+Плоская деформация: смещение $\mathbf u = (u_x, u_y)$ в области $\Omega$, $\mathbf u = 0$ на границе,
+объёмная сила $\mathbf f$. Умножим уравнение равновесия $\partial_j\sigma_{ij} + f_i = 0$ на пробное
+поле $\mathbf v$ и проинтегрируем по частям:
+
+::: {#def-weak-elasticity}
+**Слабая постановка** задачи теории упругости: найти $\mathbf u$ (с $\mathbf u = 0$ на границе)
+такое, что для всех пробных $\mathbf v$
+$$
+a(\mathbf u, \mathbf v) \equiv \int_\Omega\sigma(\mathbf u):\varepsilon(\mathbf v)\,\dd S
+= \int_\Omega\bigl(\lambda\operatorname{div}\mathbf u\operatorname{div}\mathbf v + 2\mu\,\varepsilon(\mathbf u):\varepsilon(\mathbf v)\bigr)\dd S = \int_\Omega\mathbf f\cdot\mathbf v\,\dd S .
+$$
+Это условие минимума полной энергии $\frac12a(\mathbf u, \mathbf u) - \int\mathbf f\cdot\mathbf u$. **Метод конечных элементов**
+ищет $\mathbf u$ и берёт $\mathbf v$ из конечномерного пространства, например из
+непрерывных функций, линейных (P1) или квадратичных (P2) на каждом треугольнике;
+получается линейная система $K\mathbf u = \mathbf F$ с симметричной **матрицей жёсткости** $K$.
+:::
+
+Функция `elasticity_system` из `gmph.fem` собирает $K$, вектор нагрузки $\mathbf F$ и
+матрицу $B$ дивергенции ($B\mathbf u$ — интегралы $\operatorname{div}\mathbf u$ по треугольникам, она
+понадобится ниже).
+
+## Жёсткие движения и законы сохранения
+
+Сдвиг $\mathbf u = \mathbf a$ и бесконечно малый поворот $\mathbf u = \omega(-y, x)$ не деформируют тело:
+$\varepsilon = 0$. Они лежат в пространствах P1 и P2 точно, поэтому у матрицы
+жёсткости свободного тела (без закрепления) ровно три нулевых
+собственных значения. Из этого следуют дискретные законы сохранения.
+Узловые силы упругости $\mathbf f^\text{упр} = -K\mathbf u$; так как $K$ симметрична и $K\mathbf r = 0$ для
+жёсткого движения $\mathbf r$, имеем $\mathbf r\cdot\mathbf f^\text{упр} = -\mathbf u\cdot K\mathbf r = 0$:
+
+- для сдвигов — сумма всех внутренних сил равна нулю (третий закон Ньютона
+  для сетки), и полный импульс $\sum_km_k\dot{\mathbf u}_k$ сохраняется;
+- для поворота — сумма моментов сил относительно начала равна нулю, и
+  сохраняется момент импульса $\sum_km_k\,\mathbf x_k\times\dot{\mathbf u}_k$ (в линейной теории момент
+  берётся относительно начального положения узлов $\mathbf x_k$).
+
+Проверим на свободной пластине с неправильной сеткой: массы
+сосредоточим в узлах (треть площади каждого прилегающего треугольника) и
+проинтегрируем $M\ddot{\mathbf u} = -K\mathbf u$ схемой «чехарда» со случайными начальными скоростями:
+
+```{python}
+import numpy as np
+import sympy as sp
+import scipy.sparse as sps
+import scipy.sparse.linalg as spla
+import scipy.linalg as sla
+import matplotlib.pyplot as plt
+from gmph.fem import (square_mesh, rectangle_mesh, boundary_nodes, elasticity_system,
+                      lagrange_basis, triangle_quadrature)
+
+rng = np.random.default_rng(0)
+points, tri = square_mesh(10)
+inner = ~boundary_nodes(points)
+points[inner] += rng.uniform(-0.03, 0.03, size=(inner.sum(), 2))
+free_body = elasticity_system(points, tri, 1, lam=2.0, mu=1.0)
+K = free_body["K"]
+eig = np.linalg.eigvalsh(K.toarray())
+print("пять наименьших собственных значений K:", np.round(np.where(np.abs(eig[:5]) < 1e-10, 0.0, eig[:5]), 6))
+
+area = free_body["area"]
+mass = np.bincount(tri.ravel(), np.repeat(area / 3, 3), len(points))   # сосредоточенные массы
+m2 = np.repeat(mass, 2)
+xk, yk = points[:, 0], points[:, 1]
+momentum = lambda v: np.array([mass @ v[0::2], mass @ v[1::2]])
+ang_momentum = lambda v: mass @ (xk * v[1::2] - yk * v[0::2])
+energy = lambda u, v: 0.5 * m2 @ v**2 + 0.5 * u @ (K @ u)
+
+u = np.zeros(2 * len(points))
+v = 0.1 * rng.normal(size=2 * len(points))
+dt = 0.2 * np.sqrt(m2.min() / eig[-1])                   # с запасом от предела устойчивости 2/ω_max
+P0, L0, E0 = momentum(v), ang_momentum(v), energy(u, v)
+acc = -(K @ u) / m2
+dP = dL = 0.0
+E_hist = []
+for _ in range(20000):
+    v += 0.5 * dt * acc
+    u += dt * v
+    acc = -(K @ u) / m2
+    v += 0.5 * dt * acc
+    dP, dL = max(dP, np.abs(momentum(v) - P0).max()), max(dL, abs(ang_momentum(v) - L0))
+    E_hist.append(energy(u, v))
+E_hist = np.array(E_hist)
+print(f"шаг dt = {dt:.2e}, 20000 шагов: импульс {P0.round(5)}, момент {L0:.5f}")
+print(f"max отклонение импульса {dP:.1e}, момента {dL:.1e};  размах энергии / энергия = {np.ptp(E_hist) / E_hist.mean():.1e}")
+```
+
+Импульс и момент сохраняются до ошибок округления — это свойство
+пространства (жёсткие движения в нём точно), а не точность счёта.
+Энергия схемы «чехарда» не сохраняется точно, но колеблется около
+постоянного значения без дрейфа, как у всякого симплектического интегратора.
+
+## Объёмное запирание
+
+Возьмём точное решение с $\operatorname{div}\mathbf u = 0$: $\mathbf u = (\partial_y\psi, -\partial_x\psi)$ для
+$\psi = x^2(1 - x)^2y^2(1 - y)^2$ в единичном квадрате. Тогда $\mathbf u = 0$ на границе, слагаемое с $\lambda$
+в уравнении Ламе выпадает, и сила $\mathbf f = -\mu\nabla^2\mathbf u$ от $\lambda$ не зависит. Решение одно и
+то же при любом коэффициенте Пуассона — хорошая проверка, справляется ли
+метод с почти несжимаемым материалом ($\lambda/\mu = 2\nu/(1 - 2\nu)\to\infty$).
+
+```{python}
+x, y = sp.symbols("x y", real=True)
+psi = x**2 * (1 - x)**2 * y**2 * (1 - y)**2
+u_exact = [sp.diff(psi, y), -sp.diff(psi, x)]
+mu = 1.0
+print("div u =", sp.simplify(sp.diff(u_exact[0], x) + sp.diff(u_exact[1], y)))
+f_exact = [-mu * (sp.diff(c, x, 2) + sp.diff(c, y, 2)) for c in u_exact]
+f_num = [sp.lambdify((x, y), c) for c in f_exact]
+u_num = [sp.lambdify((x, y), c) for c in u_exact]
+force = lambda p: np.stack([f(p[..., 0], p[..., 1]) for f in f_num], axis=-1)
+
+def clamped(nodes):
+    """Маска свободных степеней свободы (на границе квадрата u = 0)."""
+    free = np.ones(2 * len(nodes), bool)
+    on_wall = boundary_nodes(nodes)
+    free[0::2][on_wall] = free[1::2][on_wall] = False
+    return free
+
+def relative_error(points, tri, order, sysm, u):
+    """Относительная ошибка ‖u_h − u‖/‖u‖ в L² (квадратура степени 4)."""
+    qb, qw = triangle_quadrature(4)
+    S = lagrange_basis(order, qb)
+    pts = np.einsum("qk,tka->tqa", qb, points[tri])
+    conn = sysm["conn"]
+    uh = np.stack([u[c::2][conn] @ S.T for c in range(2)], axis=-1)
+    ue = np.stack([f(pts[..., 0], pts[..., 1]) for f in u_num], axis=-1)
+    w = sysm["area"][:, None] * qw
+    return np.sqrt(np.sum(w * np.sum((uh - ue)**2, -1)) / np.sum(w * np.sum(ue**2, -1)))
+
+def solve_displacement(n, order, nu):
+    """Чисто смещённая постановка с элементами P1 или P2."""
+    lam = 2 * mu * nu / (1 - 2 * nu)
+    points, tri = square_mesh(n)
+    sysm = elasticity_system(points, tri, order, lam, mu, force)
+    free = clamped(sysm["nodes"])
+    u = np.zeros(len(free))
+    u[free] = spla.spsolve(sysm["K"][free][:, free].tocsc(), sysm["F"][free])
+    return relative_error(points, tri, order, sysm, u)
+
+for nu in (0.3, 0.49, 0.499, 0.4999):
+    print(f"ν = {nu:<6}: λ/μ = {2 * nu / (1 - 2 * nu):7.1f};  ошибка P1 = {solve_displacement(16, 1, nu):.3e},"
+          f"  P2 = {solve_displacement(16, 2, nu):.3e}")
+```
+
+При $\nu = 0{,}3$ оба элемента работают нормально. С ростом $\nu$ ошибка P1 стремится к
+100 %: численное решение стремится к **нулю** — сетка «застывает».
+Элементы P2 тоже теряют точность (почти в 30 раз при $\nu = 0{,}4999$), хотя и не запираются полностью.
+
+**Почему.** При $\lambda\to\infty$ энергия $\frac\lambda2\int(\operatorname{div}\mathbf u)^2$ становится штрафом: конечную
+энергию имеют только поля с $\operatorname{div}\mathbf u\approx0$. У поля P1 дивергенция
+постоянна на каждом треугольнике, и условие $\operatorname{div}\mathbf u = 0$ — это по одному
+уравнению на треугольник. На сетке $n\times n$ клеток с закреплённой границей
+неизвестных $2(n - 1)^2$, а треугольников $2n^2$: связей больше, чем неизвестных.
+Найдём размерность пространства дискретно бездивергентных полей:
+
+```{python}
+def divergence_free_count(n, order):
+    points, tri = square_mesh(n)
+    sysm = elasticity_system(points, tri, order, 0.0, 1.0)
+    free = clamped(sysm["nodes"])
+    B = sysm["B"][:, free].toarray()
+    return free.sum(), len(tri), free.sum() - np.linalg.matrix_rank(B)
+
+for n in (4, 8, 16):
+    for order in (1, 2):
+        unknowns, constraints, dim = divergence_free_count(n, order)
+        print(f"n = {n:2d}, P{order}: неизвестных {unknowns:5d}, треугольников {constraints:4d}, "
+              f"бездивергентных полей {dim}")
+```
+
+Единственное бездивергентное поле P1 — нулевое, при любом $n$: никакого
+приближения к несжимаемому течению в этом пространстве нет. У P2
+неизвестных больше (узлы в серединах рёбер), и бездивергентных полей
+много.
+
+## Смешанная постановка
+
+Введём давление $p = -\lambda\operatorname{div}\mathbf u$ как отдельную неизвестную. Тогда $\lambda$ входит
+только в виде $1/\lambda$, и предел $\lambda\to\infty$ безопасен:
+
+::: {#def-mixed-elasticity}
+**Смешанная постановка** смещение–давление: найти $(\mathbf u, p)$ такие, что для всех $(\mathbf v, q)$
+$$
+\int 2\mu\,\varepsilon(\mathbf u):\varepsilon(\mathbf v) - \int p\operatorname{div}\mathbf v = \int\mathbf f\cdot\mathbf v, \qquad
+-\int q\operatorname{div}\mathbf u - \frac1\lambda\int pq = 0 .
+$$
+При $\lambda = \infty$ это уравнения Стокса для медленного течения несжимаемой жидкости
+(с заменой смещения на скорость). Дискретная задача — седловая система
+$$
+\begin{pmatrix}A & -B^{\mathsf T}\\ -B & -\lambda^{-1}M_p\end{pmatrix}\begin{pmatrix}\mathbf u\\ \mathbf p\end{pmatrix} = \begin{pmatrix}\mathbf F\\ 0\end{pmatrix}.
+$$
+:::
+
+Пространства смещений и давлений нельзя выбирать независимо. Условие
+устойчивости — **условие inf-sup** (Ладыженская, Бабушка, Брецци): существует $\beta > 0$,
+не зависящее от сетки, такое, что
+$$
+\sup_{\mathbf v_h}\frac{\int q_h\operatorname{div}\mathbf v_h}{\|\mathbf v_h\|_A}\ge\beta\,\|q_h\|_{L^2}\quad\text{для всех } q_h .
+$$
+Это дискретный аналог того, что $\operatorname{div}$ отображает поля **на** все функции с
+нулевым средним, — условие точности «хвоста» комплекса, как в предыдущей
+статье. Константа $\beta_h$ — корень наименьшего ненулевого собственного значения
+задачи $BA^{-1}B^{\mathsf T}\mathbf p = \beta^2M_p\mathbf p$, а нулевые собственные значения — **паразитные моды
+давления**, которые не видит ни одно поле смещений. Сравним пары P1–P0 и
+P2–P0 (давление постоянно на треугольниках):
+
+```{python}
+def inf_sup(n, order):
+    points, tri = square_mesh(n)
+    sysm = elasticity_system(points, tri, order, 0.0, 1.0)    # λ = 0: A = 2μ∫ε:ε
+    free = clamped(sysm["nodes"])
+    A = sysm["K"][free][:, free].toarray()
+    B = sysm["B"][:, free].toarray()
+    ev = sla.eigh(B @ np.linalg.solve(A, B.T), np.diag(sysm["area"]), eigvals_only=True)
+    zero = ev < 1e-10
+    return int(zero.sum()), np.sqrt(ev[~zero].min())
+
+for n in (4, 8, 16):
+    (z1, b1), (z2, b2) = inf_sup(n, 1), inf_sup(n, 2)
+    print(f"n = {n:2d}:  P1–P0: нулевых мод давления {z1:3d}, β_h = {b1:.3f};   P2–P0: нулевых {z2}, β_h = {b2:.3f}")
+```
+
+У P1–P0 число паразитных мод давления растёт с сеткой, а $\beta_h$ убывает как $h$ —
+пара неустойчива. У P2–P0 единственная нулевая мода — постоянное давление
+(оно определено с точностью до константы, когда граница закреплена), и
+$\beta_h\approx0{,}43$ не зависит от сетки. Решим смешанную задачу с P2–P0:
+
+```{python}
+def solve_mixed(n, nu):
+    """Смешанная постановка P2–P0; при ν = ½ — предел λ = ∞."""
+    points, tri = square_mesh(n)
+    sysm = elasticity_system(points, tri, 2, 0.0, mu, force)
+    free = clamped(sysm["nodes"])
+    inv_lam = (1 - 2 * nu) / (2 * mu * nu)
+    B = sysm["B"][:, free]
+    saddle = sps.bmat([[sysm["K"][free][:, free], -B.T],
+                       [-B, -inv_lam * sps.diags(sysm["area"]) - 1e-12 * sps.eye(len(tri))]]).tocsc()
+    sol = spla.spsolve(saddle, np.r_[sysm["F"][free], np.zeros(len(tri))])
+    u = np.zeros(len(free))
+    u[free] = sol[:free.sum()]
+    return relative_error(points, tri, 2, sysm, u)
+
+nus = np.array([0.3, 0.4, 0.45, 0.49, 0.499, 0.4999, 0.49999])
+err = {name: [solver(16, nu) for nu in nus] for name, solver in
+       (("P1", lambda n, nu: solve_displacement(n, 1, nu)), ("P2", lambda n, nu: solve_displacement(n, 2, nu)),
+        ("P2–P0", solve_mixed))}
+for k, nu in enumerate(nus):
+    print(f"ν = {nu:<7}: P1 {err['P1'][k]:.3e}   P2 {err['P2'][k]:.3e}   P2–P0 {err['P2–P0'][k]:.3e}")
+print(f"предел ν = ½ (λ = ∞), P2–P0: {solve_mixed(16, 0.5):.3e}")
+```
+
+```{python}
+#| label: fig-locking
+#| fig-cap: 'Слева: относительная ошибка смещения в L² на сетке 16×16 клеток (512 треугольников) в зависимости от λ/μ = 2ν/(1 − 2ν) для точного решения с div u = 0. Элементы P1 запираются (ошибка → 100 %), P2 теряют точность, смешанные P2–P0 от ν не зависят. Справа: сходимость при ν = 0,4999: P1 почти не сходится на доступных сетках, P2 сходится, но с большой ошибкой, P2–P0 — как h³.'
+ratio = 2 * nus / (1 - 2 * nus)
+ns = np.array([4, 8, 16, 32])
+conv = {"P1": [solve_displacement(n, 1, 0.4999) for n in ns],
+        "P2": [solve_displacement(n, 2, 0.4999) for n in ns],
+        "P2–P0": [solve_mixed(n, 0.4999) for n in ns]}
+styles = {"P1": ("o-", "tab:blue"), "P2": ("s-", "tab:orange"), "P2–P0": ("^-", "tab:green")}
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 3.9))
+for name, (mk, col) in styles.items():
+    ax1.loglog(ratio, err[name], mk, color=col, label=name)
+    ax2.loglog(1 / ns, conv[name], mk, color=col, label=name)
+ax2.loglog(1 / ns, conv["P2–P0"][-1] * (ns[-1] / ns)**3, "k--", lw=1, label="∝ h³")
+ax1.set(xlabel="λ / μ", ylabel="относительная ошибка в L²")
+ax2.set(xlabel="h", ylabel="относительная ошибка в L²", xticks=1 / ns, xticklabels=[f"1/{n}" for n in ns])
+ax2.minorticks_off()
+ax1.legend()
+ax2.legend()
+plt.tight_layout()
+plt.show()
+for name in conv:
+    print(name, "при n = 4, 8, 16, 32:", " ".join(f"{e:.2e}" for e in conv[name]))
+```
+
+**Деформация бруска.** Тот же эффект в инженерной задаче: прямоугольная
+пластина $4\times1$ из почти несжимаемого материала ($\nu = 0{,}4999$) закреплена левым краем и
+нагружена собственным весом $f = 0{,}002\,\mu$ на единицу площади (в единицах, где высота пластины 1). Сравним прогиб для P1 и P2–P0:
+
+```{python}
+def cantilever(mixed, nu=0.4999, nx=32, ny=8, length=4.0):
+    """Консоль length × 1, закреплённая при x = 0, под весом f = (0, −0,002 μ); узлы, связность и смещения."""
+    pts, tri_c = rectangle_mesh(nx, ny, length, 1.0)
+    lam = 2 * mu * nu / (1 - 2 * nu)
+    gravity = lambda p: np.stack([0 * p[..., 0], -0.002 * np.ones_like(p[..., 0])], axis=-1)
+    order = 2 if mixed else 1
+    sysm = elasticity_system(pts, tri_c, order, 0.0 if mixed else lam, mu, gravity)
+    free = np.ones(2 * len(sysm["nodes"]), bool)
+    wall = np.isclose(sysm["nodes"][:, 0], 0)
+    free[0::2][wall] = free[1::2][wall] = False
+    K_f, F_f = sysm["K"][free][:, free], sysm["F"][free]
+    if mixed:
+        B = sysm["B"][:, free]
+        K_f = sps.bmat([[K_f, -B.T], [-B, -sps.diags(sysm["area"]) / lam]])
+        F_f = np.r_[F_f, np.zeros(len(tri_c))]
+    sol = spla.spsolve(K_f.tocsc(), F_f)
+    u = np.zeros(len(free))
+    u[free] = sol[:free.sum()]
+    return sysm["nodes"], tri_c, u
+
+def tip_deflection(nodes, u, length=4.0):
+    tip = np.isclose(nodes[:, 0], length)
+    return u[1::2][tip].mean()
+
+for nu in (0.3, 0.4999):
+    d1 = tip_deflection(*cantilever(False, nu)[::2])
+    d2 = tip_deflection(*cantilever(True, nu)[::2])
+    d_ref = tip_deflection(*cantilever(True, nu, nx=64, ny=16)[::2])
+    print(f"ν = {nu}: прогиб конца P1 = {d1:.3f}, P2–P0 = {d2:.3f}, P2–P0 на вдвое более мелкой сетке = {d_ref:.3f}"
+          f"  (P1 / эталон = {d1 / d_ref:.3f})")
+```
+
+```{python}
+#| label: fig-cantilever
+#| fig-cap: 'Консоль 4×1 из почти несжимаемого материала (ν = 0,4999, μ = 1), закреплённая слева и нагруженная собственным весом; сетка 32×8 клеток, смещения показаны в истинном масштабе (серый контур — недеформированная пластина). Элементы P1 (сверху) дают почти жёсткую консоль; смешанные элементы P2–P0 (снизу) — правильный прогиб.'
+fig, axes = plt.subplots(2, 1, figsize=(8, 5.2), sharex=True)
+for ax, mixed, name in zip(axes, (False, True), ("P1", "P2–P0")):
+    nodes_c, tri_c, u_c = cantilever(mixed)
+    xy = nodes_c + np.column_stack([u_c[0::2], u_c[1::2]])   # для P2 первые узлы — вершины
+    ax.triplot(xy[:, 0], xy[:, 1], tri_c, color="tab:blue" if not mixed else "tab:green", lw=0.4)
+    ax.plot([0, 4, 4, 0, 0], [0, 0, 1, 1, 0], color="0.6", lw=1)
+    ax.set(aspect="equal", title=f"{name}: прогиб конца {tip_deflection(nodes_c, u_c):.3f}", ylabel="y")
+axes[1].set_xlabel("x")
+plt.tight_layout()
+plt.show()
+```
+
+При $\nu = 0{,}3$ элементы P1 занижают прогиб на 6 %, при $\nu = 0{,}4999$ — почти в 10 раз — для расчёта
+резиновой опоры или мягкой ткани такая ошибка катастрофична. Смешанные
+элементы дают ответ, не зависящий от того, насколько материал близок к
+несжимаемому.
+
+## Связь с внешним исчислением
+
+Смешанная постановка — частный случай общего рецепта FEEC: пара
+«смещения P2 — давления P0» должна быть устойчивой парой пространств для
+оператора $\operatorname{div}$, как пара «Неделек — кусочно-постоянные» для $\operatorname{rot}$.
+Устойчивые пары (Тейлор–Худ P2–P1, MINI, Скотт–Фогелиус) строятся из
+дискретных комплексов
+$$
+0\to\text{функции тока}\xrightarrow{\operatorname{rot}}\text{скорости}\xrightarrow{\operatorname{div}}\text{давления}\to0 ,
+$$
+и дискретная точность этого «комплекса Стокса» — то же условие inf-sup.
+
+Можно пойти дальше и приближать само напряжение: постановка
+Хеллингера–Рейсснера ищет симметричное $\sigma$ с $\operatorname{div}\sigma$ в пространстве смещений.
+Симметрия $\sigma$ — это закон сохранения момента (статья
+[«Тензор напряжений»](/physics/continuum/stress.qmd)), и её трудно совместить с непрерывностью
+нормальных компонент. Устойчивые элементы для симметричных напряжений
+(Арнольд и Винтер, 2002) построены из **комплекса упругости** —
+аналога комплекса де Рама, где вместо $\dd$ стоят $\operatorname{rot}\operatorname{rot}^{\mathsf T}$ (условие совместности
+Сен-Венана) и $\operatorname{div}$. В этих элементах импульс и момент импульса
+сохраняются локально, на каждом треугольнике, а не только для тела в
+целом.
+
+## Итоги
+
+- МКЭ для упругости: слабая постановка $\int\sigma(\mathbf u):\varepsilon(\mathbf v) = \int\mathbf f\cdot\mathbf v$, матрица жёсткости $K$ на элементах Лагранжа P1, P2.
+- Жёсткие движения лежат в пространствах точно; ядро $K$ свободного тела трёхмерно, отсюда точное сохранение импульса и момента в явной динамике.
+- Объёмное запирание: при $\nu\to\frac12$ штраф $\frac\lambda2\int(\operatorname{div}\mathbf u)^2$ требует $\operatorname{div}\mathbf u = 0$, а у P1 на треугольниках единственное такое поле — нулевое.
+- Смешанная постановка с $p = -\lambda\operatorname{div}\mathbf u$ устойчива, если пара пространств удовлетворяет условию inf-sup: P1–P0 — нет (паразитные моды давления, $\beta_h\propto h$), P2–P0 — да ($\beta_h\approx0{,}43$).
+- P2–P0 даёт ошибку, не зависящую от $\nu$, и сходимость $h^3$ в $L^2$.
+
+## Упражнения
+
+1. Докажите, что на сетке $n\times n$ клеток с диагоналями и закреплённой границей
+   единственное поле P1 с $\operatorname{div}\mathbf u = 0$ на каждом треугольнике — нулевое. Указание:
+   начните с угловой клетки.
+2. Чему равно отношение $\lambda/\mu$ для резины с $\nu = 0{,}4999$ и для стали с $\nu = 0{,}29$?
+3. Покажите, что строки матрицы жёсткости, отвечающие компоненте $x$, в сумме
+   дают нуль (сумма узловых сил равна нулю), и выведите отсюда сохранение импульса
+   для схемы «чехарда» с сосредоточенными массами.
+4. Сколько паразитных мод давления у пары P1–P0 на сетке $n\times n$? Сравните ответ с выводом
+   ячейки при $n = 4, 8, 16$.
+5. Почему в смешанной постановке давление определено только с точностью до
+   константы, если граница закреплена целиком, и почему это не так при $\lambda < \infty$?
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. В угловой клетке $[0, h]^2$ незакреплена только вершина $c = (h, h)$. На треугольнике $(0,0), (h,0), (h,h)$
+   барицентрическая координата $c$ равна $y/h$, поэтому $\operatorname{div}\mathbf u = u_{c,y}/h$; на треугольнике $(0,0), (h,h), (0,h)$
+   она равна $x/h$, и $\operatorname{div}\mathbf u = u_{c,x}/h$. Оба обязаны быть нулём, так что $\mathbf u_c = 0$. В следующей клетке
+   ряда снова неизвестна лишь одна вершина (правая верхняя) с теми же двумя уравнениями — по
+   индукции все смещения нулевые.
+2. $\lambda/\mu = 2\nu/(1 - 2\nu)$: для резины $4999$, для стали $\approx1{,}38$.
+3. Жёсткий сдвиг $\mathbf r = (1, 0, 1, 0, \dots)$ лежит в ядре $K$, и $K$ симметрична, поэтому $\mathbf r^{\mathsf T}K = 0$ — сумма $x$-компонент
+   узловых сил равна нулю. В схеме $v^{n+1/2} = v^{n-1/2} + \Delta t\,M^{-1}f^n$ величина $\mathbf r^{\mathsf T}Mv$ меняется на $\Delta t\,\mathbf r^{\mathsf T}f^n = 0$.
+4. $4n - 2$: 14, 30, 62 — как в выводе. Это ровно разность числа треугольников $2n^2$ и ранга матрицы $B$,
+   равного числу неизвестных $2(n - 1)^2$ (матрица $B$ полного ранга по столбцам, отсюда же упражнение 1).
+5. При закреплённой границе $\int\operatorname{div}\mathbf v = \oint\mathbf v\cdot\mathbf n = 0$ для всех $\mathbf v$, поэтому постоянное давление не
+   входит в первое уравнение. При $\lambda < \infty$ член $\lambda^{-1}\int pq$ его фиксирует: $\int p = -\lambda\int\operatorname{div}\mathbf u = 0$.
+:::
