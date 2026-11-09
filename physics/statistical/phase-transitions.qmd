@@ -1,0 +1,357 @@
+---
+title: "Фазовые переходы"
+topic: phase-transitions
+order: 10
+description: "Параметр порядка и спонтанное нарушение симметрии ℤ₂; почему переход возможен только в термодинамическом пределе; критические показатели α, β, γ, δ, ν; одномерная модель Изинга точно: трансфер-матрица (проверка прямым перебором), намагниченность аналитична при T > 0, корреляционная длина конечна — перехода нет; теория среднего поля: вариационная свободная энергия, разложение Ландау (T − T_c)m²/2 + Tm⁴/12, показатели β = ½, γ = 1, δ = 3, скачок теплоёмкости 3/2 (SymPy и численное решение), двойная яма (рисунок); точные результаты Онсагера и сравнение со средним полем (рисунок); кластерный алгоритм Свендсена–Ванга; кумулянт Биндера и T_c по пересечению кривых, конечномерный скейлинг ⟨|m|⟩ ∝ L^{−β/ν}, χ ∝ L^{γ/ν} (рисунок); универсальность"
+---
+
+Вода закипает при 100 °C, железо теряет намагниченность при 770 °C
+(точка Кюри). В обоих случаях гладкая на вид зависимость термодинамических
+величин от температуры вдруг ломается: плотность прыгает, намагниченность
+обращается в нуль, теплоёмкость расходится. Удивительно, что статистическая
+механика вообще способна это описать: свободная энергия
+$F = -T\ln Z$, а $Z = \sum e^{-E/T}$ — конечная сумма положительных аналитических
+функций $T$. Особенность может появиться только в пределе бесконечной
+системы. Как именно это происходит, лучше всего видно на **модели Изинга** —
+простейшей модели, в которой симметрия гамильтониана нарушается
+состоянием равновесия.
+
+Используются [каноническое распределение](/physics/statistical/canonical-ensemble.qmd) и
+[методы Монте-Карло](/math/numerics/monte-carlo.qmd), где модель Изинга уже моделировалась
+алгоритмом Метрополиса и сравнивалась с формулой Онсагера.
+Температура — в энергетических единицах ($k_\text{Б} = 1$).
+
+## Параметр порядка и критические показатели
+
+Модель Изинга: спины $s_i = \pm1$ в узлах решётки,
+$$
+E = -J\sum_{\langle ij\rangle}s_is_j - h\sum_is_i, \qquad J > 0,
+$$
+сумма по парам соседей. При $h = 0$ энергия не меняется при перевороте всех
+спинов: симметрия $\mathbb Z_2$. Поэтому в каждой конечной системе
+$\langle m\rangle = \langle\frac1N\sum s_i\rangle = 0$ при $h = 0$ строго. Но если сначала устремить $N\to\infty$, а
+потом $h\to+0$, намагниченность может остаться конечной.
+
+::: {#def-order-parameter}
+**Параметр порядка** — величина, равная нулю в симметричной фазе и
+ненулевая в фазе с нарушенной симметрией; для магнетика —
+**спонтанная намагниченность**
+$$
+m_0(T) = \lim_{h\to+0}\lim_{N\to\infty}\langle m\rangle .
+$$
+Переход **непрерывный** (второго рода), если $m_0\to0$ при $T\to T_c$ непрерывно.
+**Критические показатели** описывают поведение вблизи $T_c$ ($\tau = (T - T_c)/T_c$):
+$$
+C\propto|\tau|^{-\alpha}, \quad m_0\propto(-\tau)^{\beta}, \quad \chi = \frac{\partial m}{\partial h}\propto|\tau|^{-\gamma}, \quad
+m\propto h^{1/\delta}\ (\tau = 0), \quad \xi\propto|\tau|^{-\nu},
+$$
+где $\xi$ — корреляционная длина: $\langle s_is_j\rangle - \langle s_i\rangle\langle s_j\rangle\sim e^{-r_{ij}/\xi}$.
+:::
+
+Порядок пределов важен: при конечном $N$ состояния «все вверх» и «все вниз»
+связаны переходами за конечное время, и система бродит между ними. В
+бесконечной системе время перехода бесконечно, и равновесие распадается
+на два **чистых состояния** — так геометрически выглядит спонтанное
+нарушение симметрии: множество равновесных состояний — орбита группы
+$\mathbb Z_2$, две точки.
+
+## Одномерная цепочка: перехода нет
+
+Цепочка из $N$ спинов на кольце решается точно. Запишем $e^{-E/T}$ как
+произведение множителей, зависящих от пары соседей:
+$$
+Z = \sum_{s_1\dots s_N}\prod_iT_{s_is_{i+1}} = \operatorname{tr}\mathsf T^N, \qquad
+\mathsf T = \begin{pmatrix}e^{\beta(J + h)} & e^{-\beta J}\\ e^{-\beta J} & e^{\beta(J - h)}\end{pmatrix},
+$$
+— **трансфер-матрица** (поле $h$ разделено поровну между двумя
+соседними множителями). Тогда $Z = \lambda_+^N + \lambda_-^N$ с собственными значениями
+$\lambda_\pm = e^{\beta J}\cosh\beta h\pm\sqrt{e^{2\beta J}\sinh^2\beta h + e^{-2\beta J}}$. Проверим прямым перебором:
+
+```{python}
+import itertools
+import numpy as np
+import sympy as sp
+import matplotlib.pyplot as plt
+import scipy.sparse as sps
+from scipy.sparse.csgraph import connected_components
+from scipy.optimize import brentq
+
+beta, J, h = sp.symbols("beta J h", positive=True)
+Tmat = sp.Matrix([[sp.exp(beta * (J + h)), sp.exp(-beta * J)], [sp.exp(-beta * J), sp.exp(beta * (J - h))]])
+root = sp.sqrt(sp.exp(2 * beta * J) * sp.sinh(beta * h)**2 + sp.exp(-2 * beta * J))
+lam_p, lam_m = sp.exp(beta * J) * sp.cosh(beta * h) + root, sp.exp(beta * J) * sp.cosh(beta * h) - root
+point = {beta: sp.Rational(7, 10), J: 1, h: sp.Rational(3, 10)}
+print("det(T − λ±) = 0:", [abs(sp.N((Tmat - lam * sp.eye(2)).det().subs(point), 40)) < 1e-30 for lam in (lam_p, lam_m)])
+
+N = 8
+Z_brute = sum(sp.exp(beta * sum(J * c[i] * c[(i + 1) % N] + h * c[i] for i in range(N)))
+              for c in itertools.product([1, -1], repeat=N))
+print("Z(перебор 2⁸ конфигураций) = λ₊⁸ + λ₋⁸:", abs(sp.N((Z_brute - lam_p**N - lam_m**N).subs(point), 40)) < 1e-30)
+```
+
+При $N\to\infty$ выживает большее собственное значение: свободная энергия на спин
+$f = -T\ln\lambda_+$, намагниченность $m = -\partial f/\partial h$. Корреляции спинов на расстоянии $r$
+убывают как $(\lambda_-/\lambda_+)^r$, откуда при $h = 0$ корреляционная длина
+$\xi = 1/\ln(\lambda_+/\lambda_-) = -1/\ln\operatorname{th}\beta J$:
+
+```{python}
+m_chain = sp.simplify(sp.diff(sp.log(lam_p), h) / beta)
+m_closed = sp.sinh(beta * h) / sp.sqrt(sp.sinh(beta * h)**2 + sp.exp(-4 * beta * J))
+print("m(h) = sh βh / √(sh² βh + e^{−4βJ}):", abs(sp.N((m_chain - m_closed).subs(point), 40)) < 1e-30)
+print("ξ при h = 0:", sp.simplify(1 / sp.log((lam_p / lam_m).subs(h, 0))), " = −1/ln th βJ:",
+      sp.simplify((sp.log((lam_p / lam_m).subs(h, 0)) + sp.log(sp.tanh(beta * J))).rewrite(sp.exp)) == 0)
+for T_val in (2, 1, 0.5, 0.25):
+    xi = -1 / np.log(np.tanh(1 / T_val))
+    print(f"T/J = {T_val:4}: ξ = {xi:10.3f},  χ = ∂m/∂h|₀ = βe^(2βJ) = {np.exp(2 / T_val) / T_val:10.3f}")
+```
+
+Намагниченность — аналитическая функция $h$ при любой $T > 0$, $m(0) = 0$, а
+$\xi$ и $\chi$ конечны, хоть и растут как $e^{2J/T}$ при $T\to0$. Причина физическая
+(Ландау): одна доменная стенка в цепочке стоит энергии $2J$, а выигрывает
+энтропию $\ln N$ — места для неё. При $N\to\infty$ стенки выгодны при любой $T > 0$, и
+порядок разрушается. В двух измерениях стенка длины $\ell$ стоит $2J\ell$, а число
+её форм растёт лишь как $\mu^\ell$ — при малых $T$ энергия выигрывает (довод Пайерлса),
+и переход есть.
+
+## Теория среднего поля
+
+Заменим соседей спина их средним: каждый спин чувствует поле
+$h + zJm$, где $z$ — число соседей (4 на квадратной решётке). Отсюда
+уравнение самосогласования $m = \operatorname{th}\bigl(\beta(zJm + h)\bigr)$. Его можно получить
+вариационно: свободная энергия на спин для состояния с независимыми
+спинами и средним $m$
+$$
+f(m) = -\frac{zJ}{2}m^2 - hm - T\,s(m), \qquad
+s(m) = -\frac{1 + m}{2}\ln\frac{1 + m}{2} - \frac{1 - m}{2}\ln\frac{1 - m}{2},
+$$
+энергия минус температура на энтропию, и условие $f'(m) = 0$ даёт то же
+уравнение. Это верхняя оценка истинной $f$ (неравенство Боголюбова). При
+$T_c = zJ$ коэффициент при $m^2$ меняет знак:
+
+```{python}
+m, T, Tc, hh = sp.symbols("m T T_c h", positive=True)
+s_m = -((1 + m) / 2 * sp.log((1 + m) / 2) + (1 - m) / 2 * sp.log((1 - m) / 2))
+f_mf = -Tc * m**2 / 2 - hh * m - T * s_m                 # zJ = T_c
+residual = sp.diff(f_mf, m) - (T * sp.atanh(m) - Tc * m - hh)       # f'(m) = T artanh m − T_c m − h
+print("f'(m) = T artanh m − T_c m − h:",
+      all(abs(sp.N(residual.subs({m: mv, T: tv, Tc: 1, hh: hv}), 30)) < 1e-25
+          for mv, tv, hv in ((sp.Rational(1, 3), sp.Rational(7, 10), sp.Rational(1, 10)), (sp.Rational(-4, 5), 2, 0))))
+landau = sp.series(f_mf.subs(hh, 0), m, 0, 7).removeO()
+print("разложение Ландау: f(m) =", sp.collect(sp.expand(landau), m))
+```
+
+Получилось **разложение Ландау**
+$f = -T\ln2 + \frac{T - T_c}{2}m^2 + \frac{T}{12}m^4 + \dots$ — «двойная яма» ниже $T_c$. Показатели среднего
+поля получаются из минимизации двух первых членов: $m_0^2 = 3(T_c - T)/T$, то есть
+$\beta = \frac12$; восприимчивость $\chi = 1/f''(m_0)$ равна $1/(T - T_c)$ выше $T_c$ и $1/2(T_c - T)$ ниже
+($\gamma = 1$); при $T = T_c$ $h = T_cm^3/3$ ($\delta = 3$). Минимальное значение
+$f = -3(T - T_c)^2/4T$ ниже $T_c$ даёт **скачок теплоёмкости** $C = -T\,\partial^2f/\partial T^2\to\frac32$
+(выше $T_c$ $C = 0$), так что $\alpha = 0$. Проверим всё на точном решении уравнения
+самосогласования, без разложения:
+
+```{python}
+def m_mf(T, h=0.0, Tc=1.0):
+    """Решение m = th((T_c m + h)/T), ветвь m ≥ 0."""
+    g = lambda x: x - np.tanh((Tc * x + h) / T)
+    if h == 0 and T >= Tc:
+        return 0.0
+    return brentq(g, 1e-14, 1.0)
+
+def f_mf_num(T, h=0.0, Tc=1.0):
+    x = m_mf(T, h, Tc)
+    s = -sum(p * np.log(p) for p in ((1 + x) / 2, (1 - x) / 2) if p > 0)
+    return -Tc * x**2 / 2 - h * x - T * s
+
+def chi_mf(T, Tc=1.0):
+    """χ = ∂m/∂h при h = 0 (дифференцирование уравнения самосогласования)."""
+    x = m_mf(T, 0.0, Tc)
+    return (1 - x**2) / (T - Tc * (1 - x**2))
+
+for tau in (1e-2, 1e-3, 1e-4):
+    T_low = 1 - tau
+    chi_below, chi_above = chi_mf(T_low), chi_mf(1 + tau)
+    print(f"τ = {tau:.0e}: m₀/√(3τ) = {m_mf(T_low) / np.sqrt(3 * tau):.4f},  χ·τ: выше {chi_above * tau:.4f}, "
+          f"ниже {chi_below * tau:.4f}")
+for hval in (1e-4, 1e-6):
+    print(f"T = T_c, h = {hval:.0e}: m/(3h)^(1/3) = {m_mf(1.0, hval) / (3 * hval)**(1 / 3):.4f}")
+dT = 1e-3
+for Tm in (0.99, 0.999):
+    C = -Tm * (f_mf_num(Tm + dT) - 2 * f_mf_num(Tm) + f_mf_num(Tm - dT)) / dT**2
+    print(f"T/T_c = {Tm}: C = {C:.4f}")
+C_above = -1.01 * (f_mf_num(1.01 + dT) - 2 * f_mf_num(1.01) + f_mf_num(1.01 - dT)) / dT**2
+print(f"T/T_c = 1.01: C = {abs(C_above):.4f}")
+```
+
+```{python}
+#| label: fig-pt-meanfield
+#| fig-cap: 'Слева: свободная энергия среднего поля f(m) + T ln 2 при h = 0 для T/T_c = 1,2; 1; 0,9; 0,8 — ниже T_c минимум m = 0 становится максимумом и появляются два симметричных минимума ±m₀. Справа: спонтанная намагниченность квадратной решётки по теории среднего поля (T_c = 4J) и точная (Онсагер, T_c ≈ 2,269J).'
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9.5, 3.8))
+ms = np.linspace(-0.999, 0.999, 401)
+for T_val, col in ((1.2, "tab:blue"), (1.0, "k"), (0.9, "tab:orange"), (0.8, "tab:red")):
+    s = -((1 + ms) / 2 * np.log((1 + ms) / 2) + (1 - ms) / 2 * np.log((1 - ms) / 2))
+    ax1.plot(ms, -ms**2 / 2 - T_val * s + T_val * np.log(2), color=col, label=f"T/T_c = {T_val}")
+ax1.set(xlabel="m", ylabel="f(m) + T ln 2  (в единицах T_c)", ylim=(-0.06, 0.15))
+ax1.legend(fontsize=8)
+Tc_ons = 2 / np.log(1 + np.sqrt(2))
+Ts = np.linspace(0.01, 4.5, 500)
+onsager = np.where(Ts < Tc_ons, np.abs(1 - np.sinh(2 / Ts)**-4.0)**0.125, 0.0)
+ax2.plot(Ts, [m_mf(T_val, Tc=4.0) for T_val in Ts], "tab:blue", label="среднее поле")
+ax2.plot(Ts, onsager, "k", label="Онсагер")
+ax2.set(xlabel="T / J", ylabel="m₀", xlim=(0, 4.5))
+ax2.legend()
+plt.tight_layout()
+plt.show()
+```
+
+Среднее поле правильно угадывает качественную картину, но завышает $T_c$
+почти вдвое и ошибается в показателях. Точное решение Онсагера (1944) для
+квадратной решётки даёт $T_c = 2J/\ln(1 + \sqrt2)\approx2{,}269J$ и
+$$
+\alpha = 0\ (\text{логарифм}), \quad \beta = \tfrac18, \quad \gamma = \tfrac74, \quad \delta = 15, \quad \nu = 1 .
+$$
+Среднее поле пренебрегает флуктуациями параметра порядка, а они вблизи
+$T_c$ коррелированы на масштабе $\xi\to\infty$. Критерий Гинзбурга: в размерности $d > 4$
+флуктуации малы, и показатели среднего поля точны; при $d < 4$ — нет.
+
+## Моделирование: кластеры и конечномерный скейлинг
+
+Вблизи $T_c$ алгоритм Метрополиса переворачивает по одному спину, а
+коррелированные области имеют размер $\xi$; время корреляции растёт
+как $\xi^{z}$, $z\approx2{,}2$ — **критическое замедление**. **Алгоритм Свендсена–Ванга** (1987)
+переворачивает целые кластеры. На каждом шаге:
+
+1. каждую связь между соседями с одинаковыми спинами «включаем» с
+   вероятностью $p = 1 - e^{-2\beta J}$;
+2. находим связные компоненты графа включённых связей (кластеры);
+3. каждому кластеру независимо присваиваем случайный знак.
+
+Этот шаг удовлетворяет детальному равновесию для распределения Гиббса:
+он вытекает из представления Фортуина–Кастелейна, где статсумма Изинга —
+сумма по графам связей, как в задаче о перколяции. Кластеры при $T_c$ —
+фракталы размера $\sim\xi$, и замедления почти нет.
+
+Конечная система перехода не имеет, но по тому, **как** её величины зависят
+от размера $L$, можно найти и $T_c$, и показатели. Если единственный масштаб
+вблизи $T_c$ — это $\xi$, то величины зависят от $L/\xi$ (гипотеза конечномерного
+скейлинга), и при $T = T_c$
+$$
+\langle|m|\rangle\propto L^{-\beta/\nu}, \qquad \chi = \frac{N\langle m^2\rangle}{T}\propto L^{\gamma/\nu} .
+$$
+Безразмерный **кумулянт Биндера** $U = 1 - \langle m^4\rangle/3\langle m^2\rangle^2$ стремится к $2/3$ в упорядоченной
+фазе и к $0$ в неупорядоченной, а при $T_c$ не зависит от $L$: кривые $U_L(T)$ для
+разных $L$ пересекаются в точке перехода.
+
+```{python}
+def swendsen_wang(L, T, sweeps, burn_in=300, seed=0):
+    """Ряд намагниченностей m на шаг для модели Изинга L×L (J = 1, периодические границы)."""
+    rng = np.random.default_rng(seed)
+    n = L * L
+    site = np.arange(n).reshape(L, L)
+    i = np.r_[site.ravel(), site.ravel()]
+    j = np.r_[np.roll(site, -1, axis=1).ravel(), np.roll(site, -1, axis=0).ravel()]   # правый и нижний соседи
+    p = 1 - np.exp(-2 / T)
+    s = rng.choice([-1, 1], n)
+    ms = np.empty(sweeps)
+    for k in range(burn_in + sweeps):
+        on = (s[i] == s[j]) & (rng.random(2 * n) < p)
+        graph = sps.coo_matrix((np.ones(on.sum()), (i[on], j[on])), shape=(n, n))
+        n_clusters, label = connected_components(graph, directed=False)
+        s = s * rng.choice([-1, 1], n_clusters)[label]
+        if k >= burn_in:
+            ms[k - burn_in] = s.mean()
+    return ms
+
+def binder(ms):
+    return 1 - np.mean(ms**4) / (3 * np.mean(ms**2)**2)
+
+Tc_exact = 2 / np.log(1 + np.sqrt(2))
+temps = np.linspace(2.15, 2.39, 7)
+sizes = (8, 16, 32)
+U = {L: [binder(swendsen_wang(L, T_val, 2500, seed=k)) for k, T_val in enumerate(temps)] for L in sizes}
+for k, T_val in enumerate(temps):
+    print(f"T = {T_val:.3f}: " + ",  ".join(f"U({L}) = {U[L][k]:.3f}" for L in sizes))
+```
+
+```{python}
+fits = {L: np.polyfit(temps - Tc_exact, U[L], 3) for L in sizes}   # сглаживаем шум кубической подгонкой
+for La, Lb in ((8, 16), (16, 32)):
+    roots = np.roots(fits[La] - fits[Lb]).real + Tc_exact
+    T_cross = roots[np.argmin(np.abs(roots - Tc_exact))]
+    print(f"пересечение U({La}) и U({Lb}): T = {T_cross:.3f}  (Онсагер {Tc_exact:.3f}, отклонение {T_cross / Tc_exact - 1:+.1%})")
+
+sizes_c = (8, 16, 32, 64)
+data = {L: swendsen_wang(L, Tc_exact, 4000, seed=10 + L) for L in sizes_c}
+abs_m = np.array([np.abs(data[L]).mean() for L in sizes_c])
+chi = np.array([L * L * np.mean(data[L]**2) / Tc_exact for L in sizes_c])
+slope_m = np.polyfit(np.log(sizes_c), np.log(abs_m), 1)[0]
+slope_chi = np.polyfit(np.log(sizes_c), np.log(chi), 1)[0]
+for L, a, c in zip(sizes_c, abs_m, chi):
+    print(f"L = {L:2d}: ⟨|m|⟩ = {a:.4f},  χ = {c:8.2f},  U = {binder(data[L]):.3f}")
+print(f"наклоны: −β/ν = {slope_m:.3f} (точно −0.125),  γ/ν = {slope_chi:.3f} (точно 1.75)")
+```
+
+```{python}
+#| label: fig-pt-scaling
+#| fig-cap: 'Слева: кумулянт Биндера U(T) для решёток 8×8, 16×16 и 32×32 (алгоритм Свендсена–Ванга, 2500 шагов на точку) и их кубические подгонки; кривые пересекаются вблизи точной T_c (пунктир). Справа: при T = T_c средний модуль намагниченности и восприимчивость в логарифмическом масштабе ложатся на прямые с наклонами, близкими к −β/ν = −1/8 и γ/ν = 7/4.'
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9.5, 3.8))
+T_fine = np.linspace(temps[0], temps[-1], 100)
+for L in sizes:
+    line, = ax1.plot(temps, U[L], "o", ms=4, label=f"L = {L}")
+    ax1.plot(T_fine, np.polyval(fits[L], T_fine - Tc_exact), color=line.get_color(), lw=1)
+ax1.axvline(Tc_exact, color="k", ls="--", lw=1)
+ax1.set(xlabel="T / J", ylabel="U")
+ax1.legend()
+Ls = np.array(sizes_c)
+ax2.loglog(Ls, abs_m, "o", color="tab:blue", label="⟨|m|⟩")
+ax2.loglog(Ls, abs_m[0] * (Ls / 8.0)**-0.125, "--", color="tab:blue", lw=1, label="∝ L^(−1/8)")
+ax2.loglog(Ls, chi / chi[0], "s", color="tab:red", label="χ / χ(8)")
+ax2.loglog(Ls, (Ls / 8.0)**1.75, "--", color="tab:red", lw=1, label="∝ L^(7/4)")
+ax2.set(xlabel="L", xticks=sizes_c, xticklabels=[str(L) for L in sizes_c])
+ax2.minorticks_off()
+ax2.legend(fontsize=8)
+plt.tight_layout()
+plt.show()
+```
+
+Решётки от $8\times8$ до $64\times64$ и несколько секунд счёта
+дают $T_c$ с точностью лучше процента и отношения показателей $\beta/\nu$, $\gamma/\nu$ — с точностью в несколько процентов. Так
+находят критические показатели моделей, которые точно не решаются (трёхмерная
+модель Изинга: $\beta\approx0{,}326$, $\gamma\approx1{,}237$, $\nu\approx0{,}630$).
+
+**Универсальность.** Показатели не зависят от деталей: та же трёхмерная
+модель Изинга описывает критическую точку жидкость–пар у воды, CO₂ и
+бинарных смесей, а также одноосные ферромагнетики. Важны только
+размерность пространства и симметрия параметра порядка ($\mathbb Z_2$ — у Изинга,
+$\mathrm{O}(2)$ — у сверхтекучего гелия, $\mathrm{O}(3)$ — у изотропного ферромагнетика). Объяснение
+дала ренормгруппа Вильсона: при $T_c$ система подобна себе на всех масштабах,
+и мелкие детали гамильтониана «выгорают» при укрупнении.
+
+## Итоги
+
+- Особенности термодинамических функций — свойство бесконечной системы; спонтанная намагниченность $m_0 = \lim_{h\to+0}\lim_{N\to\infty}\langle m\rangle$.
+- В одномерной модели Изинга $Z = \operatorname{tr}\mathsf T^N$, $\xi = -1/\ln\operatorname{th}\beta J$ конечна при $T > 0$ — перехода нет.
+- Среднее поле: $m = \operatorname{th}(\beta(zJm + h))$, $T_c = zJ$, $f = \frac{T - T_c}{2}m^2 + \frac{T}{12}m^4$; $\beta = \frac12$, $\gamma = 1$, $\delta = 3$, скачок $C$ на $\frac32$.
+- Квадратная решётка точно (Онсагер): $T_c\approx2{,}269J$, $\beta = \frac18$, $\gamma = \frac74$, $\nu = 1$; среднее поле точно лишь при $d > 4$.
+- Кластерные алгоритмы снимают критическое замедление; $T_c$ — по пересечению кумулянтов Биндера, показатели — по скейлингу $L^{-\beta/\nu}$, $L^{\gamma/\nu}$.
+
+## Упражнения
+
+1. Найдите корреляционную длину одномерной цепочки Изинга при $T = J$ и $T = J/2$.
+   Во сколько раз она выросла?
+2. Чему равна температура перехода по теории среднего поля для простой
+   кубической решётки ($z = 6$)? Сравните с численным значением $T_c\approx4{,}511J$.
+3. Покажите из разложения Ландау, что отношение восприимчивостей при одном и
+   том же $|T - T_c|$ выше и ниже $T_c$ равно 2.
+4. Получите скачок теплоёмкости $\frac32$ из $f_\text{min} = -3(T - T_c)^2/4T$. Каким он будет в
+   размерных единицах для моля спинов?
+5. Покажите, что кумулянт Биндера равен $2/3$, если $m = \pm m_0$ с равными
+   вероятностями, и $0$, если $m$ распределена по Гауссу с нулевым средним.
+
+::: {.callout-tip collapse="true"}
+## Ответы
+1. $\xi = -1/\ln\operatorname{th}(J/T)$: при $T = J$ $\xi\approx3{,}672$, при $T = J/2$ $\xi\approx27{,}30$ — в $7{,}4$ раза (при низких $T$ $\xi\approx\frac12e^{2J/T}$: $3{,}69$ и $27{,}30$).
+2. $T_c = 6J$, на 33 % выше точного значения $4{,}511J$ (на квадратной решётке среднее поле ошибается на 76 %).
+3. Выше $T_c$: $f'' = T - T_c$; ниже: $f'' = (T - T_c) + Tm_0^2 = (T - T_c) + 3(T_c - T) = 2(T_c - T)$, так что $\chi_+/\chi_- = 2$.
+4. $C = -T\,\partial^2 f_\text{min}/\partial T^2 = \frac{3T_c^2}{2T^2}\to\frac32$ при $T\to T_c$. На моль: $\Delta C = \frac32R\approx12{,}5$ Дж/(моль·К).
+5. При $m = \pm m_0$: $\langle m^4\rangle = m_0^4 = \langle m^2\rangle^2$, $U = 1 - \frac13 = \frac23$. Для гауссова распределения $\langle m^4\rangle = 3\langle m^2\rangle^2$, $U = 0$.
+:::
